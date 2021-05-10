@@ -1,0 +1,7 @@
+[build]
+target = "src/x86_64-unknown-none.json"
+out-dir = "build"
+
+[unstable]
+build-std = [ "core" ]
+unstable-options = true

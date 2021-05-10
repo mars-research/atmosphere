@@ -1,0 +1,7 @@
+target
+build
+
+*.sw*
+*.swp
+.gdb_history
+.vscode/**

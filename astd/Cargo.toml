@@ -1,0 +1,11 @@
+[package]
+name = "astd"
+version = "0.1.0"
+authors = ["Zhaofeng Li <hello@zhaofeng.li>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+spin = "0.9.0"
+heapless = "0.7.0"
