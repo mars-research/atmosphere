@@ -38,7 +38,7 @@ macro_rules! downcast_method {
         #[doc = $cap_name]
         pub fn $name<'cap>(&'cap self) -> Option<DowncastedCap<'cap, $inner_type>> {
             if self.data.capability_type() == $cap_type {
-                Some(unsafe { DowncastedCap::new(
+                Some(unsafe { DowncastedCap::new_unchecked(
                     self as *const Capability,
                     self.data.data(),
                 ) })
@@ -56,14 +56,14 @@ macro_rules! downcast_method {
 #[derive(Debug)]
 pub struct CSpace {
     /// The root CNode.
-    root: CNodeCap,
+    root: *const CNode,
 }
 
 impl CSpace {
     /// Resolves a CapPointer and returns a reference to the CSlot.
     pub fn resolve(&self, pointer: CapPointer) -> Option<&CSlot> {
         let resolution = CapPointerResolution::new(pointer);
-        self.root.resolve_ptr(resolution).map(|p| unsafe { &*p })
+        self.root_object().resolve_ptr(resolution).map(|p| unsafe { &*p })
     }
 
     /// Bootstraps a CSpace with system-level capabilities.
@@ -81,12 +81,9 @@ impl CSpace {
         let cnode_base = base as *const _ as *mut CNode;
 
         let cnode = CNode::with_radix(cnode_base, radix);
-        let untyped = {
-            let base = base.add(cnode_size);
-            let size = size - cnode_size;
-            untyped::UntypedCap::new(base, size)
-        };
+        let untyped = untyped::UntypedCap::new(size - cnode_size);
         let cap = Capability {
+            object: base.add(cnode_size),
             data: CData::Untyped(untyped),
             permissions: PermissionSet::maximum(),
             prev: 0 as *const Capability,
@@ -96,8 +93,13 @@ impl CSpace {
         cnode.insert(cap).unwrap();
 
         Ok(CSpace {
-            root: CNodeCap::new(cnode),
+            root: cnode as *const CNode,
         })
+    }
+
+    #[inline]
+    const fn root_object(&self) -> &CNode {
+        unsafe { &*self.root }
     }
 }
 
@@ -107,7 +109,7 @@ impl fmt::Display for CSpace {
             depth: 0,
         };
         writeln!(f, "[CSpace]")?;
-        self.root.display_recursive(f, state)
+        self.root_object().display_recursive(f, state)
     }
 }
 
@@ -158,7 +160,8 @@ impl CapPointerResolution {
     }
 
     /// Returns the number of bits in the address that still needs to be resolved.
-    fn bits_remaining(&self) -> u8 {
+    #[inline]
+    const fn bits_remaining(&self) -> u8 {
         32 - self.bit_offset
     }
 
@@ -245,7 +248,7 @@ impl CNode {
         let slot = self.get(index as usize)?;
         if let Some(cap) = &slot {
             if let Some(cnode_cap) = cap.as_cnode() {
-                return cnode_cap.resolve_ptr(resolution);
+                return cnode_cap.cnode_object().resolve_ptr(resolution);
             }
         }
 
@@ -316,10 +319,15 @@ impl CNode {
 
 /// A capability that grants specific access to a resource.
 ///
-/// Such resource may or may not be memory-mapped. An example of a resource that is not
-/// memory-mapped is the IoPort capability.
+/// A resource may or may not be memory-mapped. An example of a resource that is not
+/// memory-mapped is the IoPort capability. In such cases the object pointer will be
+/// zero. We rely on the pointer to reclaim memory back to Untyped objects when
+/// derived objects are deleted.
 #[derive(Debug)]
 pub struct Capability {
+    /// Raw pointer to the object referred to by the capability.
+    object: *const u8,
+
     /// Type-specific data of the capability.
     data: CData,
 
@@ -394,13 +402,13 @@ pub enum CData {
 impl CData {
     /// Returns the pointer to the underlying data, forcibly interpreting it as T.
     #[inline]
-    unsafe fn data<T: Sized>(&self) -> *const T {
+    const unsafe fn data<T: Sized>(&self) -> *const T {
         let own = self as *const CData as *const u8;
         own.add(mem::size_of::<u32>()) as *const T
     }
 
     /// Returns the type of the capability.
-    fn capability_type(&self) -> CapType {
+    const fn capability_type(&self) -> CapType {
         unsafe { *(self as *const _ as *const CapType) }
     }
 }
@@ -418,7 +426,9 @@ pub struct DowncastedCap<'cap, T: 'cap> {
 }
 
 impl<'cap, T> DowncastedCap<'cap, T> {
-    unsafe fn new(capability: *const Capability, data: *const T) -> DowncastedCap<'cap, T> {
+    /// Creates a downcasted view of a capability without checking the type.
+    #[inline]
+    const unsafe fn new_unchecked(capability: *const Capability, data: *const T) -> DowncastedCap<'cap, T> {
         DowncastedCap {
             capability,
             data,
@@ -441,30 +451,23 @@ impl<'cap, T> DerefMut for DowncastedCap<'cap, T> {
     }
 }
 
+impl<'cap, T> DowncastedCap<'cap, T> {
+    /// Returns a reference to the Capability.
+    #[inline]
+    const fn capability(&self) -> &Capability {
+        unsafe { &*self.capability }
+    }
+}
+
 /// The CNode capability.
 #[derive(Debug)]
-pub struct CNodeCap {
-    /// Pointer to the CNode in kernel address space.
-    node: *const CNode,
-}
+pub struct CNodeCap {}
 
 impl CNodeCap {
-    unsafe fn new(node: *const CNode) -> Self {
-        Self { node }
-    }
-}
-
-impl Deref for CNodeCap {
-    type Target = CNode;
-
-    fn deref(&self) -> &Self::Target {
-        unsafe { &*self.node }
-    }
-}
-
-impl DerefMut for CNodeCap {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { &mut *(self.node as *mut CNode) }
+    /// Returns a reference to the CNode.
+    #[inline]
+    const fn cnode_object<'cap>(self: &DowncastedCap<'cap, CNodeCap>) -> &'cap CNode {
+        unsafe { &*(self.capability().object as *const CNode) }
     }
 }
 
