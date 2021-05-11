@@ -1,7 +1,7 @@
 # Atmosphere
 
 Atmosphere is a type-1 hypervisor for x86-64, written in Rust.
-It's inspired by the design of [seL4](https://sel4.systems/Info/Docs/seL4-manual-latest.pdf), where memory for kernel objects is not dynamically allocated.
+It's inspired by the design of [seL4](https://sel4.systems/Info/Docs/seL4-manual-latest.pdf), where memory for kernel objects is not dynamically allocated by the microkernel.
 
 ## Development Setup
 
