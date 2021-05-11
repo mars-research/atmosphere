@@ -1,8 +1,8 @@
 [workspace]
 
 members = [
-    "kernel",
-	"astd",
+  "kernel",
+  "astd",
 ]
 
 [profile.dev]
