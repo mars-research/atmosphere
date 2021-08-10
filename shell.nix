@@ -1,8 +1,14 @@
 let
-  env = import ./nix/environment.nix;
-in env.pkgs.mkShell {
-  buildInputs = env.dependencies;
-  shellHook = ''
-    export SSL_CERT_FILE=${env.pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
-  '';
-}
+  lock = builtins.fromJSON (builtins.readFile ./flake.lock);
+
+  flake-compat = builtins.fetchTarball {
+    url = "https://github.com/edolstra/flake-compat/archive/${lock.nodes.flake-compat.locked.rev}.tar.gz";
+    sha256 = lock.nodes.flake-compat.locked.narHash;
+  };
+
+  flake = import flake-compat {
+    src = ./.;
+  };
+
+  shell = flake.shellNix.default;
+in shell
