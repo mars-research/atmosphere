@@ -1,8 +1,8 @@
-// LAPIC
-// Reference:
-//  - https://wiki.osdev.org/APIC#Local_APIC_configuration
-//  - https://github.com/pdoane/osdev/blob/master/intr/local_apic.c
-//  - https://github.com/mit-pdos/xv6-public/blob/master/lapic.c
+//! LAPIC
+//! Reference:
+//!  - <https://wiki.osdev.org/APIC#Local_APIC_configuration>
+//!  - <https://github.com/pdoane/osdev/blob/master/intr/local_apic.c>
+//!  - <https://github.com/mit-pdos/xv6-public/blob/master/lapic.c>
 
 use core::ptr;
 use x86::io::outb;
@@ -37,7 +37,6 @@ const LAPIC_TIMER_PERIODIC: u32 = 0x0002_0000;
 const LAPIC_MASKED: u32 = 0x0001_0000;
 
 const CMOS_PORT: u16 = 0x70;
-const CMOD_RETURN: u16 = 0x71;
 
 const IRQ_OFFSET: u32 = super::IRQ_OFFSET as u32;
 const IRQ_SPURIOUS: u32 = 31;
@@ -97,6 +96,7 @@ fn init_lapic() {
     }
 }
 
+#[allow(dead_code)]
 pub unsafe fn start_ap(cpu: u32, code: *const u8) {
     outb(CMOS_PORT, 0xf);
     outb(CMOS_PORT + 1, 0x0a);
@@ -119,6 +119,7 @@ pub unsafe fn start_ap(cpu: u32, code: *const u8) {
     lapicw(LAPIC_ICRLO, LAPIC_ICRLO_STARTUP | (codeaddr >> 12));
 }
 
+#[allow(dead_code)]
 pub fn end_of_interrupt() {
     unsafe {
         lapicw(LAPIC_EOI, 0);

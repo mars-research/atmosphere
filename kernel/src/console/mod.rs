@@ -10,8 +10,6 @@
 //!
 //! `serial=[com1|com2|com3|com4]`
 
-mod ns16550a;
-
 use core::fmt::Write;
 
 use astd::sync::{Mutex, MutexGuard};

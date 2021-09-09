@@ -8,10 +8,12 @@ use astd::sync::Mutex;
 /// A list of usable RAM regions as (base, size) tuples.
 pub static RAM_REGIONS: Mutex<Vec<(u64, u64), 10>> = Mutex::new(Vec::new());
 
+/*
 /// Returns the virtual address for a physical address in the kernel.
 pub fn get_virtual(physical: PAddr) -> VAddr {
     physical.as_usize().into()
 }
+*/
 
 /// Returns the physical address for a virtual address in the kernel.
 pub fn get_physical(r#virtual: VAddr) -> PAddr {

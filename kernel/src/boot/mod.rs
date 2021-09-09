@@ -8,8 +8,8 @@ use multiboot::information::{MemoryManagement, Multiboot, PAddr};
 
 extern "C" {
     static bootinfo: u64;
-    static stack_bottom: u64;
-    static stack_top: u64;
+    // static stack_bottom: u64;
+    // static stack_top: u64;
 }
 
 static mut IDENT_MAP: IdentMap = IdentMap {};
@@ -51,11 +51,12 @@ impl MemoryManagement for IdentMap {
         Some(core::slice::from_raw_parts(ptr, length))
     }
 
-    unsafe fn allocate(&mut self, length: usize) -> Option<(PAddr, &mut [u8])> {
+    unsafe fn allocate(&mut self, _length: usize) -> Option<(PAddr, &mut [u8])> {
         // Not supported
         None
     }
 
-    unsafe fn deallocate(&mut self, addr: PAddr) {
+    unsafe fn deallocate(&mut self, _addr: PAddr) {
+        // No-op
     }
 }

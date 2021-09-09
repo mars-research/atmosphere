@@ -9,10 +9,22 @@ use core::mem;
 
 use bit_field::BitField;
 use snafu::Snafu;
-use x86::bits64::vmx;
+use x86::bits64::vmx::{self, vmwrite};
 use x86::cpuid::CpuId;
 use x86::msr;
 use x86::vmx::vmcs::ro::VM_INSTRUCTION_ERROR;
+/*
+use x86::segmentation as x86_seg;
+use x86::vmx::vmcs::host::{
+    ES_SELECTOR as HOST_ES_SELECTOR,
+    CS_SELECTOR as HOST_CS_SELECTOR,
+    SS_SELECTOR as HOST_SS_SELECTOR,
+    DS_SELECTOR as HOST_DS_SELECTOR,
+    FS_SELECTOR as HOST_FS_SELECTOR,
+    GS_SELECTOR as HOST_GS_SELECTOR,
+    TR_SELECTOR as HOST_TR_SELECTOR,
+};
+*/
 
 use astd::sync::{Mutex, RwLock};
 use vmcs::{Vmcs, Vmxon};
@@ -351,10 +363,119 @@ impl<'a> Monitor<'a> {
         Ok(())
     }
 
+    /// Low-level method to initialize the currently-loaded VMCS.
+    pub unsafe fn init_vmcs(&mut self) -> VmxResult<()> {
+        use x86::vmx::vmcs::control::{
+            PINBASED_EXEC_CONTROLS,
+            PRIMARY_PROCBASED_EXEC_CONTROLS,
+            EXCEPTION_BITMAP,
+            VMEXIT_CONTROLS,
+        };
+
+        self.check_vmm_started()?;
+
+        let current_vmcs = self.current_vmcs.lock();
+        if current_vmcs.is_none() {
+            return Err(VmxError::VmcsPtrInvalid);
+        }
+
+        // Set Pin-Based VM-Execution Controls.
+        //
+        // The value of the IA32_VMX_PINBASED_CTLS capability MSR specifies the allowed/supported settings.
+        // This is like the CR0_FIXED MSRs we use in start(). Intel SDM Vol. 3D A.3.1 has
+        // the details, but the basic idea is:
+        // - Bits 31:0  - If the bit is zero, then the corresponding bit is allowed to be zero.
+        // - Bits 63:32 - If the bit is one, then the corresponding bit is allowed to be one.
+        //
+        // See Intel SDM Vol. 3C 24.6.1 for the bitfield definition.
+        {
+            let pinbased_ctrl_msr = msr::rdmsr(msr::IA32_VMX_PINBASED_CTLS);
+            let allowed_zero = pinbased_ctrl_msr as u32;
+            let allowed_one = (pinbased_ctrl_msr >> 32) as u32;
+
+            // FIXME: Make this configurable
+            let pinbased_ctrl = allowed_zero & allowed_one;
+            vmwrite(PINBASED_EXEC_CONTROLS, pinbased_ctrl as u64)?;
+        }
+
+        // Set Processor-Based VM-Execution Controls.
+        //
+        // Similar to above.
+        // See Intel SDM Vol. 3C 24.6.2 for the bitfield definition.
+        {
+            let procbased_ctrl_msr = msr::rdmsr(msr::IA32_VMX_PROCBASED_CTLS);
+            let allowed_zero = procbased_ctrl_msr as u32;
+            let allowed_one = (procbased_ctrl_msr >> 32) as u32;
+
+            // FIXME: Make this configurable
+            let mut procbased_ctrl = allowed_zero & allowed_one;
+
+            // Disable secondary control
+            procbased_ctrl.set_bit(31, false); // "Activate secondary controls"
+
+            vmwrite(PRIMARY_PROCBASED_EXEC_CONTROLS, procbased_ctrl as u64)?;
+        }
+
+        // Set Exception Bitmap
+        //
+        // A 32-bit bitfield with each bit corresponding to an exception.
+        // VM exits will occur for exceptions with their bits set to 1.
+        // See Intel SDM Vol. 3C 24.6.3 for more explanation.
+        {
+            // FIXME: Specify reasonable defaults
+            vmwrite(EXCEPTION_BITMAP, 0)?;
+        }
+
+        // Set VM-Exit Control
+        //
+        // See Intel SDM Vol. 3C 24.7.1.
+        {
+            let exit_ctrl_msr = msr::rdmsr(msr::IA32_VMX_EXIT_CTLS);
+            let allowed_zero = exit_ctrl_msr as u32;
+            // let allowed_one = (exit_ctrl_msr >> 32) as u32;
+
+            let mut exit_ctrl = allowed_zero;
+            exit_ctrl.set_bit(9, true); // "Host address-space size" - We want the processor to be in 64-bit mode on exit
+
+            vmwrite(VMEXIT_CONTROLS, 0)?;
+        }
+
+        // Set VM-Entry Control
+        //
+        // See Intel SDM Vol. 3C 24.8.1.
+        {
+            let entry_ctrl_msr = msr::rdmsr(msr::IA32_VMX_ENTRY_CTLS);
+            let allowed_zero = entry_ctrl_msr as u32;
+            // let allowed_one = (entry_ctrl_msr >> 32) as u32;
+
+            let mut entry_ctrl = allowed_zero;
+            entry_ctrl.set_bit(9, true); // "A-32e mode guest"
+
+            vmwrite(VMEXIT_CONTROLS, 0)?;
+        }
+
+        Ok(())
+    }
+
+    /*
     /// Low-level method to launch/resume the current VMCS.
     pub unsafe fn low_level_launch(&mut self) -> VmxResult<()> {
+        // Save host state into VMCS
+
+        // The 3 least significant bits must be zero.
+        let selector_mask = 0b11111000;
+        vmwrite(HOST_CS_SELECTOR, (x86_seg::cs().bits() & selector_mask) as u64)?;
+        vmwrite(HOST_ES_SELECTOR, (x86_seg::es().bits() & selector_mask) as u64)?;
+        vmwrite(HOST_SS_SELECTOR, (x86_seg::ss().bits() & selector_mask) as u64)?;
+        vmwrite(HOST_DS_SELECTOR, (x86_seg::ds().bits() & selector_mask) as u64)?;
+
+        vmwrite(HOST_FS_SELECTOR, (x86_seg::fs().bits() & selector_mask) as u64)?;
+        vmwrite(HOST_GS_SELECTOR, (x86_seg::gs().bits() & selector_mask) as u64)?;
+
+        vmwrite(HOST_TR_SELECTOR, (x86::task::tr().bits() & selector_mask) as u64)?;
         unimplemented!()
     }
+    */
 
     /// Returns the VMCS revision identifier.
     pub fn get_vmcs_revision(&self) -> u32 {
@@ -387,6 +508,7 @@ impl<'a> Monitor<'a> {
         Ok(())
     }
 }
+
 
 /// Reads the value of CR0.
 pub unsafe fn read_cr0() -> u32 {

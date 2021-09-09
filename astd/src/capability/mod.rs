@@ -6,14 +6,23 @@ pub type CapResult<T> = Result<T, CapError>;
 /// An error from a capability call.
 #[derive(Debug, Clone, Copy)]
 pub enum CapError {
+    /// There is insufficient memory to perform the action.
+    InsufficientMemory,
+
+    /// The capability depth is invalid.
+    InvalidDepth,
+
     /// The supplied capability pointer is invalid.
     InvalidPointer,
+
+    /// The attempted retype operation is not supported.
+    NotRetypable,
 
     /// There is insufficient permission to perform the action.
     PermissionDenied,
 
-    /// There is insufficient memory to perform the action.
-    InsufficientMemory,
+    /// The destination capability slot is already taken.
+    SlotInUse,
 }
 
 /// Type of a capability.
@@ -25,6 +34,9 @@ pub enum CapType {
 
     /// Untyped memory.
     Untyped,
+
+    /// CPU.
+    Cpu,
 }
 
 /// A reference to a capability in a CSpace.

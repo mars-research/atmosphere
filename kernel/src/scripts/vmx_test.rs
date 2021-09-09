@@ -1,5 +1,5 @@
 use x86::bits64::vmx::{vmwrite, vmlaunch};
-use x86::vmx::vmcs::control::{PinbasedControls, PINBASED_EXEC_CONTROLS, CR0_READ_SHADOW, CR4_READ_SHADOW};
+use x86::vmx::vmcs::control::{CR0_READ_SHADOW, CR4_READ_SHADOW};
 use x86::vmx::vmcs::guest::{CR0, CR3, CR4, RIP, IA32_EFER_FULL};
 
 use crate::vmx::vmcs::{Vmcs, Vmxon};
@@ -29,13 +29,7 @@ pub unsafe fn run() {
     VMCS.set_revision(vmm.get_vmcs_revision());
     log::info!("Load VMCS -> {:?}", vmm.load_vmcs(&mut VMCS));
 
-    // VM execution control fields
-    //
-    // All of this should be moved to Monitor or Vmcs.
-    let mut pin_based_controls = PinbasedControls::empty();
-    pin_based_controls.insert(PinbasedControls::EXTERNAL_INTERRUPT_EXITING);
-    pin_based_controls.insert(PinbasedControls::NMI_EXITING);
-    vmwrite(PINBASED_EXEC_CONTROLS, pin_based_controls.bits() as u64).unwrap();
+    vmm.init_vmcs().unwrap();
 
     // What am I doing again?
     let host_cr0 = x86::controlregs::cr0();

@@ -25,12 +25,15 @@
 
 #![deny(
     asm_sub_register,
+    dead_code,
     deprecated,
     missing_abi,
+    rustdoc::bare_urls,
     unused_imports,
     unused_must_use,
     unused_mut,
     unused_unsafe,
+    unused_variables,
 )]
 
 mod boot;
@@ -72,7 +75,7 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
         interrupt::init_cpu();
         capability::init();
     }
-    
+
     unsafe {
         scripts::run_script_from_command_line();
     }

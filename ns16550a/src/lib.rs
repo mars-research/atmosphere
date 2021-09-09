@@ -27,7 +27,24 @@
 //! - <https://github.com/mit-pdos/xv6-riscv/blob/riscv/kernel/uart.c>
 //! - <http://byterunner.com/16550.html>
 
+#![no_std]
+#![feature(asm)]
+
+#![deny(
+    asm_sub_register,
+    dead_code,
+    deprecated,
+    missing_abi,
+    rustdoc::bare_urls,
+    unused_imports,
+    unused_must_use,
+    unused_mut,
+    unused_unsafe,
+    unused_variables,
+)]
+
 use core::fmt::{Write, Result as FmtResult};
+
 /// Receive Holding Register
 const RHR: usize = 0;
 
@@ -133,7 +150,6 @@ impl Write for $name {
     };
 }
 
-/*
 // MMIO-specific
 impl_serial!(MmioSerial, mmio_write, mmio_read);
 
@@ -150,7 +166,6 @@ unsafe fn mmio_read(base: usize, reg: usize) -> u8 {
     let ptr = (base + reg) as *mut u8;
     core::ptr::read_volatile(ptr)
 }
-*/
 
 // PIO-specific
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]

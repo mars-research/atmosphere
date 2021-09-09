@@ -1,7 +1,9 @@
 /.direnv
+/.gdb
 
 target
 build
+result
 
 *.sw*
 *.swp

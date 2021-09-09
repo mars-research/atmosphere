@@ -3,7 +3,7 @@
 //! ## Untyped in seL4
 //!
 //! A very high-level overview of how Untypeds work in seL4 can be found on
-//! [https://docs.sel4.systems/Tutorials/untyped.html](the seL4 website). Here we will
+//! [the seL4 website](https://docs.sel4.systems/Tutorials/untyped.html). Here we will
 //! summarize some of the implementation details for those new to the seL4 codebase
 //! and would like to see a comparison.
 //!
@@ -17,7 +17,7 @@
 use core::alloc::Layout;
 
 use astd::capability::{CapError, CapResult};
-use super::DowncastedCap;
+use super::{Capability, CapPointer, CapType, CSpace, DowncastedCap, PermissionSet};
 
 /// A capability to an untyped memory region.
 #[derive(Debug)]
@@ -75,6 +75,40 @@ impl UntypedCap {
 
         self.watermark += required_size;
         Ok(obj_start as *mut u8)
+    }
+
+    /// Performs a retype, creating a new capability.
+    pub fn retype(mut self: DowncastedCap<Self>,
+        capability_type: CapType,
+        this_cspace: &CSpace,
+        destination_cap: CapPointer
+    ) -> CapResult<()> {
+        let layout = super::kernel_layout(capability_type)
+            .ok_or(CapError::NotRetypable)?;
+
+        let cslot = this_cspace.resolve(destination_cap)
+            .ok_or(CapError::InvalidPointer)?;
+
+        if cslot.is_some() {
+            return Err(CapError::SlotInUse);
+        }
+
+        let object = self.allocate(layout)?;
+        let data = super::new_capability(capability_type, object)?;
+        let capability = Capability {
+            object,
+            data,
+            permissions: PermissionSet::maximum(),
+            prev: 0 as *const Capability,
+            next: 0 as *const Capability,
+            depth: self.capability().depth + 1,
+        };
+
+        cslot.replace(capability);
+
+        let cap_mem = cslot.as_mut().unwrap() as *mut Capability;
+
+        unsafe { self.capability().as_mut().insert_child(cap_mem) }
     }
 
     /// Returns the watermark as a pointer.

@@ -1,8 +1,11 @@
 [workspace]
 
 members = [
-  "kernel",
   "astd",
+  "build-tool",
+  "kernel",
+  "libcap",
+  "ns16550a",
 ]
 
 [profile.dev]

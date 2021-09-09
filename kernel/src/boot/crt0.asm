@@ -39,7 +39,7 @@ start:
     call check_long_mode
 
     call set_up_page_tables
-    call enable_paging 
+    call enable_paging
 
     ; load the 64-bit GDT
     lgdt [gdt64.pointer]
@@ -220,7 +220,7 @@ error:
 section .rodata
 gdt64:
     dq 0 ; zero entry
-.code: equ $ - gdt64 
+.code: equ $ - gdt64
     dq (1<<43) | (1<<44) | (1<<47) | (1<<53) ; code segment
 .pointer:
     dw $ - gdt64 - 1
@@ -241,7 +241,7 @@ p2_table:
     resb 4096
 
 stack_bottom:
-    resb 4096 * 4096 ; Reserve this many bytes
+    resb 1024 * 1024 * 32 ; Reserve this many bytes
 stack_top:
 
 bootinfo:

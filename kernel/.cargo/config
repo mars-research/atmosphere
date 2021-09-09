@@ -1,6 +1,6 @@
 [build]
 target = "src/x86_64-unknown-none.json"
-out-dir = "build"
+rustflags = [ "-Z", "emit-stack-sizes" ]
 
 [unstable]
 build-std = [ "core" ]

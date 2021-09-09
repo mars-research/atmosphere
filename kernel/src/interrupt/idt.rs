@@ -152,7 +152,7 @@ impl Idt {
 #[repr(C)]
 pub struct Entry<F> {
     /// Bits 0 to 15 of the ISR entrypoint.
-    entry_low: u16, 
+    entry_low: u16,
 
     /// GDT selector.
     selector: u16,

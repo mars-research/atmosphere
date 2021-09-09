@@ -30,7 +30,7 @@ SECTIONS {
     __text_end = .;
   }
 
-  .rodata : 
+  .rodata :
   {
      __rodata_start = .;
      *(.rodata*)
@@ -54,7 +54,7 @@ SECTIONS {
     __bss_end = .;
   }
 
-  .tdata : 
+  .tdata :
   {
         __tdata_start = .;
         *(.tdata*)
