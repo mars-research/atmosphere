@@ -13,6 +13,8 @@ jobs:
           install_url: https://github.com/numtide/nix-unstable-installer/releases/download/nix-2.4pre20210604_8e6ee1b/install
           extra_nix_config: |
             experimental-features = nix-command flakes
+      - run: nix-env -iA cachix -f https://cachix.org/api/v1/install
+      - run: cachix use mars-research
 
       # We can't run `cargo build` on the entire workspace yet
       # because of <https://github.com/rust-lang/cargo/issues/9451>.
@@ -27,5 +29,7 @@ jobs:
           install_url: https://github.com/numtide/nix-unstable-installer/releases/download/nix-2.4pre20210604_8e6ee1b/install
           extra_nix_config: |
             experimental-features = nix-command flakes
+      - run: nix-env -iA cachix -f https://cachix.org/api/v1/install
+      - run: cachix use mars-research
 
       - run: nix-shell --run "cd libcap && cargo test"

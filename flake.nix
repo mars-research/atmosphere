@@ -41,6 +41,8 @@
         python3
 
         editorconfig-checker
+
+        cachix pkgs.mars-research.mars-tools
       ]);
 
       inputsFrom = [
