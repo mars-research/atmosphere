@@ -1,28 +1,31 @@
 //! Command-line interface.
 
-mod run;
+macro_rules! unwrap_command {
+    ($global:expr, $type:path) => {
+        if let $type(local) = $global.cmd {
+            local
+        } else {
+            panic!("Invalid command {:?}", $global.cmd)
+        }
+    }
+}
 
-use clap::Clap;
+mod run;
+mod pre_commit;
+
+use clap::{Clap, IntoApp};
 
 /// Run the CLI.
 pub async fn run() -> Result<(), anyhow::Error> {
     let opts = GlobalOpts::parse();
 
     match &opts.cmd {
-        Command::Run(_) => {
-            run::run(opts).await?;
+        SubCommand::Run(_) => run::run(opts).await?,
+        SubCommand::PreCommit(_) => pre_commit::run(opts).await?,
+        SubCommand::GenCompletions(local) => {
+            gen_completions(&local.shell);
         }
     }
-
-    /*
-    let project = Project::discover().unwrap();
-
-    let qemu = qemu::Qemu::new(project.clone());
-    qemu.run().await?;
-
-    let grub = grub::BootableImage::generate("script=vmx_test").await?;
-    tokio::fs::copy(grub.iso_path(), "/tmp/grub.iso").await?;
-    */
 
     Ok(())
 }
@@ -31,7 +34,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 #[derive(Debug, Clap)]
 struct GlobalOpts {
     #[clap(subcommand)]
-    cmd: Command,
+    cmd: SubCommand,
 
     /// Use verbose output.
     #[clap(short, long, global = true)]
@@ -43,7 +46,33 @@ struct GlobalOpts {
 }
 
 #[derive(Debug, Clap)]
-enum Command {
+enum SubCommand {
     Run(run::Opts),
+    PreCommit(pre_commit::Opts),
+
+    #[clap(setting(clap::AppSettings::Hidden))]
+    GenCompletions(GenCompletions),
 }
 
+#[derive(Debug, Clap)]
+struct GenCompletions {
+    #[clap(index = 1)]
+    shell: String,
+}
+
+macro_rules! generate_for {
+    ($shell:ty) => {
+        clap_generate::generate::<$shell, _>(&mut GlobalOpts::into_app(), "atmo", &mut std::io::stdout())
+    }
+}
+
+fn gen_completions(shell: &str) {
+    use clap_generate::generators::{Bash, Fish, Zsh};
+
+    match shell {
+        "bash" => generate_for!(Bash),
+        "fish" => generate_for!(Fish),
+        "zsh" => generate_for!(Zsh),
+        _ => panic!("{} is not supported", shell),
+    }
+}

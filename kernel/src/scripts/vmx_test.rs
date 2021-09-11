@@ -2,6 +2,7 @@ use x86::bits64::vmx::{vmwrite, vmlaunch};
 use x86::vmx::vmcs::control::{CR0_READ_SHADOW, CR4_READ_SHADOW};
 use x86::vmx::vmcs::guest::{CR0, CR3, CR4, RIP, IA32_EFER_FULL};
 
+use crate::error::Result;
 use crate::vmx::vmcs::{Vmcs, Vmxon};
 use crate::vmx::{self, Monitor};
 
@@ -20,7 +21,7 @@ unsafe extern "C" fn vm_test() {
     );
 }
 
-pub unsafe fn run() {
+pub unsafe fn run() -> Result<()> {
     log::debug!("VT-x platform info: {:?}", vmx::get_platform_info());
 
     let mut vmm = Monitor::new(&mut VMXON);
@@ -29,7 +30,7 @@ pub unsafe fn run() {
     VMCS.set_revision(vmm.get_vmcs_revision());
     log::info!("Load VMCS -> {:?}", vmm.load_vmcs(&mut VMCS));
 
-    vmm.init_vmcs().unwrap();
+    vmm.init_vmcs()?;
 
     // What am I doing again?
     let host_cr0 = x86::controlregs::cr0();
@@ -54,4 +55,6 @@ pub unsafe fn run() {
     log::info!("VM-instruction error: {:?}", vmm.get_vm_instruction_error());
 
     log::info!("VMM stop -> {:?}", vmm.stop());
+
+    Ok(())
 }

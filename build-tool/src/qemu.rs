@@ -32,6 +32,15 @@ pub struct Qemu {
     /// GDB server configuration.
     gdb_server: GdbServer,
 
+    /// I/O port for the isa-debug-exit device.
+    debug_exit_io_base: u16,
+
+    /// Whether to pass `-no-shutdown` to QEMU.
+    ///
+    /// This will also tell Atmosphere not to shutdown when
+    /// the specified script finishes.
+    no_shutdown: bool,
+
     /// Atmosphere script to execute.
     ///
     /// This will be prepended to the kernel command-line.
@@ -51,13 +60,30 @@ impl Qemu {
             // grub_image: None,
             qemu_binary: PathBuf::from("qemu-system-x86_64"),
             gdb_server: GdbServer::disabled(),
+            debug_exit_io_base: 0xf4,
+            no_shutdown: false,
             script: None,
             command_line: String::new(),
         }
     }
 
+    /// Set the script to run.
+    pub fn set_script(&mut self, script: String) {
+        self.script = Some(script);
+    }
+
+    /// Set the kernelt command-line.
+    pub fn set_command_line(&mut self, cmdline: String) {
+        self.command_line = cmdline;
+    }
+
+    /// Set the -no-shutdown flag.
+    pub fn set_no_shutdown(&mut self, val: bool) {
+        self.no_shutdown = val;
+    }
+
     /// Start the QEMU process.
-    pub async fn run(&self, kernel: &Binary) -> Result<()> {
+    pub async fn run(&self, kernel: &Binary) -> Result<QemuExit> {
         let memory = self.memory.get_adjusted_unit(ByteUnit::MiB)
             .get_value() as usize;
 
@@ -65,8 +91,14 @@ impl Qemu {
             let mut s = self.command_line.clone();
 
             if let Some(script) = &self.script {
-                s = format!("script={} {}", script, self.command_line);
+                s = format!("script={} {}", script, s);
             }
+
+            if !self.no_shutdown {
+                s += " script_shutdown";
+            }
+
+            s += &format!(" qemu_debug_exit_io_base={}", self.debug_exit_io_base);
 
             s
         };
@@ -86,19 +118,37 @@ impl Qemu {
             .args(&["-m", &format!("{}", memory)])
             .arg("-hda").arg(grub.iso_path())
             .arg("-hdb").arg(hdb)
+            .args(&["-device", &format!("isa-debug-exit,iobase={:#x},iosize=0x04", self.debug_exit_io_base)])
             .args(self.cpu_model.to_qemu())
             .args(self.gdb_server.to_qemu());
+
+        if self.no_shutdown {
+            command.arg("-no-shutdown");
+        }
 
         log::debug!("Starting QEMU with {:?}", command);
 
         let status = command.status().await?;
 
         if !status.success() {
-            log::error!("QEMU exited with {:?}", status);
+            if let Some(code) = status.code() {
+                log::error!("QEMU exited with code {}", code);
+                Ok(QemuExit::Code(code))
+            } else {
+                log::error!("QEMU was killed by a signal");
+                Ok(QemuExit::Killed)
+            }
+        } else {
+            Ok(QemuExit::Success)
         }
-
-        Ok(())
     }
+}
+
+/// How QEMU has exited.
+pub enum QemuExit {
+    Success,
+    Killed,
+    Code(i32),
 }
 
 /// CPU model.

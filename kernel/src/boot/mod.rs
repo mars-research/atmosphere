@@ -5,6 +5,8 @@
 pub mod command_line;
 
 use multiboot::information::{MemoryManagement, Multiboot, PAddr};
+use x86::io::outw;
+// use qemu_exit::{QEMUExit, X86 as QemuExitHandle};
 
 extern "C" {
     static bootinfo: u64;
@@ -33,6 +35,37 @@ pub unsafe fn get_bootinfo() -> Multiboot<'static, 'static> {
         Some(info) => info,
         None => panic!("Could not retrieve valid boot information"),
     }
+}
+
+/// Shutdown the system.
+///
+/// On virtual platforms it's possible to set an exit code to
+/// be returned by the hypervisor.
+pub unsafe fn shutdown(success: bool) -> ! {
+    log::info!("The system is shutting down...");
+
+    // QEMU isa-debug-exit
+    //
+    // <https://github.com/qemu/qemu/blob/bd662023e683850c085e98c8ff8297142c2dd9f2/hw/misc/debugexit.c>
+    if let Some(io_base) = command_line::get_first_value("qemu_debug_exit_io_base") {
+        let io_base = io_base.parse::<u16>()
+            .expect("Failed to parse qemu_debug_exit_io_base");
+
+        if !success {
+            // QEMU will exit with (val << 1) | 1
+            outw(io_base, 0x0);
+        }
+    }
+
+    // ACPI shutdown
+    //
+    // PM1a_CNT <- SLP_TYPa | SLP_EN
+    outw(0x604, 0x2000 | 0x0);
+
+    log::info!("It is now safe to turn off your computer"); // ;)
+
+    asm!("hlt");
+    loop {}
 }
 
 /*

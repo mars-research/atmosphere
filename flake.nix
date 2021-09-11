@@ -21,7 +21,7 @@
     };
   in {
     packages = {
-      atmo = pkgs.callPackage ./build-tool {
+      build-tool = pkgs.callPackage ./build-tool {
         inherit rustPlatform;
         cargo = pinnedRust;
       };
@@ -31,7 +31,7 @@
       nativeBuildInputs = [
         pinnedRust
 
-        self.packages.${system}.atmo
+        self.packages.${system}.build-tool
       ] ++ (with pkgs; [
         gnumake utillinux
 
@@ -46,7 +46,7 @@
       ]);
 
       inputsFrom = [
-        self.packages.${system}.atmo
+        self.packages.${system}.build-tool
       ];
     };
   });

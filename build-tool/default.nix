@@ -3,58 +3,30 @@
 with builtins;
 
 let
+  cargoSha256 = "sha256-DbMLXDDtfonq/KeH6tZSnzcb58KI7n4rMwKsgMIn1Gs=";
+in rustPlatform.buildRustPackage {
+  pname = "build-tool";
+  version = "0.1.0";
+
   src = lib.cleanSourceWith {
     filter = name: type: !(elem (baseNameOf name) ["target"]);
     src = lib.cleanSource ./.;
   };
 
-  lockHash = "sha256-77JpgvBhdDilUBevf2ugQdprcLlyGvsreGlQrU1VBmM=";
-  vendorHash = "sha256-b7JV+RLhz/XpdxCzvo1vJv9/82GrAD391lINkbW5/hs=";
+  inherit cargoSha256;
 
-  # Giant hack to build this in isolation from other workspace members
-  # We can't pull in the entire workspace because it will require a rebuild
-  # on every single change.
-  lock = stdenv.mkDerivation {
-    name = "atmo-lock";
-
-    outputHashMode = "recursive";
-    outputHashAlgo = "sha256";
-    outputHash = lockHash;
-
-    inherit src;
-
-    nativeBuildInputs = [ cacert cargo pkg-config ];
-    buildInputs = [ openssl ];
-
-    buildPhase = ''
-      export SOURCE_DATE_EPOCH=1
-      export CARGO_HOME=$(mktemp -d cargo-home.XXX)
-
-      cat ${../Cargo.lock} > Cargo.lock
-
-      cargo check
-    '';
-
-    installPhase = ''
-      cp Cargo.lock $out
-    '';
-
-    impureEnvVars = lib.fetchers.proxyImpureEnvVars;
-  };
-
-  lockedSrc = runCommand "atmo-src" {} ''
-    cp -r ${src} $out
-    chmod u+w $out
-    cat ${lock} > $out/Cargo.lock
-  '';
-in rustPlatform.buildRustPackage {
-  pname = "atmo";
-  version = "0.1.0";
-
-  src = lockedSrc;
-
-  nativeBuildInputs = [ pkg-config ];
   buildInputs = [ openssl ];
+  nativeBuildInputs = [ pkg-config ];
 
-  cargoSha256 = vendorHash;
+  postInstall = lib.optionalString (stdenv.hostPlatform == stdenv.buildPlatform) ''
+    mkdir completions
+    for shell in bash fish zsh; do
+      $out/bin/atmo gen-completions $shell > completions/$shell
+    done
+
+    mkdir -p "$out/share/"{bash-completion/completions,fish/vendor_completions.d,zsh/site-functions}
+    cp completions/bash $out/share/bash-completion/completions/atmo
+    cp completions/fish $out/share/fish/vendor_completions.d/atmo.fish
+    cp completions/zsh $out/share/zsh/site-functions/_atmo
+  '';
 }

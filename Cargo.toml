@@ -2,10 +2,15 @@
 
 members = [
   "astd",
-  "build-tool",
   "kernel",
   "libcap",
   "ns16550a",
+]
+
+# `build-tool` is not in the workspace so it's easier to
+# build it in isolation.
+exclude = [
+  "build-tool",
 ]
 
 [profile.dev]

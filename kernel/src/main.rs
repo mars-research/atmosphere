@@ -40,6 +40,7 @@ mod boot;
 mod capability;
 mod console;
 mod cpu;
+mod error;
 mod interrupt;
 mod logging;
 mod memory;

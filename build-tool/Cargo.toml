@@ -14,6 +14,7 @@ cargo = { git = "https://github.com/rust-lang/cargo", rev = "18751dd3f238d94d384
 anyhow = "1.0"
 byte-unit = "4.0.12"
 clap = "3.0.0-beta.4"
+clap_generate = "3.0.0-beta.4"
 env_logger = "0.9.0"
 home = "0.5.3"
 log = { version = "0.4.14", features = [] }

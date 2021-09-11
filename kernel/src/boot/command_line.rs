@@ -73,3 +73,19 @@ pub fn get_first_value(key: &str) -> Option<&'static str> {
 
     None
 }
+
+/// Returns whether a flag is set.
+///
+/// This does not allocate any new data structures and
+/// is O(N).
+pub fn get_flag(flag: &str) -> bool {
+    for component in get_iter() {
+        if let Component::Flag(f) = component {
+            if flag == f {
+                return true;
+            }
+        }
+    }
+
+    false
+}
