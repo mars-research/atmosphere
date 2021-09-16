@@ -3,9 +3,10 @@
 
   inputs = {
     mars-std.url = "github:mars-research/mars-std";
+    kexec-tools.url = "github:mars-research/kexec-tools/mb2-x86-64";
   };
 
-  outputs = { self, mars-std, ... }: let
+  outputs = { self, mars-std, kexec-tools, ... }: let
     supportedSystems = [ "x86_64-linux" ];
   in mars-std.lib.eachSystem supportedSystems (system: let
     nightlyVersion = "2021-09-07";
@@ -36,13 +37,17 @@
         gnumake utillinux
 
         gcc10 clang_10 nasm
-        qemu grub2 xorriso gdb
+        grub2 xorriso gdb
+
+        qemu bochs
 
         python3
 
         editorconfig-checker
 
         cachix pkgs.mars-research.mars-tools
+
+        kexec-tools.defaultPackage.${system}
       ]);
 
       inputsFrom = [
