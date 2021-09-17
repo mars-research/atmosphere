@@ -202,7 +202,7 @@ impl Crate {
 pub struct Binary(PathBuf);
 
 impl Binary {
-    fn new(path: PathBuf) -> Self {
+    pub fn new(path: PathBuf) -> Self {
         Self(path)
     }
 

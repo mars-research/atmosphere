@@ -2,6 +2,9 @@
 target = "src/x86_64-unknown-none.json"
 rustflags = [ "-Z", "emit-stack-sizes" ]
 
+[target.x86_64-unknown-none]
+runner = [ "atmo", "cargo-runner" ]
+
 [unstable]
 build-std = [ "core" ]
 unstable-options = true
