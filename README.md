@@ -7,13 +7,11 @@ It's inspired by the design of [seL4](https://sel4.systems/Info/Docs/seL4-manual
 
 ## Development Setup
 
-An Intel x86-64 machine running Linux is required to develop Atmosphere.
-We currently do not support AMD-V.
-
 [Nix](https://github.com/numtide/nix-unstable-installer) is required to install development dependencies.
 With Nix installed, enter the prepared nix-shell environment with `nix-shell` or `nix develop` (Nix 2.4).
 
 You can now build and run Atmosphere with `atmo run`.
+To run the kernel on Bochs with VT-x emulation, use `atmo run --bochs`.
 
 ### Direnv
 
@@ -22,7 +20,7 @@ With direnv installed, run `direnv allow` under the project root to allow it to 
 
 ### `/dev/kvm` Access
 
-Your user will need to be in the `kvm` or `libvirtd` group to access `/dev/kvm` directly.
+If you want to use QEMU-KVM, your user will need to be in the `kvm` or `libvirtd` group to access `/dev/kvm` directly.
 Previously we made use of `sudo` to launch the QEMU process but that resulted in additional complications regarding the ownership of generated files (serial logs, trace dumps, etc.).
 
 ### Editor/IDE

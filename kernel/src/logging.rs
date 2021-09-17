@@ -19,11 +19,13 @@ static mut LOGGER: Logger = Logger {
 /// Initializes the early-boot logger, crashing the kernel on failure.
 ///
 /// This should only be called once.
-pub unsafe fn init_early() {
+pub unsafe fn early_init() {
     log::set_logger(&LOGGER)
         .map(|_| log::set_max_level(log::LevelFilter::Trace))
         .unwrap();
+}
 
+pub unsafe fn init() {
     for component in command_line::get_iter() {
         match component {
             CommandLineComponent::Flag("nocolor") => {

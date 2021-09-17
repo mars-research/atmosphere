@@ -15,7 +15,7 @@ macro_rules! static_link {
 fn main() {
     println!("Baking garlic bread...");
     source!("build.rs");
-    x86_64_asm("multiboot_header.asm");
+    x86_64_asm("multiboot2_header.asm");
     x86_64_asm("crt0.asm");
 }
 

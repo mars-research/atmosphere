@@ -3,6 +3,7 @@
 //! ## Kernel Command Line
 //!
 //! Supported kernel command line parameters:
+//! - `nologo`: Disable the logo
 //! - `nocolor`: Disable colored serial output
 //! - `serial=[com1|com2|com3|com4]`: Log to a specified serial port
 //! - `script=NAME`: Run a debug script
@@ -57,12 +58,18 @@ use core::panic::PanicInfo;
 /// `boot/crt0.asm`.
 fn main(_argc: isize, _argv: *const *const u8) -> isize {
     unsafe {
+        console::early_init();
+        logging::early_init();
+
         boot::init();
-        logging::init_early();
         console::init();
+        logging::init();
     }
 
-    print_logo();
+    if !boot::command_line::get_flag("nologo") {
+        print_logo();
+    }
+
     log::info!("Command line: {}", boot::get_command_line());
     #[cfg(debug_assertions)]
     {

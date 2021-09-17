@@ -1,3 +1,3 @@
 //! Errors.
 
-pub use anyhow::Result;
+pub use anyhow::{Error, Result};

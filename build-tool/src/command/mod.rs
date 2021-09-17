@@ -11,7 +11,7 @@ macro_rules! unwrap_command {
 }
 
 mod run;
-mod pre_commit;
+mod build;
 
 use clap::{Clap, IntoApp};
 
@@ -21,7 +21,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     match &opts.cmd {
         SubCommand::Run(_) => run::run(opts).await?,
-        SubCommand::PreCommit(_) => pre_commit::run(opts).await?,
+        SubCommand::Build(_) => build::run(opts).await?,
         SubCommand::GenCompletions(local) => {
             gen_completions(&local.shell);
         }
@@ -48,7 +48,7 @@ struct GlobalOpts {
 #[derive(Debug, Clap)]
 enum SubCommand {
     Run(run::Opts),
-    PreCommit(pre_commit::Opts),
+    Build(build::Opts),
 
     #[clap(setting(clap::AppSettings::Hidden))]
     GenCompletions(GenCompletions),

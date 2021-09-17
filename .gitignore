@@ -4,6 +4,12 @@
 target
 build
 result
+result-*
+
+*.mb
+*.mb2
+*.iso
+*.mbr
 
 *.sw*
 *.swp

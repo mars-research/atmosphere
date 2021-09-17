@@ -12,11 +12,12 @@ use std::process::Stdio;
 
 use anyhow::anyhow;
 use tempfile::TempDir;
-use tokio::fs::{OpenOptions, create_dir_all};
+use tokio::fs::{OpenOptions, self};
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
 use crate::error::Result;
+use crate::project::Binary;
 
 /// A bootable ISO image.
 pub struct BootableImage {
@@ -29,7 +30,7 @@ pub struct BootableImage {
 
 impl BootableImage {
     /// Create a bootable image.
-    pub async fn generate<S: AsRef<str>>(command_line: S) -> Result<Self> {
+    pub async fn generate<S: AsRef<str>>(command_line: S, kernel: Option<&Binary>) -> Result<Self> {
         let temp_dir = TempDir::new()?;
 
         let source_dir = temp_dir.path().join("grub");
@@ -37,7 +38,7 @@ impl BootableImage {
 
         let mut grub_cfg = {
             let path = source_dir.join("boot/grub/grub.cfg");
-            create_dir_all(path.parent().unwrap()).await?;
+            fs::create_dir_all(path.parent().unwrap()).await?;
 
             OpenOptions::new()
                 .read(false)
@@ -48,8 +49,13 @@ impl BootableImage {
                 .await?
         };
 
-        let config = generate_grub_config(command_line.as_ref());
+        let config = generate_grub_config(command_line.as_ref(), kernel.is_some());
         grub_cfg.write_all(config.as_bytes()).await?;
+
+        if let Some(kernel) = kernel {
+            let kernel_path = source_dir.join("boot/atmosphere");
+            fs::copy(kernel.path(), kernel_path).await?;
+        }
 
         // actually generate the image
         let output = Command::new("grub-mkrescue")
@@ -61,8 +67,8 @@ impl BootableImage {
 
         if output.status.success() {
             Ok(Self {
-                _temp_dir: temp_dir,
                 iso_path,
+                _temp_dir: temp_dir,
             })
         } else {
             let exit_code = output.status.code().expect("There is no exit code");
@@ -80,14 +86,16 @@ impl BootableImage {
     }
 }
 
-fn generate_grub_config(command_line: &str) -> String {
+fn generate_grub_config(command_line: &str, embedded: bool) -> String {
+    let root = if embedded { "/boot" } else { "(hd1,msdos1)" };
+
     format!(r#"
 set timeout=0
 set default=0
 
 menuentry "Atmosphere" {{
-    multiboot (hd1,msdos1)/atmosphere {}
+    multiboot2 {}/atmosphere {}
     boot
 }}
-"#, command_line)
+"#, root, command_line)
 }

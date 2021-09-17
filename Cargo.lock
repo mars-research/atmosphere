@@ -18,11 +18,12 @@ dependencies = [
  "bit_field",
  "libcap",
  "log",
- "multiboot",
+ "multiboot2",
  "nasm-rs",
  "ns16550a",
  "num",
  "num-derive",
+ "realjump",
  "snafu",
  "x86",
 ]
@@ -155,12 +156,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "multiboot"
-version = "0.7.0"
+name = "multiboot2"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ade66c06b320f119f05e339924ac6b3d22127516ce99307da712c3040875f985"
+checksum = "5809e17a554c6dd50643b2b39e8bf9738d595eb5cddcf4f233ce643faffa217b"
 dependencies = [
- "paste",
+ "bitflags",
 ]
 
 [[package]]
@@ -263,12 +264,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "paste"
-version = "1.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "acbf547ad0c65e31259204bd90935776d1c693cec2f4ff7abb7a1bbbd40dfe58"
-
-[[package]]
 name = "proc-macro2"
 version = "1.0.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -294,6 +289,12 @@ checksum = "c27cb5785b85bd05d4eb171556c9a1a514552e26123aeae6bb7d811353148026"
 dependencies = [
  "bitflags",
 ]
+
+[[package]]
+name = "realjump"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec5c2d1cde8e214a607766655a9f20277fbca292e5631b4dd019c8fdfe297f65"
 
 [[package]]
 name = "rustc_version"

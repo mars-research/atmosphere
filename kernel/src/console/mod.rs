@@ -10,7 +10,7 @@
 //!
 //! `serial=[com1|com2|com3|com4]`
 
-use core::fmt::Write;
+// use core::fmt::Write;
 
 use astd::sync::{Mutex, MutexGuard};
 use crate::boot::command_line;
@@ -22,6 +22,12 @@ static SERIAL: Mutex<PioSerial> = Mutex::new(unsafe { PioSerial::new(0x3f8) });
 /// Returns a writer that implements `core::fmt::Write`.
 pub fn get_writer() -> MutexGuard<'static, PioSerial> {
     SERIAL.lock()
+}
+
+/// Initializes early logging.
+pub unsafe fn early_init() {
+    let serial = SERIAL.lock();
+    serial.init();
 }
 
 /// Initializes the serial console.
@@ -47,8 +53,10 @@ pub unsafe fn init() {
         log::error!("Invalid serial port specified - Valid values for `serial` are: com1, com2, com3, com4");
     }
 
+    /*
     // Clear the screen and move the cursor to (0,0).
     //
     // In some terminals, [2J alone does not reset the cursor position.
     write!(serial, "\x1B[2J\x1B[0;0H").unwrap();
+    */
 }

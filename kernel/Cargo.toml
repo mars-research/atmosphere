@@ -3,6 +3,7 @@ name = "atmosphere"
 version = "0.1.0"
 edition = "2021"
 build = "build.rs"
+publish = false
 
 [dependencies]
 astd = { path = "../astd" }
@@ -11,9 +12,10 @@ ns16550a = { path = "../ns16550a" }
 
 bit_field = "0.10.1"
 log = "0.4.14"
-multiboot = "0.7.0"
+multiboot2 = "0.12.1"
 num = { version = "0.4", default-features = false }
 num-derive = "0.3.3"
+realjump = "0.1.0"
 snafu = { version = "0.6.10", default-features = false }
 x86 = "0.39.0"
 

@@ -1,0 +1,32 @@
+c[?7l[2J[0mSeaBIOS (version rel-1.14.0-0-g155821a1990b-prebuilt.qemu.org)
+
+
+iPXE (http://ipxe.org) 00:03.0 CA00 PCI2.10 PnP PMM+7FF8F260+7FEEF260 CA00
+Press Ctrl-B to configure iPXE (PCI 00:03.0)...                                                                               
+
+
+Booting from Hard Disk...
+GRUB loading.
+[0;30;47mWelcome to GRUB!
+
+[01;01H[0m[2J  Booting `Atmosphere'
+
+[33m WARN Trying to load from address 0x2125510[0m
+[2J[0;0H[34m INFO Command line: script=vmx_test script_shutdown nologo qemu_debug_exit_io_base=244[0m
+[33m WARN Trying to load from address 0x2125510[0m
+[34m INFO Physical RAM map:[0m
+[34m INFO [mem 0x00000000000000-0x0000000009fc01] Available[0m
+[34m INFO [mem 0x00000000100000-0x0000007ffe0001] Available[0m
+[36mDEBUG PIC masks: PIC1=0xb8, PIC2=0x8e[0m
+[34m INFO Bootstrapping initial CSpace at 0x211c000[0m
+[36mDEBUG Initial CSpace: [CSpace]
+▶ 0: Cap(Untyped(UntypedCap { size: 2112618494, watermark: 0 }))
+▶ 1..255: Empty
+[0m
+[34m INFO Running script vmx_test...[0m
+[36mDEBUG VT-x platform info: None[0m
+[34m INFO VMM start -> Err(VmxUnsupported)[0m
+[34m INFO Load VMCS -> Err(VmmNotStarted)[0m
+[31mERROR Script vmx_test failed with VT-x subsystem error: The VMM has not started..[0m
+[34m INFO The system is shutting down...[0m
+[34m INFO Trying QEMU isa-debug-exit shutdown (IO Port 0xf4)[0m

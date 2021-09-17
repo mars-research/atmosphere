@@ -35,7 +35,14 @@ impl Project {
     /// Automatically discover the Atmosphere project root.
     pub fn discover() -> Result<ProjectHandle> {
         let cwd = env::current_dir()?;
-        let cargo_toml = find_root_manifest_for_wd(&cwd)?;
+        let mut cargo_toml = find_root_manifest_for_wd(&cwd)?;
+
+        // Ugly exception for build-tool which lives outside the workspace
+        if "build-tool" == cargo_toml.parent().unwrap().file_name().unwrap() {
+            cargo_toml = cargo_toml
+                .parent().unwrap().parent().unwrap()
+                .join("Cargo.toml");
+        }
 
         let cargo_config = CargoConfig::default()?;
 

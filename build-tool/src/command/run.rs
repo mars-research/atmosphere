@@ -4,12 +4,16 @@ use clap::Clap;
 
 use crate::error::Result;
 use crate::project::{BuildOptions, Project};
-use crate::qemu::{Qemu, QemuExit};
+use crate::emulator::{CpuModel, Emulator, EmulatorExit, RunConfiguration, Qemu, Bochs};
 use super::{SubCommand, GlobalOpts};
 
 /// Run Atmosphere.
 #[derive(Debug, Clap)]
 pub struct Opts {
+    /// The CPU model to emulate.
+    #[clap(long = "cpu")]
+    cpu_model: Option<CpuModel>,
+
     /// A script to run.
     #[clap(long)]
     script: Option<String>,
@@ -17,6 +21,10 @@ pub struct Opts {
     /// Extra command-line arguments.
     #[clap(long = "cmdline")]
     command_line: Option<String>,
+
+    /// Whether to use Bochs.
+    #[clap(long)]
+    bochs: bool,
 
     /// Do not automatically shutdown.
     ///
@@ -41,22 +49,35 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
     let kernel = kernel_crate.build(&opts).await?
         .expect("No binary was produced");
 
-    let mut qemu = Qemu::new(project.clone());
-    qemu.set_no_shutdown(local.no_shutdown);
+    let mut run_config = RunConfiguration::default();
+    run_config.auto_shutdown(!local.no_shutdown);
+
+    if let Some(cpu_model) = local.cpu_model {
+        run_config.cpu_model(cpu_model);
+    }
 
     if let Some(script) = local.script {
-        qemu.set_script(script);
+        run_config.script(script);
     }
 
     if let Some(cmdline) = local.command_line {
-        qemu.set_command_line(cmdline);
+        run_config.command_line(cmdline);
     }
 
-    match qemu.run(&kernel).await? {
-        QemuExit::Code(code) => {
+    let mut emulator: Box<dyn Emulator> = if local.bochs {
+        Box::new(Bochs::new(project.clone()))
+    } else {
+        Box::new(Qemu::new(project.clone()))
+    };
+    // let mut qemu = Qemu::new(project.clone());
+    let ret = emulator.run(&run_config, &kernel).await?;
+
+    match ret {
+        EmulatorExit::Code(code) => {
             std::process::exit(code);
         }
-        QemuExit::Killed => {
+        EmulatorExit::Killed => {
+            log::error!("The emulator was killed by a signal");
             std::process::exit(1);
         }
         _ => {}

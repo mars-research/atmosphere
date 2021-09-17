@@ -83,7 +83,7 @@ impl $name {
 
     /// Initializes the serial port.
     ///
-    /// Currently hardcoded to do 38400 8N1 for QEMU :/
+    /// Currently hardcoded to do 115200 8N1
     pub fn init(&self) {
         unsafe {
             // Disable interrupts
@@ -92,15 +92,15 @@ impl $name {
             // Enable DLAB to set baud rate
             $write(self.base, LCR, 0x80);
 
-            // Set 38400 baud
-            $write(self.base, 0, 0x03);
+            // Set 115200 baud
+            $write(self.base, 0, 0x01);
             $write(self.base, 1, 0x00);
 
             // Disable DLAB, and 8N1
             $write(self.base, LCR, 0x03);
 
             // Reset and enable FIFOs
-            $write(self.base, FCR, 0x07);
+            $write(self.base, FCR, 0xc7);
         }
     }
 
@@ -110,7 +110,12 @@ impl $name {
             while $read(self.base, LSR) & (1 << 5) == 0 {
             }
 
-            $write(self.base, THR, c);
+            if c == '\n' as u8 {
+                $write(self.base, THR, '\r' as u8);
+                $write(self.base, THR, '\n' as u8);
+            } else {
+                $write(self.base, THR, c);
+            }
         }
     }
 

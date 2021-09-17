@@ -8,7 +8,8 @@ SECTIONS {
   .rodata :
   {
     /* ensure that the multiboot header is at the beginning */
-    KEEP(*(.multiboot_header))
+    KEEP(*(.multiboot2_header))
+    *(.multiboot2_header)
     *(.rodata .rodata.*)
     . = ALIGN(4K);
   }

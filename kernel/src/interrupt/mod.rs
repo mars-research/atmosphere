@@ -10,6 +10,8 @@ mod exception;
 mod lapic;
 mod idt;
 
+use x86::io::{inb, outb};
+
 use core::convert::{Into, TryFrom};
 
 use bit_field::BitField;
@@ -25,6 +27,10 @@ pub const IRQ_OFFSET: usize = 32;
 
 /// The global IDT.
 static GLOBAL_IDT: Mutex<Idt> = Mutex::new(Idt::new());
+
+const PIC1_DATA: u16 = 0x21;
+const PIC2_DATA: u16 = 0xa1;
+
 
 // "x86-interrupt" is gated behind #![feature(abi_x86_interrupt)].
 
@@ -208,6 +214,14 @@ impl PageFaultErrorCode {
 ///
 /// This should be called only once.
 pub unsafe fn init() {
+    let pic1 = inb(PIC1_DATA);
+    let pic2 = inb(PIC2_DATA);
+
+    log::debug!("PIC masks: PIC1={:#x?}, PIC2={:#x?}", pic1, pic2);
+
+    // Disable 8259 PIC
+    outb(PIC1_DATA, 0xff);
+    outb(PIC2_DATA, 0xff);
 }
 
 /// Initializes per-CPU interrupt controllers.

@@ -60,8 +60,9 @@ pub fn get_iter() -> Iterator<'static> {
 
 /// Returns the first value of a given key.
 ///
-/// This does not allocate any new data structures and
-/// is O(N).
+/// This does not allocate any new data structures and is `O(n)`.
+/// You should use this as sparingly as possible (preferably once
+/// per boot).
 pub fn get_first_value(key: &str) -> Option<&'static str> {
     for component in get_iter() {
         if let Component::KeyValue((k, v)) = component {
@@ -76,8 +77,9 @@ pub fn get_first_value(key: &str) -> Option<&'static str> {
 
 /// Returns whether a flag is set.
 ///
-/// This does not allocate any new data structures and
-/// is O(N).
+/// This does not allocate any new data structures and `O(n)`.
+/// You should use this as sparingly as possible (preferably once
+/// per boot).
 pub fn get_flag(flag: &str) -> bool {
     for component in get_iter() {
         if let Component::Flag(f) = component {

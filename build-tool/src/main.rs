@@ -12,10 +12,10 @@
 )]
 
 mod command;
+mod emulator;
 mod error;
 mod grub;
 mod project;
-mod qemu;
 
 // use std::env;
 
