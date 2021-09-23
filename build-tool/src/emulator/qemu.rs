@@ -12,15 +12,12 @@ use tokio::process::Command;
 use crate::grub::BootableImage;
 use crate::project::{ProjectHandle, Binary};
 use crate::error::Result;
-use super::{CpuModel, Emulator, EmulatorExit, RunConfiguration, InitialOutputFilter};
+use super::{CpuModel, Emulator, EmulatorExit, GdbServer, RunConfiguration, InitialOutputFilter};
 
 /// A QEMU instance.
 pub struct Qemu {
     /// The QEMU binary to use.
     qemu_binary: PathBuf,
-
-    /// GDB server configuration.
-    gdb_server: GdbServer,
 
     /// I/O port for the isa-debug-exit device.
     debug_exit_io_base: u16,
@@ -31,7 +28,6 @@ impl Qemu {
     pub fn new(_project: ProjectHandle) -> Self {
         Self {
             qemu_binary: PathBuf::from("qemu-system-x86_64"),
-            gdb_server: GdbServer::disabled(),
             debug_exit_io_base: 0xf4,
         }
     }
@@ -68,8 +64,7 @@ impl Emulator for Qemu {
             .arg("-drive").arg(&hda)
             .arg("-drive").arg(&hdb)
             .args(&["-device", &format!("isa-debug-exit,iobase={:#x},iosize=0x04", self.debug_exit_io_base)])
-            .args(config.cpu_model.to_qemu()?)
-            .args(self.gdb_server.to_qemu());
+            .args(config.cpu_model.to_qemu()?);
 
         if config.suppress_initial_outputs {
             command.stdout(Stdio::piped());
@@ -77,6 +72,14 @@ impl Emulator for Qemu {
 
         if !config.auto_shutdown {
             command.arg("-no-shutdown");
+        }
+
+        if config.freeze_on_startup {
+            command.arg("-S");
+        }
+
+        if let Some(server) = &config.gdb_server {
+            command.args(server.to_qemu()?);
         }
 
         log::debug!("Starting QEMU with {:?}", command);
@@ -128,52 +131,20 @@ impl QemuArgs for CpuModel {
     }
 }
 
-pub struct GdbServer {
-    /// Whether to enable GDB server.
-    enable: bool,
+impl QemuArgs for GdbServer {
+    fn to_qemu(&self) -> Result<Vec<OsString>> {
+        let mut result: Vec<OsString> = vec!["-gdb".to_string().into()];
 
-    /// Whether to freeze execution at startup.
-    freeze_execution: bool,
-
-    /// Path to the Unix socket.
-    ///
-    /// If none, the default `tcp::1234` will be used.
-    ///
-    /// TODO: Support other setups.
-    socket_path: Option<PathBuf>,
-}
-
-impl GdbServer {
-    pub fn disabled() -> Self {
-        Self {
-            enable: false,
-            freeze_execution: false,
-            socket_path: None,
-        }
-    }
-
-    /// Returns QEMU arguments.
-    pub fn to_qemu(&self) -> Vec<OsString> {
-        let mut result = vec![];
-
-        if !self.enable {
-            return result;
-        }
-
-        if self.freeze_execution {
-            result.push("-S".to_string().into());
-        }
-
-        if self.enable {
-            result.push("-gdb".to_string().into());
-
-            if let Some(socket_path) = &self.socket_path {
-                result.push(socket_path.as_os_str().to_owned());
-            } else {
-                result.push("tcp::1234".to_string().into());
+        match self {
+            GdbServer::Unix(path) => {
+                let path = path.to_str().expect("Socket path contains non-UTF-8 characters");
+                result.push(format!("unix:{},server,nowait", path).into());
+            }
+            GdbServer::Tcp(port) => {
+                result.push(format!("tcp::{}", port).into());
             }
         }
 
-        result
+        Ok(result)
     }
 }

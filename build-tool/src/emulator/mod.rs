@@ -3,6 +3,7 @@
 pub mod bochs;
 pub mod qemu;
 
+use std::path::PathBuf;
 use std::str::FromStr;
 
 use anyhow::anyhow;
@@ -40,6 +41,12 @@ pub struct RunConfiguration {
     /// Whether to automatically shutdown when a script finishes.
     auto_shutdown: bool,
 
+    /// GDB server configrations.
+    gdb_server: Option<GdbServer>,
+
+    /// Whether to freeze on start-up to wait for the debugger.
+    freeze_on_startup: bool,
+
     /// Whether to suppress inital outputs from the emulator.
     ///
     /// By default, we suppress initial outputs from the emulator (BIOS, GRUB,
@@ -75,6 +82,18 @@ impl RunConfiguration {
         self
     }
 
+    /// Set the GDB server config.
+    pub fn gdb_server(&mut self, gdb_server: GdbServer) -> &mut Self {
+        self.gdb_server = Some(gdb_server);
+        self
+    }
+
+    /// Set the freeze on startup config.
+    pub fn freeze_on_startup(&mut self, freeze_on_startup: bool) -> &mut Self {
+        self.freeze_on_startup = freeze_on_startup;
+        self
+    }
+
     /// Returns the full kernel command line.
     fn full_command_line(&self) -> String {
         let mut cmdline = self.command_line.clone();
@@ -103,6 +122,8 @@ impl Default for RunConfiguration {
             script: None,
             command_line: String::new(),
             auto_shutdown: true,
+            gdb_server: None,
+            freeze_on_startup: false,
             suppress_initial_outputs: true,
         }
     }
@@ -148,6 +169,17 @@ pub enum EmulatorExit {
 
     /// The emulator exited with a code.
     Code(i32),
+}
+
+/// GDB server configurations.
+#[allow(dead_code)]
+#[derive(Debug)]
+pub enum GdbServer {
+    /// Listen on a Unix socket.
+    Unix(PathBuf),
+
+    /// Listen on a TCP port.
+    Tcp(u16),
 }
 
 /// A filter that suppresses initial boot outputs from the emulator.

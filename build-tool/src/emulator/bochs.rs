@@ -15,7 +15,7 @@ use tokio::process::Command;
 use crate::error::Result;
 use crate::grub::BootableImage;
 use crate::project::{ProjectHandle, Binary};
-use super::{CpuModel, Emulator, EmulatorExit, RunConfiguration};
+use super::{CpuModel, Emulator, EmulatorExit, GdbServer, RunConfiguration};
 
 /// A Bochs instance.
 #[allow(dead_code)]
@@ -57,6 +57,16 @@ impl Emulator for Bochs {
         let bochsrc = {
             let mut f = NamedTempFile::new()?;
 
+            let gdbstub = match &config.gdb_server {
+                // If gdbstub support is not enabled in Bochs, the gdbstub config must not appear
+                // at all (even enabled=0 will cause an error)
+                None => String::new(),
+                Some(GdbServer::Tcp(port)) => format!("gdbstub: enabled=1, port={}, text_base=0, data_base=0, bss_base=0", port),
+                Some(unsupported) => {
+                    return Err(anyhow!("GDB server {:?} is not supported by Bochs", unsupported));
+                }
+            };
+
             let boshsrc = format!(r#"
                 log: -
                 logprefix: %t%e%d
@@ -90,10 +100,12 @@ impl Emulator for Bochs {
                 sound: waveoutdrv=dummy, waveout=none, waveindrv=dummy, wavein=none, midioutdrv=dummy, midiout=none
 
                 com1: enabled=true, mode=file, dev=/dev/stdout
+                {gdbstub}
             "#,
                 memory = memory,
                 cpu_model = bochs_cpu_model(&config.cpu_model)?,
                 iso_path = grub.iso_path().to_str().expect("Path contains non-UTF-8"),
+                gdbstub = gdbstub,
             );
 
             f.write_all(boshsrc.as_bytes())?;
@@ -101,7 +113,7 @@ impl Emulator for Bochs {
             f.into_temp_path()
         };
 
-        let debugrc = {
+        let nofreeze_debugrc = {
             let mut f = NamedTempFile::new()?;
 
             let debugrc = "continue\n";
@@ -114,8 +126,11 @@ impl Emulator for Bochs {
         let mut command = Command::new(self.bochs_binary.as_os_str());
         command
             .arg("-f").arg(bochsrc.as_os_str())
-            .arg("-rc").arg(debugrc.as_os_str())
             .arg("-q");
+
+        if !config.freeze_on_startup {
+            command.arg("-rc").arg(nofreeze_debugrc.as_os_str());
+        }
 
         let child = command.spawn()?;
 

@@ -4,7 +4,7 @@ use clap::Clap;
 
 use crate::error::Result;
 use crate::project::{BuildOptions, Project};
-use crate::emulator::{CpuModel, Emulator, EmulatorExit, RunConfiguration, Qemu, Bochs};
+use crate::emulator::{CpuModel, Emulator, EmulatorExit, GdbServer, RunConfiguration, Qemu, Bochs};
 use super::{SubCommand, GlobalOpts};
 
 /// Run Atmosphere.
@@ -21,6 +21,10 @@ pub struct Opts {
     /// Extra command-line arguments.
     #[clap(long = "cmdline")]
     command_line: Option<String>,
+
+    /// Whether to enable the GDB server.
+    #[clap(long)]
+    gdb: bool,
 
     /// Whether to use Bochs.
     #[clap(long)]
@@ -62,6 +66,20 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
 
     if let Some(cmdline) = local.command_line {
         run_config.command_line(cmdline);
+    }
+
+    // FIXME: Make this configurable
+    if local.gdb {
+        if local.bochs {
+            run_config.gdb_server(GdbServer::Tcp(1234));
+        } else {
+            // Use Unix Domain Socket
+            unimplemented!()
+        }
+
+        run_config.freeze_on_startup(true);
+
+        panic!("Not implemented yet")
     }
 
     let mut emulator: Box<dyn Emulator> = if local.bochs {
