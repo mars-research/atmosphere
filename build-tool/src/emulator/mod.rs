@@ -2,6 +2,7 @@
 
 pub mod bochs;
 pub mod qemu;
+mod output_filter;
 
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -9,7 +10,6 @@ use std::str::FromStr;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use byte_unit::{Byte, ByteUnit};
-use tokio::io::{self, AsyncWrite, AsyncWriteExt, AsyncBufRead, AsyncBufReadExt};
 
 use crate::error::{Error, Result};
 use crate::project::Binary;
@@ -91,6 +91,12 @@ impl RunConfiguration {
     /// Set the freeze on startup config.
     pub fn freeze_on_startup(&mut self, freeze_on_startup: bool) -> &mut Self {
         self.freeze_on_startup = freeze_on_startup;
+        self
+    }
+
+    /// Set the initial output suppression config.
+    pub fn suppress_initial_outputs(&mut self, suppress_initial_outputs: bool) -> &mut Self {
+        self.suppress_initial_outputs = suppress_initial_outputs;
         self
     }
 
@@ -180,44 +186,4 @@ pub enum GdbServer {
 
     /// Listen on a TCP port.
     Tcp(u16),
-}
-
-/// A filter that suppresses initial boot outputs from the emulator.
-struct InitialOutputFilter<R, W> {
-    reader: R,
-    writer: W,
-}
-
-impl<R, W> InitialOutputFilter<R, W>
-where
-    R: AsyncBufRead + Unpin + Sized,
-    W: AsyncWrite + Unpin + Sized,
-{
-    fn new(reader: R, writer: W) -> Self {
-        Self {
-            reader,
-            writer,
-        }
-    }
-
-    /// Feed ChildStdout to the writer, skipping initial emulator outputs.
-    async fn pipe(mut self) -> Result<()> {
-        self.writer.write_all(b"Booting: ").await?;
-
-        let mut lines = self.reader.lines();
-        while let Some(line) = lines.next_line().await? {
-            if line.contains("SeaBIOS") {
-                self.writer.write_all(b"SeaBIOS... ").await?;
-            }
-            if line.contains("Booting `") {
-                self.writer.write_all(b"GRUB...\n").await?;
-                break;
-            }
-        }
-
-        let mut reader = lines.into_inner();
-        io::copy(&mut reader, &mut self.writer).await?;
-
-        Ok(())
-    }
 }

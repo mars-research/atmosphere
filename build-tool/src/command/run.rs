@@ -26,9 +26,15 @@ pub struct Opts {
     #[clap(long)]
     gdb: bool,
 
-    /// Whether to use Bochs.
+    /// Whether to use QEMU.
+    ///
+    /// KVM on an Intel machine with nested virtualization is required.
     #[clap(long)]
-    bochs: bool,
+    qemu: bool,
+
+    /// Whether to emit full output from the emulator.
+    #[clap(long)]
+    full_output: bool,
 
     /// Do not automatically shutdown.
     ///
@@ -68,13 +74,17 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
         run_config.command_line(cmdline);
     }
 
+    if local.full_output {
+        run_config.suppress_initial_outputs(false);
+    }
+
     // FIXME: Make this configurable
     if local.gdb {
-        if local.bochs {
-            run_config.gdb_server(GdbServer::Tcp(1234));
-        } else {
+        if local.qemu {
             // Use Unix Domain Socket
             unimplemented!()
+        } else {
+            run_config.gdb_server(GdbServer::Tcp(1234));
         }
 
         run_config.freeze_on_startup(true);
@@ -82,10 +92,10 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
         panic!("Not implemented yet")
     }
 
-    let mut emulator: Box<dyn Emulator> = if local.bochs {
-        Box::new(Bochs::new(project.clone()))
-    } else {
+    let mut emulator: Box<dyn Emulator> = if local.qemu {
         Box::new(Qemu::new(project.clone()))
+    } else {
+        Box::new(Bochs::new(project.clone()))
     };
     // let mut qemu = Qemu::new(project.clone());
     let ret = emulator.run(&run_config, &kernel).await?;

@@ -12,7 +12,8 @@ use tokio::process::Command;
 use crate::grub::BootableImage;
 use crate::project::{ProjectHandle, Binary};
 use crate::error::Result;
-use super::{CpuModel, Emulator, EmulatorExit, GdbServer, RunConfiguration, InitialOutputFilter};
+use super::{CpuModel, Emulator, EmulatorExit, GdbServer, RunConfiguration, /*InitialOutputFilter*/};
+use super::output_filter::InitialOutputFilter;
 
 /// A QEMU instance.
 pub struct Qemu {
@@ -82,7 +83,7 @@ impl Emulator for Qemu {
             command.args(server.to_qemu()?);
         }
 
-        log::debug!("Starting QEMU with {:?}", command);
+        log::warn!("Starting QEMU with {:?}", command);
 
         let mut child = command.spawn()?;
 
@@ -92,8 +93,8 @@ impl Emulator for Qemu {
                 BufReader::new(reader)
             };
 
-            let filter = InitialOutputFilter::new(stdout, io::stdout());
-            filter.pipe().await?;
+            let mut filter = InitialOutputFilter::new(stdout);
+            tokio::io::copy(&mut filter, &mut io::stdout()).await?;
         }
 
         let status = child.wait_with_output().await?.status;

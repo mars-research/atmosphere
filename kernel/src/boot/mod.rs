@@ -65,7 +65,8 @@ pub unsafe fn shutdown(success: bool) -> ! {
         let io_base = io_base.parse::<u16>()
             .expect("Failed to parse qemu_debug_exit_io_base");
 
-        log::debug!("Trying Bochs APM shutdown (IO Port {:#x})", io_base);
+        let success_marker = if success { "BOCHS_SUCCESS" } else { "BOCHS_FAILURE" };
+        log::debug!("Trying Bochs APM shutdown (IO Port {:#x}) - {}", io_base, success_marker);
 
         let shutdown = "Shutdown";
 

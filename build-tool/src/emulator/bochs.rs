@@ -3,22 +3,27 @@
 //! We use Bochs because of its VT-x emulation capability, which
 //! actually provides meaningful error outputs for VM errors.
 
-use std::io::Write;
+use std::collections::VecDeque;
+use std::io::{Result as IoResult, Write};
 use std::path::PathBuf;
+use std::pin::Pin;
+use std::process::Stdio;
+use std::task::{Context, Poll};
 
 use anyhow::anyhow;
 use async_trait::async_trait;
 use byte_unit::ByteUnit;
 use tempfile::NamedTempFile;
+use tokio::io::{self, AsyncRead, AsyncBufRead, BufReader, ReadBuf};
 use tokio::process::Command;
 
 use crate::error::Result;
 use crate::grub::BootableImage;
 use crate::project::{ProjectHandle, Binary};
 use super::{CpuModel, Emulator, EmulatorExit, GdbServer, RunConfiguration};
+use super::output_filter::InitialOutputFilter;
 
 /// A Bochs instance.
-#[allow(dead_code)]
 pub struct Bochs {
     /// Which Bochs binary to use.
     bochs_binary: PathBuf,
@@ -126,18 +131,35 @@ impl Emulator for Bochs {
         let mut command = Command::new(self.bochs_binary.as_os_str());
         command
             .arg("-f").arg(bochsrc.as_os_str())
-            .arg("-q");
+            .arg("-q")
+            .stdout(Stdio::piped());
 
         if !config.freeze_on_startup {
             command.arg("-rc").arg(nofreeze_debugrc.as_os_str());
         }
 
-        let child = command.spawn()?;
+        let mut child = command.spawn()?;
+
+        let mut stdout: Box<dyn AsyncBufRead + Unpin + Send> = {
+            let reader = child.stdout.take().expect("Could not capture emulator stdout");
+            Box::new(BufReader::new(reader))
+        };
+
+        if config.suppress_initial_outputs {
+            let filter = InitialOutputFilter::new(stdout);
+            stdout = Box::new(BufReader::new(filter));
+        }
+
+        let mut stdout = BochsOutputFilter::new(stdout);
+
+        tokio::io::copy(&mut stdout, &mut io::stdout()).await?;
 
         let status = child.wait_with_output().await?.status;
 
         if !status.success() {
-            if let Some(code) = status.code() {
+            if stdout.has_success_marker() {
+                Ok(EmulatorExit::Success)
+            } else if let Some(code) = status.code() {
                 log::error!("Bochs exited with code {}", code);
                 Ok(EmulatorExit::Code(code))
             } else {
@@ -154,5 +176,68 @@ fn bochs_cpu_model(cpu_model: &CpuModel) -> Result<String> {
     match cpu_model {
         CpuModel::Haswell => Ok("corei7_haswell_4770".to_string()),
         CpuModel::Host => Err(anyhow!("Bochs does not support host passthrough configuration")),
+    }
+}
+
+/// A filter that catches the success marker printed by the kernel.
+///
+/// Bochs doesn't provide an easy way to terminate the emulator
+/// with a zero exit code but we need it for our CI pipeline.
+///
+/// To work around this, when Atmosphere is shutting down with
+/// `success == true` using Bochs APM, the kernel will print out
+/// `BOCHS_SUCCESS`. We then catch this output and exit with 0.
+struct BochsOutputFilter<R>
+where
+    R: AsyncRead + Unpin + Sized,
+{
+    reader: Pin<Box<R>>,
+    buffer: VecDeque::<u8>,
+}
+
+impl<R> AsyncRead for BochsOutputFilter<R>
+where
+    R: AsyncRead + Unpin + Sized,
+{
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<IoResult<()>> {
+        let old_index = buf.filled().len();
+
+        match self.reader.as_mut().poll_read(cx, buf) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
+            Poll::Ready(Ok(())) => {
+                let new = &buf.filled()[old_index..];
+                let ring_remaining = self.buffer.capacity() - self.buffer.len();
+
+                if new.len() > ring_remaining {
+                    self.buffer.drain(..new.len() - ring_remaining);
+                }
+
+                self.buffer.extend(new);
+
+                Poll::Ready(Ok(()))
+            }
+        }
+    }
+}
+
+impl<R> BochsOutputFilter<R>
+where
+    R: AsyncRead + Unpin + Sized,
+{
+    fn new(reader: R) -> Pin<Box<Self>> {
+        Box::pin(Self {
+            reader: Box::pin(reader),
+            buffer: VecDeque::with_capacity(1024),
+        })
+    }
+
+    fn has_success_marker(&mut self) -> bool {
+        let s = String::from_utf8_lossy(self.buffer.make_contiguous());
+        s.contains("BOCHS_SUCCESS")
     }
 }

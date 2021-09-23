@@ -90,6 +90,10 @@ fn generate_grub_config(command_line: &str, embedded: bool) -> String {
     let root = if embedded { "/boot" } else { "(hd1,msdos1)" };
 
     format!(r#"
+serial --unit=0 --speed=115200 --word=8 --parity=no --stop=1
+terminal_input --append serial
+terminal_output --append serial
+
 set timeout=0
 set default=0
 
