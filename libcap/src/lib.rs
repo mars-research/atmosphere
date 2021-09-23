@@ -240,7 +240,7 @@ impl CNode {
         // FIXME: Slow
         for i in 0..cnode.capacity() {
             let slot = cnode.get_ptr(i).unwrap() as *mut CSlot;
-            ptr::write_volatile(slot, None);
+            ptr::write_unaligned(slot, None);
         }
 
         &mut *address
