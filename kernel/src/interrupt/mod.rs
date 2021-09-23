@@ -45,6 +45,12 @@ pub type HandlerFuncWithErrCode =
 pub type PageFaultHandlerFunc =
     extern "x86-interrupt" fn(&mut InterruptStackFrame, PageFaultErrorCode);
 
+/// Invalid Opcode handler.
+unsafe extern "C" fn invalid_opcode(regs: &mut PtRegs) {
+    log::error!("Invalid Opcode: {:#x?}", regs);
+    loop {}
+}
+
 /// Double Fault handler.
 unsafe extern "C" fn double_fault(regs: &mut PtRegs) {
     log::error!("Double Fault: {:#x?}", regs);
@@ -231,6 +237,7 @@ pub unsafe fn init_cpu() {
     lapic::init();
 
     let mut idt = GLOBAL_IDT.lock();
+    idt.invalid_opcode.set_handler_fn(invalid_opcode);
     idt.double_fault.set_handler_fn(double_fault);
     idt.stack_segment_fault.set_handler_fn(stack_segment_fault);
     idt.general_protection_fault.set_handler_fn(general_protection_fault);
