@@ -19,5 +19,11 @@ realjump = "0.1.0"
 snafu = { version = "0.6.10", default-features = false }
 x86 = "0.39.0"
 
+[dependencies.pal]
+git = "https://github.com/mars-research/pal"
+rev = "dc9fd90da7b920eb4523db8907cdcf547ac7ce23"
+default-features = false
+features = [ "intel_64bit_systemv_nasm" ]
+
 [build-dependencies]
 nasm-rs = "0.1.5"

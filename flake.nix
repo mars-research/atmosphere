@@ -48,6 +48,12 @@
         cachix pkgs.mars-research.mars-tools
 
         kexec-tools.defaultPackage.${system}
+
+        # Bareflank pal.py code generator
+        cmake
+      ]) ++ (with pkgs.python3Packages; [
+        # Bareflank pal.py code generator
+        lxml pyyaml
       ]);
 
       inputsFrom = [
