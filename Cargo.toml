@@ -12,9 +12,3 @@ members = [
 exclude = [
   "build-tool",
 ]
-
-[profile.dev]
-panic = "abort"
-
-[profile.release]
-panic = "abort"

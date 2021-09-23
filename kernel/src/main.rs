@@ -19,6 +19,7 @@
     const_ptr_offset,
     const_raw_ptr_deref,
     const_slice_from_raw_parts,
+    custom_test_frameworks,
     naked_functions,
     pattern,
     start,
@@ -37,6 +38,10 @@
     unused_variables,
 )]
 
+#![reexport_test_harness_main = "test_main"]
+#![test_runner(crate::test_runner)]
+#![no_main]
+
 mod boot;
 mod capability;
 mod console;
@@ -51,11 +56,14 @@ mod vmx;
 
 use core::panic::PanicInfo;
 
-#[start]
+static mut SHUTDOWN_ON_PANIC: bool = false;
+
 /// CPU 0 entry point.
 ///
 /// This entry point is jumped to at the end of
 /// `boot/crt0.asm`.
+#[start]
+#[no_mangle]
 fn main(_argc: isize, _argv: *const *const u8) -> isize {
     unsafe {
         console::early_init();
@@ -76,6 +84,12 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
         log::info!("Atmosphere was built in debug mode.");
     }
 
+    #[cfg(test)]
+    {
+        log::info!("Atmosphere was built with the test harness");
+        test_main();
+    }
+
     unsafe {
         memory::init();
         memory::init_cpu();
@@ -91,6 +105,24 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
     loop {}
 }
 
+/// Runs all tests.
+#[cfg(test)]
+fn test_runner(tests: &[&dyn Fn()]) -> ! {
+    unsafe {
+        SHUTDOWN_ON_PANIC = true;
+    }
+
+    log::info!("Running {} tests", tests.len());
+
+    for test in tests {
+        test();
+    }
+
+    unsafe {
+        boot::shutdown(true);
+    }
+}
+
 /// Prints the Atmosphere logo.
 fn print_logo() {
     let logo = include_str!("logo.txt");
@@ -103,6 +135,12 @@ fn print_logo() {
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     log::error!("panic! {:#?}", info);
+
+    unsafe {
+        if SHUTDOWN_ON_PANIC {
+            boot::shutdown(false);
+        }
+    }
 
     // FIXME: Signal all other CPUs to halt
 

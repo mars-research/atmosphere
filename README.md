@@ -1,6 +1,6 @@
 # Atmosphere
 
-[![Build](https://github.com/mars-research/atmosphere/actions/workflows/build.yml/badge.svg)](https://github.com/mars-research/atmosphere/actions/workflows/build.yml)
+[![Kernel](https://github.com/mars-research/atmosphere/actions/workflows/kernel.yml/badge.svg)](https://github.com/mars-research/atmosphere/actions/workflows/kernel.yml)
 
 Atmosphere is a Type-1 hypervisor for Intel x86-64, written in Rust.
 It's inspired by the design of [seL4](https://sel4.systems/Info/Docs/seL4-manual-latest.pdf), where memory for kernel objects is not dynamically allocated by the microkernel.
