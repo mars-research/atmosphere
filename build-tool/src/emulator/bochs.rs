@@ -105,6 +105,7 @@ impl Emulator for Bochs {
                 sound: waveoutdrv=dummy, waveout=none, waveindrv=dummy, wavein=none, midioutdrv=dummy, midiout=none
 
                 com1: enabled=true, mode=file, dev=/dev/stdout
+                magic_break: enabled=1
                 {gdbstub}
             "#,
                 memory = memory,
@@ -214,7 +215,10 @@ where
                 let ring_remaining = self.buffer.capacity() - self.buffer.len();
 
                 if new.len() > ring_remaining {
-                    self.buffer.drain(..new.len() - ring_remaining);
+                    let drain = new.len() - ring_remaining;
+                    for _ in 0..drain {
+                        self.buffer.pop_front();
+                    }
                 }
 
                 self.buffer.extend(new);
