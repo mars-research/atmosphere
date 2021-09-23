@@ -118,6 +118,8 @@ fn test_runner(tests: &[&dyn Fn()]) -> ! {
         test();
     }
 
+    log::info!("All good!");
+
     unsafe {
         boot::shutdown(true);
     }

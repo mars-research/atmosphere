@@ -16,10 +16,5 @@ jobs:
       - run: nix-env -iA cachix -f https://cachix.org/api/v1/install
       - run: cachix use mars-research
 
-      # We can't run `cargo build` on the entire workspace yet
-      # because of <https://github.com/rust-lang/cargo/issues/9451>.
-      - name: Build kernel
-        run: nix-shell --run "cd kernel && cargo build && cargo doc"
-
       - name: Run tests on Bochs
-        run: nix-shell --run "cd kernel && cargo test --release"
+        run: nix-shell --run "cd kernel && cargo test"
