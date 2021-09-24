@@ -25,8 +25,6 @@ use x86::dtables::{lgdt, DescriptorTablePointer};
 use x86::segmentation::{load_ds, load_es, load_fs, load_gs, load_ss, SegmentSelector};
 use x86::task::load_tr;
 
-use crate::cpu::Cpu;
-
 /// Size of an IST stack.
 const IST_STACK_SIZE: usize = 4096;
 
