@@ -10,8 +10,6 @@
 //!
 //! `serial=[com1|com2|com3|com4]`
 
-// use core::fmt::Write;
-
 use astd::sync::{Mutex, MutexGuard};
 use crate::boot::command_line;
 use ns16550a::PioSerial;
