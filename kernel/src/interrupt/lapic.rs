@@ -131,9 +131,26 @@ pub unsafe fn init() {
 
 /// Returns the current processor's APIC ID.
 pub fn cpu_id() -> u32 {
+    let ebx: u32;
+
+    unsafe {
+        asm!(
+            "cpuid",
+            "mov {b:e}, ebx",
+            b = lateout(reg) ebx,
+            inout("eax") 1 => _,
+            lateout("ecx") _,
+            lateout("edx") _,
+        );
+    }
+
+    ebx >> 24
+
+    /*
     let reg = unsafe {
         ptr::read_volatile((LAPIC + LAPIC_ID) as *const u32)
     };
 
     reg >> 24
+    */
 }
