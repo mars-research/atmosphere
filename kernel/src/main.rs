@@ -30,6 +30,8 @@
     deprecated,
     missing_abi,
     rustdoc::bare_urls,
+    rustdoc::broken_intra_doc_links,
+    unused_macros,
     unused_must_use,
     unused_unsafe,
 )]

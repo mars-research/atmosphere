@@ -922,39 +922,6 @@ unsafe fn write_cr4(val: u32) {
     asm!("mov cr4, {0:r}", in(reg) val);
 }
 
-/*
-/// Returns the Task Register base address.
-unsafe fn read_tr_base() -> u64 {
-    use x86::segmentation::Descriptor;
-    use x86::dtables::DescriptorTablePointer;
-
-    let mut gdt_pointer = DescriptorTablePointer::<Descriptor>::default();
-    asm!("sgdt [{}]", in(reg) &mut gdt_pointer);
-    // x86::dtables::sgdt(&mut gdt_pointer);
-
-    // log::debug!("gdt64 @ {:#x?}", &gdt64 as *const _ as u64);
-    log::debug!("GDT = {:#x?}", gdt_pointer.base);
-
-    let tr_selector = {
-        let x: u64;
-        asm!("str {x}", x = out(reg) x);
-        (x as u16) & 0b11111000
-    };
-
-    let addr = ((gdt_pointer.base as u64) + (tr_selector as u64)) as *const u64;
-    log::debug!("Addr: {:#x?}", addr);
-    let desc = ptr::read_unaligned(addr);
-    log::debug!("Descriptor: {:#x?}", desc);
-
-    let base =
-        ((desc >> 16) & 0b1111_1111_1111_1111) |
-        (((desc >> 32) & 0b1111_1111) << 16) |
-        (((desc >> 56) & 0b1111_1111) << 24);
-
-    base
-}
-*/
-
 /// Returns the IDT base address.
 unsafe fn read_idt_base() -> u64 {
     use x86::segmentation::Descriptor;

@@ -50,7 +50,7 @@ pub struct Cpu {
 
     /// The Global Descriptor Table.
     ///
-    /// See [crate::interrupt::gdt] for a list of indices and their associated usages.
+    /// See [crate::gdt] for a list of indices and their associated usages.
     pub gdt: GlobalDescriptorTable,
 
     /// The Task State Segment.

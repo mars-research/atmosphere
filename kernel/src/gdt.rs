@@ -3,8 +3,7 @@
 //! During boot, we do the following:
 //!
 //! 1. The bootstrap assembly code loads a temporary GDT.
-//! 2. On CPU 0, we initialize and load the GDT in Rust using preallocated space
-//!    ([crate::cpu::CPU0]).
+//! 2. On CPU 0, we initialize and load the GDT in Rust using preallocated space.
 //! 3. On other CPUs, we initialize and load the GDT using space provided by
 //!    Cpu capabilities.
 //!
