@@ -8,7 +8,8 @@
 use core::fmt::Write;
 
 use log::{Record, Level, Metadata};
-use crate::boot::command_line::{self, Component as CommandLineComponent};
+
+use crate::boot;
 
 /// The global logger.
 static mut LOGGER: Logger = Logger {
@@ -26,13 +27,9 @@ pub unsafe fn early_init() {
 }
 
 pub unsafe fn init() {
-    for component in command_line::get_iter() {
-        match component {
-            CommandLineComponent::Flag("nocolor") => {
-                LOGGER.use_colors = false;
-            }
-            _ => {},
-        }
+    let cmdline = boot::get_command_line();
+    if cmdline.nocolor {
+        LOGGER.use_colors = false;
     }
 }
 

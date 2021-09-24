@@ -2,9 +2,10 @@
 
 pub type Result<T> = core::result::Result<T, Error>;
 
-use super::vmx::VmxError;
-
 use snafu::Snafu;
+
+use crate::vmx::VmxError;
+use crate::boot::command_line::Component as CommandLineComponent;
 
 /// An error.
 #[non_exhaustive]
@@ -16,6 +17,10 @@ pub enum Error {
 
     /// No such script is defined.
     NoSuchScript,
+
+    /// Invalid kernel command-line.
+    #[snafu(display("Invalid kernel command-line component: {:?}", component))]
+    InvalidCommandLineOption { component: CommandLineComponent<'static> },
 
     /// Other error.
     #[snafu(display("Other error: {}", description))]

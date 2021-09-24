@@ -1,7 +1,100 @@
 //! Kernel command line utilities.
+//!
+//! See the [KernelCommandLine] struct for a list of supported
+//! options.
+
+use core::ops::Deref;
+
+use spin::RwLock;
+
+use crate::error::{Error, Result};
+
+static COMMAND_LINE: RwLock<KernelCommandLine> = RwLock::new(KernelCommandLine::new());
+
+/// The kernel command-line configuration.
+pub struct KernelCommandLine {
+    /// Disable the logo.
+    pub nologo: bool,
+
+    /// Disable colored serial output.
+    pub nocolor: bool,
+
+    /// Log to a specified serial port.
+    pub serial: &'static str,
+
+    /// Run a debug script.
+    pub script: Option<&'static str>,
+
+    /// Shut down after the script finishes.
+    pub script_shutdown: bool,
+
+    /// QEMU isa-debug-exit I/O port base.
+    pub qemu_debug_exit_io_base: Option<u16>,
+
+    /// Bochs APM I/O port base.
+    pub bochs_apm_io_base: Option<u16>,
+}
+
+impl KernelCommandLine {
+    const fn new() -> Self {
+        Self {
+            nologo: false,
+            nocolor: false,
+            serial: "com1",
+            script: None,
+            script_shutdown: false,
+            qemu_debug_exit_io_base: None,
+            bochs_apm_io_base: None,
+        }
+    }
+
+    fn parse(&mut self, iter: Iterator<'static>) -> Result<()> {
+        for component in iter {
+            match component {
+                Component::Flag(flag) => {
+                    match flag {
+                        "nologo" => { self.nologo = true; }
+                        "nocolor" => { self.nocolor = true; }
+                        "script_shutdown" => { self.script_shutdown = true; }
+                        _ => {
+                            return Err(Error::InvalidCommandLineOption {
+                                component,
+                            });
+                        }
+                    }
+                }
+                Component::KeyValue((key, value)) => {
+                    match key {
+                        "serial" => { self.serial = value; }
+                        "script" => { self.script = Some(value); }
+                        "qemu_debug_exit_io_base" => {
+                            self.qemu_debug_exit_io_base.replace(value.parse()
+                                .map_err(|_| Error::InvalidCommandLineOption {
+                                    component,
+                                })?);
+                        }
+                        "bochs_apm_io_base" => {
+                            self.bochs_apm_io_base.replace(value.parse()
+                                .map_err(|_| Error::InvalidCommandLineOption {
+                                    component,
+                                })?);
+                        }
+                        _ => {
+                            return Err(Error::InvalidCommandLineOption {
+                                component,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
 
 /// A command line component.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Component<'a> {
     /// A flag.
     ///
@@ -23,7 +116,7 @@ impl<'a> Component<'a> {
     }
 }
 
-pub struct Iterator<'a> {
+struct Iterator<'a> {
     split: core::str::Split<'a, char>,
 }
 
@@ -51,43 +144,23 @@ impl<'a> core::iter::Iterator for Iterator<'a> {
     }
 }
 
-/// Returns an iterator over command line components.
-pub fn get_iter() -> Iterator<'static> {
-    Iterator {
-        split: super::get_command_line().split(' '),
+impl<'a> Iterator<'a> {
+    fn new(raw: &'a str) -> Self {
+        Self {
+            split: raw.split(' '),
+        }
     }
 }
 
-/// Returns the first value of a given key.
-///
-/// This does not allocate any new data structures and is `O(n)`.
-/// You should use this as sparingly as possible (preferably once
-/// per boot).
-pub fn get_first_value(key: &str) -> Option<&'static str> {
-    for component in get_iter() {
-        if let Component::KeyValue((k, v)) = component {
-            if key == k {
-                return Some(v);
-            }
-        }
-    }
-
-    None
+/// Returns the kernel command-line.
+pub fn get_command_line() -> impl Deref<Target = KernelCommandLine> {
+    COMMAND_LINE.read()
 }
 
-/// Returns whether a flag is set.
-///
-/// This does not allocate any new data structures and `O(n)`.
-/// You should use this as sparingly as possible (preferably once
-/// per boot).
-pub fn get_flag(flag: &str) -> bool {
-    for component in get_iter() {
-        if let Component::Flag(f) = component {
-            if flag == f {
-                return true;
-            }
-        }
-    }
+/// Parses a raw kernel command line, replacing the current value.
+pub(super) fn init(raw: &'static str) -> Result<()> {
+    let iter = Iterator::new(raw);
 
-    false
+    let mut cmdline = COMMAND_LINE.write();
+    cmdline.parse(iter)
 }

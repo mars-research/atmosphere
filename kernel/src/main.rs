@@ -78,11 +78,13 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
         logging::init();
     }
 
-    if !boot::command_line::get_flag("nologo") {
+    let cmdline = boot::get_command_line();
+
+    if !cmdline.nologo {
         print_logo();
     }
 
-    log::info!("Command line: {}", boot::get_command_line());
+    log::info!("Command line: {}", boot::get_raw_command_line());
     #[cfg(debug_assertions)]
     {
         log::info!("Atmosphere was built in debug mode.");

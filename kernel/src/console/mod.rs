@@ -10,8 +10,8 @@
 //!
 //! `serial=[com1|com2|com3|com4]`
 
+use crate::boot;
 use astd::sync::{Mutex, MutexGuard};
-use crate::boot::command_line;
 use ns16550a::PioSerial;
 
 /// The serial device.
@@ -33,18 +33,17 @@ pub unsafe fn init() {
     let mut serial = SERIAL.lock();
     let mut invalid_serial = false;
 
-    if let Some(port) = command_line::get_first_value("serial") {
-        *serial = PioSerial::new(match port {
-            "" | "com1" => 0x3f8,
-            "com2" => 0x2f8,
-            "com3" => 0x3e8,
-            "com4" => 0x2e8,
-            _ => {
-                invalid_serial = true;
-                0x3f8
-            }
-        });
-    }
+    let cmdline = boot::get_command_line();
+    *serial = PioSerial::new(match cmdline.serial {
+        "" | "com1" => 0x3f8,
+        "com2" => 0x2f8,
+        "com3" => 0x3e8,
+        "com4" => 0x2e8,
+        _ => {
+            invalid_serial = true;
+            0x3f8
+        }
+    });
 
     serial.init();
     if invalid_serial {

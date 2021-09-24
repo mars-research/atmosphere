@@ -1,12 +1,13 @@
 //! Bootloader integration.
 //!
-//! We implement the Multiboot v1 specification.
+//! We implement the Multiboot v2 specification.
 
 pub mod command_line;
 
 use multiboot2::BootInformation;
 use x86::io::{outb, outw};
-// use qemu_exit::{QEMUExit, X86 as QemuExitHandle};
+
+pub use command_line::get_command_line;
 
 extern "C" {
     static bootinfo: u64;
@@ -23,10 +24,13 @@ pub unsafe fn init() {
         let ptr = command_line.command_line() as *const str;
         COMMAND_LINE = &*ptr; // We won't touch the boot information region
     }
+
+    command_line::init(COMMAND_LINE)
+        .expect("Invalid kernel command-line");
 }
 
-/// Returns the kernel command line.
-pub fn get_command_line() -> &'static str {
+/// Returns the raw kernel command line.
+pub fn get_raw_command_line() -> &'static str {
     unsafe { COMMAND_LINE }
 }
 
@@ -45,13 +49,12 @@ pub unsafe fn get_bootinfo() -> BootInformation {
 pub unsafe fn shutdown(success: bool) -> ! {
     log::info!("The system is shutting down...");
 
+    let cmdline = get_command_line();
+
     // QEMU isa-debug-exit
     //
     // <https://github.com/qemu/qemu/blob/bd662023e683850c085e98c8ff8297142c2dd9f2/hw/misc/debugexit.c>
-    if let Some(io_base) = command_line::get_first_value("qemu_debug_exit_io_base") {
-        let io_base = io_base.parse::<u16>()
-            .expect("Failed to parse qemu_debug_exit_io_base");
-
+    if let Some(io_base) = cmdline.qemu_debug_exit_io_base {
         if !success {
             log::debug!("Trying QEMU isa-debug-exit shutdown (IO Port {:#x})", io_base);
 
@@ -61,10 +64,7 @@ pub unsafe fn shutdown(success: bool) -> ! {
     }
 
     // Bochs APM
-    if let Some(io_base) = command_line::get_first_value("bochs_apm_io_base") {
-        let io_base = io_base.parse::<u16>()
-            .expect("Failed to parse qemu_debug_exit_io_base");
-
+    if let Some(io_base) = cmdline.bochs_apm_io_base {
         let success_marker = if success { "BOCHS_SUCCESS" } else { "BOCHS_FAILURE" };
         log::debug!("Trying Bochs APM shutdown (IO Port {:#x}) - {}", io_base, success_marker);
 

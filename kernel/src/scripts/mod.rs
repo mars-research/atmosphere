@@ -7,7 +7,7 @@ mod cap_test;
 mod fail_test;
 mod vmx_test;
 
-use crate::boot::{command_line, shutdown};
+use crate::boot;
 use crate::error::{Error, Result};
 
 macro_rules! match_script {
@@ -39,11 +39,13 @@ pub unsafe fn run_script(script: &str) -> Result<()> {
 
 /// Runs the debug script specified in the command line.
 pub unsafe fn run_script_from_command_line() {
-    if let Some(script) = command_line::get_first_value("script") {
+    let cmdline = boot::get_command_line();
+
+    if let Some(script) = cmdline.script {
         let ret = run_script(script);
 
-        if command_line::get_flag("script_shutdown") {
-            shutdown(ret.is_ok());
+        if cmdline.script_shutdown {
+            boot::shutdown(ret.is_ok());
         }
     }
 }
