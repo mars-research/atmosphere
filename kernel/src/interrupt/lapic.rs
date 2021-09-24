@@ -52,48 +52,44 @@ unsafe fn lapicw(offset: u32, value: u32) {
     ptr::read_volatile((LAPIC + LAPIC_ID) as *const u32);
 }
 
-fn probe_apic() {
-    unsafe {
-        let msr27: u32 = msr::rdmsr(msr::APIC_BASE) as u32;
-        LAPIC = msr27 & 0xffff_0000;
-    }
+unsafe fn probe_apic() {
+    let msr27: u32 = msr::rdmsr(msr::APIC_BASE) as u32;
+    LAPIC = msr27 & 0xffff_0000;
 }
 
-fn init_lapic() {
-    unsafe {
-        // Enable LAPIC
-        lapicw(LAPIC_SVR, LAPIC_SVR_ENABLE | (IRQ_OFFSET + IRQ_SPURIOUS));
+unsafe fn init_lapic() {
+    // Enable LAPIC
+    lapicw(LAPIC_SVR, LAPIC_SVR_ENABLE | (IRQ_OFFSET + IRQ_SPURIOUS));
 
-        // Timer interrupt
-        lapicw(LAPIC_TDCR, LAPIC_TDCR_X1);
-        lapicw(
-            LAPIC_TIMER,
-            LAPIC_TIMER_PERIODIC | 32,
-        );
-        lapicw(LAPIC_TICR, 1000_0000);
+    // Timer interrupt
+    lapicw(LAPIC_TDCR, LAPIC_TDCR_X1);
+    lapicw(
+        LAPIC_TIMER,
+        LAPIC_TIMER_PERIODIC | 32,
+    );
+    lapicw(LAPIC_TICR, 1000_0000);
 
-        // Mask logical interrupt lines
-        lapicw(LAPIC_LINT0, LAPIC_MASKED);
-        lapicw(LAPIC_LINT1, LAPIC_MASKED);
+    // Mask logical interrupt lines
+    lapicw(LAPIC_LINT0, LAPIC_MASKED);
+    lapicw(LAPIC_LINT1, LAPIC_MASKED);
 
-        // Mask performance counter overflow interrupts
-        if ((lapicr(LAPIC_VER) >> 16) & 0xff) >= 4 {
-            lapicw(LAPIC_PCINT, LAPIC_MASKED);
-        }
-
-        // Remap error
-        lapicw(LAPIC_ERROR, 19);
-
-        // Clear error status register
-        lapicw(LAPIC_ESR, 0);
-        lapicw(LAPIC_ESR, 0);
-
-        // Ack any outstanding interrupts
-        lapicw(LAPIC_EOI, 0);
-
-        // Enable interrupts on APIC
-        lapicw(LAPIC_TPR, 0);
+    // Mask performance counter overflow interrupts
+    if ((lapicr(LAPIC_VER) >> 16) & 0xff) >= 4 {
+        lapicw(LAPIC_PCINT, LAPIC_MASKED);
     }
+
+    // Remap error
+    lapicw(LAPIC_ERROR, 19);
+
+    // Clear error status register
+    lapicw(LAPIC_ESR, 0);
+    lapicw(LAPIC_ESR, 0);
+
+    // Ack any outstanding interrupts
+    lapicw(LAPIC_EOI, 0);
+
+    // Enable interrupts on APIC
+    lapicw(LAPIC_TPR, 0);
 }
 
 #[allow(dead_code)]
@@ -119,6 +115,7 @@ pub unsafe fn start_ap(cpu: u32, code: *const u8) {
     lapicw(LAPIC_ICRLO, LAPIC_ICRLO_STARTUP | (codeaddr >> 12));
 }
 
+/// Emits an EOI.
 #[allow(dead_code)]
 pub fn end_of_interrupt() {
     unsafe {
@@ -126,7 +123,17 @@ pub fn end_of_interrupt() {
     }
 }
 
-pub fn init() {
+/// Initializes LAPIC in xAPIC mode.
+pub unsafe fn init() {
     probe_apic();
     init_lapic();
+}
+
+/// Returns the current processor's APIC ID.
+pub fn cpu_id() -> u32 {
+    let reg = unsafe {
+        ptr::read_volatile((LAPIC + LAPIC_ID) as *const u32)
+    };
+
+    reg >> 24
 }

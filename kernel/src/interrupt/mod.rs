@@ -21,6 +21,7 @@ use astd::sync::Mutex;
 pub use exception::Exception;
 use exception::EXCEPTION_MAX;
 use idt::Idt;
+pub use lapic::cpu_id;
 
 /// The IRQ offset.
 pub const IRQ_OFFSET: usize = 32;

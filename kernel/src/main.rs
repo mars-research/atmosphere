@@ -50,6 +50,7 @@ mod capability;
 mod console;
 mod cpu;
 mod error;
+mod gdt;
 mod interrupt;
 mod logging;
 mod memory;
@@ -90,6 +91,7 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
     unsafe {
         memory::init();
         memory::init_cpu();
+        gdt::init();
         interrupt::init();
         interrupt::init_cpu();
         capability::init();
