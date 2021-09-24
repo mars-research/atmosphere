@@ -16,5 +16,8 @@ jobs:
       - run: nix-env -iA cachix -f https://cachix.org/api/v1/install
       - run: cachix use mars-research
 
+      - name: Run release-mode check
+        run: nix-shell --run "cd kernel && cargo check --release"
+
       - name: Run tests on Bochs
         run: nix-shell --run "cd kernel && cargo test"

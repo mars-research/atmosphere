@@ -27,16 +27,19 @@
 
 #![deny(
     asm_sub_register,
-    dead_code,
     deprecated,
     missing_abi,
     rustdoc::bare_urls,
-    unused_imports,
     unused_must_use,
-    unused_mut,
     unused_unsafe,
-    unused_variables,
 )]
+
+#![cfg_attr(not(debug_assertions), deny(
+    dead_code,
+    unused_imports,
+    unused_mut,
+    unused_variables,
+))]
 
 #![reexport_test_harness_main = "test_main"]
 #![test_runner(crate::test_runner)]
