@@ -986,7 +986,9 @@ mod tests {
             vmm.start()
                 .expect("Could not start VMM");
 
-            VMCS.set_revision(vmm.get_vmcs_revision());
+            VMCS.init(vmm.get_vmcs_revision())
+                .expect("Could not initialize VMCS");
+
             vmm.load_vmcs(&mut VMCS)
                 .expect("Could not load VMCS");
 

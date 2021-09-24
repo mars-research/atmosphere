@@ -4,7 +4,7 @@ use core::fmt::{Display, Formatter, Result as FmtResult};
 use core::ops::{Deref, DerefMut};
 
 use x86::bits64::paging::PAddr;
-use x86::bits64::vmx::vmwrite;
+use x86::bits64::vmx;
 use x86::msr;
 
 use crate::memory::get_physical;
@@ -100,9 +100,15 @@ impl Vmcs {
         }
     }
 
-    /// Sets the VMCS revision identifier.
-    pub fn set_revision(&mut self, vmcs_revision: u32) {
+    /// Initializes the VMCS from scratch.
+    pub fn init(&mut self, vmcs_revision: u32) -> VmxResult<()> {
+        unsafe {
+            vmx::vmclear(self.get_physical().as_u64())?;
+        }
+
         self.vmcs_revision = vmcs_revision;
+
+        Ok(())
     }
 
     /// Checks the alignment of the VMCS region.
@@ -276,7 +282,7 @@ impl CurrentVmcsField {
     /// Applies the new value after checking that it meets the constraint.
     pub unsafe fn apply(&self) -> VmxResult<()> {
         self.constraint.check(self.value)?;
-        vmwrite(self.vmcs_field, self.value as u64)?;
+        vmx::vmwrite(self.vmcs_field, self.value as u64)?;
         Ok(())
     }
 }

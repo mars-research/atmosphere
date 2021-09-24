@@ -11,7 +11,7 @@ pub unsafe fn run() -> Result<()> {
     let mut vmm = Monitor::new(&mut VMXON);
     log::info!("VMM start -> {:?}", vmm.start());
 
-    VMCS.set_revision(vmm.get_vmcs_revision());
+    VMCS.init(vmm.get_vmcs_revision())?;
     log::info!("Load VMCS -> {:?}", vmm.load_vmcs(&mut VMCS));
 
     vmm.demo_launch()?;
