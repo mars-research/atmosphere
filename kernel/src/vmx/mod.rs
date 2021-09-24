@@ -31,6 +31,22 @@ type VmxResult<T, E = VmxError> = core::result::Result<T, E>;
 
 static GUEST_STACK: [u8; 4096] = [0u8; 4096];
 
+macro_rules! copy_host_state {
+    ($x:ident) => {
+        {
+            use x86::vmx::vmcs::{guest, host};
+            (true, host::$x, guest::$x)
+        }
+    };
+    ($cond:expr, $x:ident) => {
+        {
+            use x86::vmx::vmcs::{guest, host};
+            ($cond, host::$x, guest::$x)
+        }
+    };
+}
+
+
 /// A virtualization error.
 ///
 /// The naming of the variants are subject to change.
@@ -329,10 +345,8 @@ impl<'a> Monitor<'a> {
         self.vmxon.check_alignment()?;
 
         // Enter VMX operation
-        //
-        // FIXME: Error reporting
         self.vmxon.set_revision(self.vmcs_revision);
-        vmx::vmxon(self.vmxon.get_physical().as_u64()).unwrap();
+        vmx::vmxon(self.vmxon.get_physical().as_u64())?;
 
         *vmx_enabled = true;
 
@@ -340,16 +354,16 @@ impl<'a> Monitor<'a> {
     }
 
     /// Leaves VMX operation and stops the VMM.
-    pub unsafe fn stop(&mut self) -> VmxResult<()> {
+    pub fn stop(&mut self) -> VmxResult<()> {
         let mut vmx_enabled = self.enabled.write();
         if !*vmx_enabled {
             return Err(VmxError::VmmNotStarted);
         }
 
         // Leave VMX operation
-        //
-        // FIXME: Error reporting
-        vmx::vmxoff().unwrap();
+        unsafe {
+            vmx::vmxoff()?;
+        }
         *vmx_enabled = false;
 
         Ok(())
@@ -372,14 +386,28 @@ impl<'a> Monitor<'a> {
         Ok(())
     }
 
-    /// Low-level method to initialize the currently-loaded VMCS.
-    pub unsafe fn init_vmcs(&mut self) -> VmxResult<()> {
-        self.check_vmm_started()?;
+    /// Test method to initialize and launch an unconfined VM.
+    pub unsafe fn demo_launch(&mut self) -> VmxResult<()> {
+        self.check_vmcs_loaded()?;
 
-        let current_vmcs = self.current_vmcs.lock();
-        if current_vmcs.is_none() {
-            return Err(VmxError::VmcsPtrInvalid);
-        }
+        self.init_vmcs_controls()?;
+        self.save_vmcs_host_state()?;
+        self.init_vmcs_guest_state()?;
+        self.copy_vmcs_host_state_to_guest()?;
+
+        let stack_end = (&GUEST_STACK as *const u8).offset(4096) as u64;
+        let target = demo_guest_main as *const () as u64;
+
+        self.set_vmcs_guest_entrypoint(target, stack_end)?;
+
+        self.launch_current(false)?;
+
+        Ok(())
+    }
+
+    /// Initializes VMCS control fields.
+    unsafe fn init_vmcs_controls(&mut self) -> VmxResult<()> {
+        self.check_vmcs_loaded()?;
 
         let vmx_basic = msr::rdmsr(msr::IA32_VMX_BASIC);
 
@@ -468,58 +496,313 @@ impl<'a> Monitor<'a> {
         Ok(())
     }
 
-    /// Test method to initialize and launch an unconfined VM.
-    pub unsafe fn demo_launch(&mut self) -> VmxResult<()> {
-        use x86::vmx::vmcs::guest::{RIP as GUEST_RIP, RSP as GUEST_RSP};
+    /// Initializes the VMCS Guest-State Area.
+    unsafe fn init_vmcs_guest_state(&self) -> VmxResult<()> {
+        self.check_vmcs_loaded()?;
 
-        self.check_vmm_started()?;
+        // ## Register State
 
-        {
-            let current_vmcs = self.current_vmcs.lock();
-            if current_vmcs.is_none() {
-                return Err(VmxError::VmcsPtrInvalid);
-            }
+        // Limits
+        // If G(Granularity) = 0, then we must mask out the higher bits
+        let unlimited = u32::MAX as u64 & !0xfff00000;
+        vmx::vmwrite(CS_LIMIT, unlimited)?;
+        vmx::vmwrite(SS_LIMIT, unlimited)?;
+        vmx::vmwrite(DS_LIMIT, unlimited)?;
+        vmx::vmwrite(ES_LIMIT, unlimited)?;
+        vmx::vmwrite(FS_LIMIT, unlimited)?;
+        vmx::vmwrite(GS_LIMIT, unlimited)?;
+        vmx::vmwrite(LDTR_LIMIT, unlimited)?;
+        vmx::vmwrite(TR_LIMIT, mem::size_of::<TaskStateSegment>() as u64)?;
+
+        vmx::vmwrite(GDTR_LIMIT, 0xffff)?;
+        vmx::vmwrite(IDTR_LIMIT, 0xffff)?;
+
+        // Access Rights
+        // Attention: Here we disable all access. This must be initialized
+        // correctly before the machine can be started.
+        //
+        // TODO: Implement a builder interface that can be shared between
+        //       here and gdt.
+        vmx::vmwrite(CS_ACCESS_RIGHTS, 0b10000000000000000)?;
+        vmx::vmwrite(SS_ACCESS_RIGHTS, 0b10000000000000000)?;
+        vmx::vmwrite(DS_ACCESS_RIGHTS, 0b10000000000000000)?;
+        vmx::vmwrite(ES_ACCESS_RIGHTS, 0b10000000000000000)?;
+        vmx::vmwrite(FS_ACCESS_RIGHTS, 0b10000000000000000)?;
+        vmx::vmwrite(GS_ACCESS_RIGHTS, 0b10000000000000000)?;
+        vmx::vmwrite(LDTR_ACCESS_RIGHTS, 0b10000000000000000)?;
+        vmx::vmwrite(TR_ACCESS_RIGHTS, 0b10000000000000000)?;
+
+        // ## Non-register State
+        use x86::vmx::vmcs::guest::*;
+        use pal::vmcs::secondary_processor_based_vm_execution_controls::{
+            vmcs_shadowing_is_enabled,
+            enable_pml_is_enabled,
+        };
+
+        vmx::vmwrite(ACTIVITY_STATE, 0)?;
+
+        // Only has an effect when Virtual Interrupt Delivery is enabled
+        vmx::vmwrite(INTERRUPT_STATUS, 0)?;
+
+        // Only has an effect when VMX Preemption Timer is enabled
+        vmx::vmwrite(VMX_PREEMPTION_TIMER_VALUE, 0)?;
+
+        // TODO: Support this for performance gain in nested virtualization
+        if vmcs_shadowing_is_enabled() {
+            return Err(VmxError::VmcsOtherError {
+                error: "VMCS Shadowing is not implemented",
+            });
+        } else {
+            vmx::vmwrite(LINK_PTR_FULL, 0xffff_ffff_ffff_ffff)?;
         }
 
-        save_host_state()?;
-        init_guest_state()?;
-        copy_host_state_to_guest()?;
-
-        let stack_end = (&GUEST_STACK as *const u8).offset(4096) as u64;
-        let target = guest_main as *const () as u64;
-
-        log::info!("Guest RIP <- {:#x?}", target);
-        vmx::vmwrite(GUEST_RIP, target)?;
-        vmx::vmwrite(GUEST_RSP, stack_end)?;
-
-        self.launch_current()?;
+        // TODO: Investigate this
+        if enable_pml_is_enabled() {
+            return Err(VmxError::VmcsOtherError {
+                error: "Page-Modification Logging is not implemented",
+            });
+        } else {
+            // vmx::vmwrite(PML_INDEX, 0)?;
+        }
 
         Ok(())
     }
 
-    /// Launches the currently-loaded VMCS (low-level).
-    pub unsafe fn launch_current(&mut self) -> VmxResult<()> {
+    /// Saves the current host state to the Host-State Area.
+    unsafe fn save_vmcs_host_state(&self) -> VmxResult<()> {
+        // See Intel SDM, Volume 3C, Chapter 24.5.
+
+        self.check_vmcs_loaded()?;
+
+        use pal::vmcs::vm_exit_controls::*;
+        use x86::segmentation as seg;
+        use x86::controlregs as ctl;
+        use x86::vmx::vmcs::host::*;
+
+        // > Selector fields (16 bits each) for the segment registers
+        // > CS, SS, DS, ES, FS, GS, and TR.
+        let selector_mask = 0b11111000;
+        vmx::vmwrite(CS_SELECTOR, (seg::cs().bits() & selector_mask) as u64)?;
+        vmx::vmwrite(SS_SELECTOR, (seg::ss().bits() & selector_mask) as u64)?;
+        vmx::vmwrite(DS_SELECTOR, (seg::ds().bits() & selector_mask) as u64)?;
+        vmx::vmwrite(ES_SELECTOR, (seg::es().bits() & selector_mask) as u64)?;
+
+        vmx::vmwrite(FS_SELECTOR, (seg::fs().bits() & selector_mask) as u64)?;
+        vmx::vmwrite(GS_SELECTOR, (seg::gs().bits() & selector_mask) as u64)?;
+        vmx::vmwrite(TR_SELECTOR, (x86::task::tr().bits() & selector_mask) as u64)?;
+
+        // > Base-address fields for FS, GS, TR, GDTR, and IDTR (64 bits
+        // > each; 32 bits on processors that do not support Intel 64
+        // > architecture)."
+        vmx::vmwrite(FS_BASE, msr::rdmsr(msr::IA32_FS_BASE))?;
+        vmx::vmwrite(GS_BASE, msr::rdmsr(msr::IA32_GS_BASE))?;
+
+        let (tr_base, gdt_base) = {
+            let cpu = cpu::get_current();
+            (&cpu.tss as *const _ as u64, &cpu.gdt as *const _ as u64)
+        };
+        vmx::vmwrite(TR_BASE, tr_base)?;
+        vmx::vmwrite(GDTR_BASE, gdt_base)?;
+        vmx::vmwrite(IDTR_BASE, read_idt_base())?;
+
+        // > CR0, CR3, and CR4 (64 bits each; 32 bits on processors that
+        // > do not support Intel 64 architecture).
+        vmx::vmwrite(CR0, read_cr0() as u64)?;
+        vmx::vmwrite(CR3, ctl::cr3())?;
+        vmx::vmwrite(CR4, read_cr4() as u64)?;
+
+        // > The following MSRs:
+        // > - IA32_SYSENTER_CS (32 bits)
+        // > - IA32_SYSENTER_ESP and IA32_SYSENTER_EIP
+        // > - IA32_PERF_GLOBAL_CTRL
+        // > - IA32_PAT
+        // > - IA32_EFER
+
+        // FIXME: Detect the availability of those features.
+        vmx::vmwrite(IA32_SYSENTER_CS, msr::rdmsr(msr::IA32_SYSENTER_CS))?;
+        vmx::vmwrite(IA32_SYSENTER_ESP, msr::rdmsr(msr::IA32_SYSENTER_ESP))?;
+        vmx::vmwrite(IA32_SYSENTER_EIP, msr::rdmsr(msr::IA32_SYSENTER_EIP))?;
+
+        if load_ia32_perf_global_ctrl_is_enabled() {
+            vmx::vmwrite(IA32_PERF_GLOBAL_CTRL_FULL, msr::rdmsr(msr::IA32_PERF_GLOBAL_CTRL))?;
+        }
+
+        if load_ia32_efer_is_enabled() {
+            vmx::vmwrite(IA32_EFER_FULL, msr::rdmsr(msr::IA32_EFER))?;
+        }
+
+        if load_ia32_pat_is_enabled() {
+            vmx::vmwrite(IA32_PAT_FULL, msr::rdmsr(msr::IA32_PAT))?;
+        }
+
+        Ok(())
+    }
+
+    /// Copies values from the Host-State Area to the Guest-State Area.
+    unsafe fn copy_vmcs_host_state_to_guest(&self) -> VmxResult<()> {
+        use pal::vmcs::vm_entry_controls::*;
+        use x86::vmx::vmcs::guest::{
+            RFLAGS as GUEST_RFLAGS,
+
+            CS_ACCESS_RIGHTS,
+            SS_ACCESS_RIGHTS,
+            DS_ACCESS_RIGHTS,
+            ES_ACCESS_RIGHTS,
+            FS_ACCESS_RIGHTS,
+            GS_ACCESS_RIGHTS,
+            TR_ACCESS_RIGHTS,
+        };
+
+        self.check_vmcs_loaded()?;
+
+        // Copy required host state
+        let to_copy = [
+            // > Selector fields (16 bits each) for the segment registers
+            // > CS, SS, DS, ES, FS, GS, and TR.
+            copy_host_state!(CS_SELECTOR),
+            copy_host_state!(SS_SELECTOR),
+            copy_host_state!(DS_SELECTOR),
+            copy_host_state!(ES_SELECTOR),
+
+            copy_host_state!(FS_SELECTOR),
+            copy_host_state!(GS_SELECTOR),
+
+            copy_host_state!(TR_SELECTOR),
+
+            // > Base-address fields for FS, GS, TR, GDTR, and IDTR (64 bits
+            // > each; 32 bits on processors that do not support Intel 64
+            // > architecture)."
+            copy_host_state!(FS_BASE),
+            copy_host_state!(GS_BASE),
+            copy_host_state!(TR_BASE),
+
+            copy_host_state!(GDTR_BASE),
+            copy_host_state!(IDTR_BASE),
+
+            // > CR0, CR3, and CR4 (64 bits each; 32 bits on processors that
+            // > do not support Intel 64 architecture).
+            copy_host_state!(CR0),
+            copy_host_state!(CR3),
+            copy_host_state!(CR4),
+
+            // > The following MSRs:
+            // > - IA32_SYSENTER_CS (32 bits)
+            // > - IA32_SYSENTER_ESP and IA32_SYSENTER_EIP
+            // > - IA32_PERF_GLOBAL_CTRL
+            // > - IA32_PAT
+            // > - IA32_EFER
+
+            // FIXME: Detect the availability of those features.
+            copy_host_state!(IA32_SYSENTER_CS),
+            copy_host_state!(IA32_SYSENTER_ESP),
+            copy_host_state!(IA32_SYSENTER_EIP),
+
+            // Conditional on whether we load those registers
+            // on VM entry
+            copy_host_state!(
+                load_ia32_perf_global_ctrl_is_enabled(),
+                IA32_PERF_GLOBAL_CTRL_FULL
+            ),
+            copy_host_state!(
+                load_ia32_efer_is_enabled(),
+                IA32_EFER_FULL
+            ),
+            copy_host_state!(
+                load_ia32_pat_is_enabled(),
+                IA32_PAT_FULL
+            ),
+        ];
+
+        for (condition, from, to) in to_copy {
+            if condition {
+                let val = vmx::vmread(from)?;
+                vmx::vmwrite(to, val)?;
+            }
+        }
+
+        let cpu = crate::cpu::get_current();
+
+        // The zeroth bit is A (Accessed). Here we are feeding
+        // the access rights directly into the segment cache, so
+        // it must have been "accessed."
+        let code_ar = cpu.gdt.kernel_code.access_bytes() | 1;
+        let data_ar = cpu.gdt.kernel_data.access_bytes() | 1;
+
+        // Same idea, but for TSS where the A bit is at bit 2
+        let tss_ar = cpu.gdt.tss.access_bytes() | (1 << 1);
+
+        vmx::vmwrite(CS_ACCESS_RIGHTS, code_ar as u64)?;
+        vmx::vmwrite(SS_ACCESS_RIGHTS, data_ar as u64)?;
+        vmx::vmwrite(DS_ACCESS_RIGHTS, data_ar as u64)?;
+        vmx::vmwrite(ES_ACCESS_RIGHTS, data_ar as u64)?;
+        vmx::vmwrite(FS_ACCESS_RIGHTS, data_ar as u64)?;
+        vmx::vmwrite(GS_ACCESS_RIGHTS, data_ar as u64)?;
+        vmx::vmwrite(TR_ACCESS_RIGHTS, tss_ar as u64)?;
+
+        // Bit 1 in RFLAGS must be 1
+        vmx::vmwrite(GUEST_RFLAGS, 0x2)?;
+
+        Ok(())
+    }
+
+    /// Sets the Guest RIP and RSP for the currently-loaded VMCS.
+    unsafe fn set_vmcs_guest_entrypoint(&mut self, rip: u64, rsp: u64) -> VmxResult<()> {
+        use x86::vmx::vmcs::guest::{RIP as GUEST_RIP, RSP as GUEST_RSP};
+
+        self.check_vmcs_loaded()?;
+
+        vmx::vmwrite(GUEST_RIP, rip)?;
+        vmx::vmwrite(GUEST_RSP, rsp)?;
+
+        Ok(())
+    }
+
+    /// Launches or resumes the currently-loaded VMCS (low-level).
+    unsafe fn launch_current(&mut self, resume: bool) -> VmxResult<()> {
         use x86::vmx::vmcs::host::{RIP as HOST_RIP, RSP as HOST_RSP};
 
+        let failure: usize;
         asm!(
+            "xor rax, rax",
+
             "push rbx",
             "push rbp",
             "pushfq",
-            "vmwrite {vmcs_host_rsp:r}, rsp",
-            "lea rax, 1f",
-            "vmwrite {vmcs_host_rip:r}, rax",
-            "vmlaunch",
 
-            "1:", // Exit
+            "mov rbx, {vmcs_host_rsp}",
+            "vmwrite rbx, rsp",
+
+            "lea rdx, 3f", // -> VM Exit
+            "mov rbx, {vmcs_host_rip}",
+            "vmwrite rbx, rdx",
+
+            "cmp {resume:r}, 1",
+            "je 1f", // -> Resume
+
+            // Launch
+            "vmlaunch",
+            "jmp 2f", // -> Failure
+
+            // Resume
+            "1:",
+            "vmresume",
+
+            // Failure
+            "2:",
+            "mov rax, 1",
+
+            // VM Exit
+            "3:",
 
             "popfq",
             "pop rbp",
             "pop rbx",
 
-            vmcs_host_rsp = in(reg) HOST_RSP,
-            vmcs_host_rip = in(reg) HOST_RIP,
-            lateout("rax") _,
-            lateout("rcx") _,
+            vmcs_host_rsp = const HOST_RSP,
+            vmcs_host_rip = const HOST_RIP,
+            resume = in(reg) resume as usize,
+
+            lateout("rax") failure,
             lateout("rdx") _,
             lateout("rdi") _,
             lateout("rsi") _,
@@ -534,14 +817,16 @@ impl<'a> Monitor<'a> {
             lateout("r15") _,
         );
 
-        let rflags = read_rflags();
+        if failure == 1 {
+            let rflags = read_rflags();
 
-        if rflags.contains(RFlags::FLAGS_ZF) {
-            return Err(VmxError::VmcsPtrValid);
-        }
+            if rflags.contains(RFlags::FLAGS_ZF) {
+                return Err(VmxError::VmcsPtrValid);
+            }
 
-        if rflags.contains(RFlags::FLAGS_CF) {
-            return Err(VmxError::VmcsPtrInvalid);
+            if rflags.contains(RFlags::FLAGS_CF) {
+                return Err(VmxError::VmcsPtrInvalid);
+            }
         }
 
         Ok(())
@@ -579,10 +864,31 @@ impl<'a> Monitor<'a> {
 
         Ok(())
     }
+
+    /// Checks that a VMCS is currently loaded.
+    fn check_vmcs_loaded(&self) -> VmxResult<()> {
+        self.check_vmm_started()?;
+
+        let current_vmcs = self.current_vmcs.lock();
+        if current_vmcs.is_none() {
+            return Err(VmxError::VmcsPtrInvalid);
+        }
+
+        Ok(())
+    }
+}
+
+impl<'a> Drop for Monitor<'a> {
+    fn drop(&mut self) {
+        let vmx_enabled = *self.enabled.read();
+        if vmx_enabled {
+            self.stop().expect("Monitor::Drop(): Could not VMXOFF");
+        }
+    }
 }
 
 #[no_mangle]
-unsafe extern "C" fn guest_main() {
+unsafe extern "C" fn demo_guest_main() {
     log::info!("Hello from VM");
 
     // Cause an exit
@@ -591,263 +897,6 @@ unsafe extern "C" fn guest_main() {
 
 // FIXME: Also set RIP and RSP
 
-/// Saves the current host state to the Host-State Area.
-unsafe fn save_host_state() -> VmxResult<()> {
-    // See Intel SDM, Volume 3C, Chapter 24.5.
-
-    use pal::vmcs::vm_exit_controls::*;
-    use x86::segmentation as seg;
-    use x86::controlregs as ctl;
-    use x86::vmx::vmcs::host::*;
-
-    // > Selector fields (16 bits each) for the segment registers
-    // > CS, SS, DS, ES, FS, GS, and TR.
-    let selector_mask = 0b11111000;
-    vmx::vmwrite(CS_SELECTOR, (seg::cs().bits() & selector_mask) as u64)?;
-    vmx::vmwrite(SS_SELECTOR, (seg::ss().bits() & selector_mask) as u64)?;
-    vmx::vmwrite(DS_SELECTOR, (seg::ds().bits() & selector_mask) as u64)?;
-    vmx::vmwrite(ES_SELECTOR, (seg::es().bits() & selector_mask) as u64)?;
-
-    vmx::vmwrite(FS_SELECTOR, (seg::fs().bits() & selector_mask) as u64)?;
-    vmx::vmwrite(GS_SELECTOR, (seg::gs().bits() & selector_mask) as u64)?;
-    vmx::vmwrite(TR_SELECTOR, (x86::task::tr().bits() & selector_mask) as u64)?;
-
-    // > Base-address fields for FS, GS, TR, GDTR, and IDTR (64 bits
-    // > each; 32 bits on processors that do not support Intel 64
-    // > architecture)."
-    vmx::vmwrite(FS_BASE, msr::rdmsr(msr::IA32_FS_BASE))?;
-    vmx::vmwrite(GS_BASE, msr::rdmsr(msr::IA32_GS_BASE))?;
-
-    let (tr_base, gdt_base) = {
-        let cpu = cpu::get_current();
-        (&cpu.tss as *const _ as u64, &cpu.gdt as *const _ as u64)
-    };
-    vmx::vmwrite(TR_BASE, tr_base)?;
-    vmx::vmwrite(GDTR_BASE, gdt_base)?;
-    vmx::vmwrite(IDTR_BASE, read_idt_base())?;
-
-    // > CR0, CR3, and CR4 (64 bits each; 32 bits on processors that
-    // > do not support Intel 64 architecture).
-    vmx::vmwrite(CR0, read_cr0() as u64)?;
-    vmx::vmwrite(CR3, ctl::cr3())?;
-    vmx::vmwrite(CR4, read_cr4() as u64)?;
-
-    // > The following MSRs:
-    // > - IA32_SYSENTER_CS (32 bits)
-    // > - IA32_SYSENTER_ESP and IA32_SYSENTER_EIP
-    // > - IA32_PERF_GLOBAL_CTRL
-    // > - IA32_PAT
-    // > - IA32_EFER
-
-    // FIXME: Detect the availability of those features.
-    vmx::vmwrite(IA32_SYSENTER_CS, msr::rdmsr(msr::IA32_SYSENTER_CS))?;
-    vmx::vmwrite(IA32_SYSENTER_ESP, msr::rdmsr(msr::IA32_SYSENTER_ESP))?;
-    vmx::vmwrite(IA32_SYSENTER_EIP, msr::rdmsr(msr::IA32_SYSENTER_EIP))?;
-
-    if load_ia32_perf_global_ctrl_is_enabled() {
-        vmx::vmwrite(IA32_PERF_GLOBAL_CTRL_FULL, msr::rdmsr(msr::IA32_PERF_GLOBAL_CTRL))?;
-    }
-
-    if load_ia32_efer_is_enabled() {
-        vmx::vmwrite(IA32_EFER_FULL, msr::rdmsr(msr::IA32_EFER))?;
-    }
-
-    if load_ia32_pat_is_enabled() {
-        vmx::vmwrite(IA32_PAT_FULL, msr::rdmsr(msr::IA32_PAT))?;
-    }
-
-    Ok(())
-}
-
-macro_rules! copy_host_state {
-    ($x:ident) => {
-        {
-            use x86::vmx::vmcs::{guest, host};
-            (true, host::$x, guest::$x)
-        }
-    };
-    ($cond:expr, $x:ident) => {
-        {
-            use x86::vmx::vmcs::{guest, host};
-            ($cond, host::$x, guest::$x)
-        }
-    };
-}
-
-/// Initializes the Guest-State Area.
-unsafe fn init_guest_state() -> VmxResult<()> {
-    // ## Register State
-
-    // Limits
-    // If G(Granularity) = 0, then we must mask out the higher bits
-    let unlimited = u32::MAX as u64 & !0xfff00000;
-    vmx::vmwrite(CS_LIMIT, unlimited)?;
-    vmx::vmwrite(SS_LIMIT, unlimited)?;
-    vmx::vmwrite(DS_LIMIT, unlimited)?;
-    vmx::vmwrite(ES_LIMIT, unlimited)?;
-    vmx::vmwrite(FS_LIMIT, unlimited)?;
-    vmx::vmwrite(GS_LIMIT, unlimited)?;
-    vmx::vmwrite(LDTR_LIMIT, unlimited)?;
-    vmx::vmwrite(TR_LIMIT, mem::size_of::<TaskStateSegment>() as u64)?;
-
-    vmx::vmwrite(GDTR_LIMIT, 0xffff)?;
-    vmx::vmwrite(IDTR_LIMIT, 0xffff)?;
-
-    // Access Rights
-    // Attention: Here we disable all access. This must be initialized
-    // correctly before the machine can be started.
-    //
-    // TODO: Implement a builder interface that can be shared between
-    //       here and gdt.
-    vmx::vmwrite(CS_ACCESS_RIGHTS, 0b10000000000000000)?;
-    vmx::vmwrite(SS_ACCESS_RIGHTS, 0b10000000000000000)?;
-    vmx::vmwrite(DS_ACCESS_RIGHTS, 0b10000000000000000)?;
-    vmx::vmwrite(ES_ACCESS_RIGHTS, 0b10000000000000000)?;
-    vmx::vmwrite(FS_ACCESS_RIGHTS, 0b10000000000000000)?;
-    vmx::vmwrite(GS_ACCESS_RIGHTS, 0b10000000000000000)?;
-    vmx::vmwrite(LDTR_ACCESS_RIGHTS, 0b10000000000000000)?;
-    vmx::vmwrite(TR_ACCESS_RIGHTS, 0b10000000000000000)?;
-
-    // ## Non-register State
-    use x86::vmx::vmcs::guest::*;
-    use pal::vmcs::secondary_processor_based_vm_execution_controls::{
-        vmcs_shadowing_is_enabled,
-        enable_pml_is_enabled,
-    };
-
-    vmx::vmwrite(ACTIVITY_STATE, 0)?;
-
-    // Only has an effect when Virtual Interrupt Delivery is enabled
-    vmx::vmwrite(INTERRUPT_STATUS, 0)?;
-
-    // Only has an effect when VMX Preemption Timer is enabled
-    vmx::vmwrite(VMX_PREEMPTION_TIMER_VALUE, 0)?;
-
-    // TODO: Support this for performance gain in nested virtualization
-    if vmcs_shadowing_is_enabled() {
-        return Err(VmxError::VmcsOtherError {
-            error: "VMCS Shadowing is not implemented",
-        });
-    } else {
-        vmx::vmwrite(LINK_PTR_FULL, 0xffff_ffff_ffff_ffff)?;
-    }
-
-    // TODO: Investigate this
-    if enable_pml_is_enabled() {
-        return Err(VmxError::VmcsOtherError {
-            error: "Page-Modification Logging is not implemented",
-        });
-    } else {
-        // vmx::vmwrite(PML_INDEX, 0)?;
-    }
-
-    Ok(())
-}
-
-/// Copies values from the Host-State Area to the Guest-State Area.
-unsafe fn copy_host_state_to_guest() -> VmxResult<()> {
-    use pal::vmcs::vm_entry_controls::*;
-    use x86::vmx::vmcs::guest::{
-        RFLAGS as GUEST_RFLAGS,
-
-        CS_ACCESS_RIGHTS,
-        SS_ACCESS_RIGHTS,
-        DS_ACCESS_RIGHTS,
-        ES_ACCESS_RIGHTS,
-        FS_ACCESS_RIGHTS,
-        GS_ACCESS_RIGHTS,
-        TR_ACCESS_RIGHTS,
-    };
-
-    // Copy required host state
-    let to_copy = [
-        // > Selector fields (16 bits each) for the segment registers
-        // > CS, SS, DS, ES, FS, GS, and TR.
-        copy_host_state!(CS_SELECTOR),
-        copy_host_state!(SS_SELECTOR),
-        copy_host_state!(DS_SELECTOR),
-        copy_host_state!(ES_SELECTOR),
-
-        copy_host_state!(FS_SELECTOR),
-        copy_host_state!(GS_SELECTOR),
-
-        copy_host_state!(TR_SELECTOR),
-
-        // > Base-address fields for FS, GS, TR, GDTR, and IDTR (64 bits
-        // > each; 32 bits on processors that do not support Intel 64
-        // > architecture)."
-        copy_host_state!(FS_BASE),
-        copy_host_state!(GS_BASE),
-        copy_host_state!(TR_BASE),
-
-        copy_host_state!(GDTR_BASE),
-        copy_host_state!(IDTR_BASE),
-
-        // > CR0, CR3, and CR4 (64 bits each; 32 bits on processors that
-        // > do not support Intel 64 architecture).
-        copy_host_state!(CR0),
-        copy_host_state!(CR3),
-        copy_host_state!(CR4),
-
-        // > The following MSRs:
-        // > - IA32_SYSENTER_CS (32 bits)
-        // > - IA32_SYSENTER_ESP and IA32_SYSENTER_EIP
-        // > - IA32_PERF_GLOBAL_CTRL
-        // > - IA32_PAT
-        // > - IA32_EFER
-
-        // FIXME: Detect the availability of those features.
-        copy_host_state!(IA32_SYSENTER_CS),
-        copy_host_state!(IA32_SYSENTER_ESP),
-        copy_host_state!(IA32_SYSENTER_EIP),
-
-        // Conditional on whether we load those registers
-        // on VM entry
-        copy_host_state!(
-            load_ia32_perf_global_ctrl_is_enabled(),
-            IA32_PERF_GLOBAL_CTRL_FULL
-        ),
-        copy_host_state!(
-            load_ia32_efer_is_enabled(),
-            IA32_EFER_FULL
-        ),
-        copy_host_state!(
-            load_ia32_pat_is_enabled(),
-            IA32_PAT_FULL
-        ),
-    ];
-
-    for (condition, from, to) in to_copy {
-        if condition {
-            let val = vmx::vmread(from)?;
-            vmx::vmwrite(to, val)?;
-        }
-    }
-
-    let cpu = crate::cpu::get_current();
-
-    // The zeroth bit is A (Accessed). Here we are feeding
-    // the access rights directly into the segment cache, so
-    // it must have been "accessed."
-    let code_ar = cpu.gdt.kernel_code.access_bytes() | 1;
-    let data_ar = cpu.gdt.kernel_data.access_bytes() | 1;
-
-    // Same idea, but for TSS where the A bit is at bit 2
-    let tss_ar = cpu.gdt.tss.access_bytes() | (1 << 1);
-
-    vmx::vmwrite(CS_ACCESS_RIGHTS, code_ar as u64)?;
-    vmx::vmwrite(SS_ACCESS_RIGHTS, data_ar as u64)?;
-    vmx::vmwrite(DS_ACCESS_RIGHTS, data_ar as u64)?;
-    vmx::vmwrite(ES_ACCESS_RIGHTS, data_ar as u64)?;
-    vmx::vmwrite(FS_ACCESS_RIGHTS, data_ar as u64)?;
-    vmx::vmwrite(GS_ACCESS_RIGHTS, data_ar as u64)?;
-    vmx::vmwrite(TR_ACCESS_RIGHTS, tss_ar as u64)?;
-
-    // Bit 1 in RFLAGS must be 1
-    vmx::vmwrite(GUEST_RFLAGS, 0x2)?;
-
-    Ok(())
-}
 
 /// Reads the value of CR0.
 unsafe fn read_cr0() -> u32 {
@@ -915,4 +964,52 @@ unsafe fn read_idt_base() -> u64 {
     x86::dtables::sidt(&mut idt_pointer);
 
     idt_pointer.base as u64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use atest::test;
+
+    static mut VMXON: Vmxon = Vmxon::new();
+    static mut VMCS: Vmcs = Vmcs::new();
+    static GUEST_STACK: [u8; 4096] = [0u8; 4096];
+
+    unsafe extern "C" fn guest_main() {
+        asm!("cpuid");
+    }
+
+    #[test]
+    fn test_simple_vm() {
+        unsafe {
+            let mut vmm = Monitor::new(&mut VMXON);
+            vmm.start()
+                .expect("Could not start VMM");
+
+            VMCS.set_revision(vmm.get_vmcs_revision());
+            vmm.load_vmcs(&mut VMCS)
+                .expect("Could not load VMCS");
+
+            vmm.init_vmcs_controls()
+                .expect("Could not initialize VMCS Controls");
+
+            vmm.init_vmcs_guest_state()
+                .expect("Could not initialize VMCS Guest State");
+
+            vmm.save_vmcs_host_state()
+                .expect("Could not save VMCS Host State");
+
+            vmm.copy_vmcs_host_state_to_guest()
+                .expect("Could not copy VMCS Host State to Guest State");
+
+            let stack_end = (&GUEST_STACK as *const u8).offset(4096) as u64;
+            let target = guest_main as *const () as u64;
+
+            vmm.set_vmcs_guest_entrypoint(target, stack_end)
+                .expect("Failed to set guest entrypoint");
+
+            vmm.launch_current(false)
+                .expect("Failed to launch VM");
+        }
+    }
 }

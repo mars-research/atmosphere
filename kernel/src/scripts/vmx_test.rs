@@ -14,7 +14,6 @@ pub unsafe fn run() -> Result<()> {
     VMCS.set_revision(vmm.get_vmcs_revision());
     log::info!("Load VMCS -> {:?}", vmm.load_vmcs(&mut VMCS));
 
-    vmm.init_vmcs()?;
     vmm.demo_launch()?;
 
     log::info!("VMM stop -> {:?}", vmm.stop());
