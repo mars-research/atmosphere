@@ -15,6 +15,7 @@ use core::mem;
 
 use bit_field::BitField;
 use snafu::Snafu;
+use x86::bits64::rflags::{read as read_rflags, RFlags};
 use x86::bits64::vmx;
 use x86::cpuid::CpuId;
 use x86::msr;
@@ -469,8 +470,16 @@ impl<'a> Monitor<'a> {
 
     /// Test method to initialize and launch an unconfined VM.
     pub unsafe fn demo_launch(&mut self) -> VmxResult<()> {
-        // use x86::vmx::vmcs::host::{RIP as HOST_RIP, RSP as HOST_RSP};
         use x86::vmx::vmcs::guest::{RIP as GUEST_RIP, RSP as GUEST_RSP};
+
+        self.check_vmm_started()?;
+
+        {
+            let current_vmcs = self.current_vmcs.lock();
+            if current_vmcs.is_none() {
+                return Err(VmxError::VmcsPtrInvalid);
+            }
+        }
 
         save_host_state()?;
         init_guest_state()?;
@@ -483,10 +492,59 @@ impl<'a> Monitor<'a> {
         vmx::vmwrite(GUEST_RIP, target)?;
         vmx::vmwrite(GUEST_RSP, stack_end)?;
 
-        asm!("xchg bx, bx");
-        vmx::vmlaunch()?;
+        self.launch_current()?;
 
-        unreachable!()
+        Ok(())
+    }
+
+    /// Launches the currently-loaded VMCS (low-level).
+    pub unsafe fn launch_current(&mut self) -> VmxResult<()> {
+        use x86::vmx::vmcs::host::{RIP as HOST_RIP, RSP as HOST_RSP};
+
+        asm!(
+            "push rbx",
+            "push rbp",
+            "pushfq",
+            "vmwrite {vmcs_host_rsp:r}, rsp",
+            "lea rax, 1f",
+            "vmwrite {vmcs_host_rip:r}, rax",
+            "vmlaunch",
+
+            "1:", // Exit
+
+            "popfq",
+            "pop rbp",
+            "pop rbx",
+
+            vmcs_host_rsp = in(reg) HOST_RSP,
+            vmcs_host_rip = in(reg) HOST_RIP,
+            lateout("rax") _,
+            lateout("rcx") _,
+            lateout("rdx") _,
+            lateout("rdi") _,
+            lateout("rsi") _,
+            lateout("r8") _,
+            lateout("r9") _,
+            lateout("r10") _,
+            lateout("r11") _,
+
+            lateout("r12") _,
+            lateout("r13") _,
+            lateout("r14") _,
+            lateout("r15") _,
+        );
+
+        let rflags = read_rflags();
+
+        if rflags.contains(RFlags::FLAGS_ZF) {
+            return Err(VmxError::VmcsPtrValid);
+        }
+
+        if rflags.contains(RFlags::FLAGS_CF) {
+            return Err(VmxError::VmcsPtrInvalid);
+        }
+
+        Ok(())
     }
 
     /// Returns the VMCS revision identifier.
@@ -525,9 +583,10 @@ impl<'a> Monitor<'a> {
 
 #[no_mangle]
 unsafe extern "C" fn guest_main() {
-    asm!("xchg bx, bx");
     log::info!("Hello from VM");
-    loop {}
+
+    // Cause an exit
+    asm!("cpuid");
 }
 
 // FIXME: Also set RIP and RSP
