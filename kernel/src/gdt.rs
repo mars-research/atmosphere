@@ -15,6 +15,7 @@
 //! * 2 - Kernel Data
 //! * 3,4 - TSS
 
+use core::cmp::min;
 use core::mem;
 
 use x86::Ring;
@@ -25,6 +26,9 @@ use x86::segmentation::{load_ds, load_es, load_fs, load_gs, load_ss, SegmentSele
 use x86::task::load_tr;
 
 use crate::cpu::Cpu;
+
+/// Size of an IST stack.
+const IST_STACK_SIZE: usize = 4096;
 
 // GDT access flags
 const GDT_A_PRESENT: u8 = 1 << 7;
@@ -46,19 +50,22 @@ const GDT_A_TSS_AVAIL: u8 = 0x9;
 // const GDT_F_PROTECTED_MODE: u8 = 1 << 6;
 const GDT_F_LONG_MODE: u8 = 1 << 5;
 
-/// Initializes the GDT on CPU 0.
-///
-/// This should only be called once on CPU 0.
-pub unsafe fn init() {
-    let cpu = &mut crate::cpu::CPU0;
-
-    init_gdt_cpu(cpu);
-}
-
-/// Initializes and loads a GDT.
+/// Initializes and loads the GDT.
 ///
 /// This must be called only once for each CPU reset.
-unsafe fn init_gdt_cpu(cpu: &mut Cpu) {
+pub unsafe fn init_cpu() {
+    let mut cpu = crate::cpu::get_current_mut();
+
+    // Initialize TSS
+    let tss_addr = {
+        for i in 0..min(cpu.ist.len(), 7) {
+            let ist_addr = &cpu.ist[i] as *const IstStack;
+            cpu.tss.set_ist(i, ist_addr as u64);
+        }
+
+        &cpu.tss as *const TaskStateSegment
+    };
+
     // Initialize GDT
     let mut gdt = &mut cpu.gdt;
 
@@ -77,27 +84,14 @@ unsafe fn init_gdt_cpu(cpu: &mut Cpu) {
     );
 
     gdt.tss = BigGdtEntry::new(
-        &cpu.tss as *const _ as u64,
+        tss_addr as u64,
         mem::size_of::<TaskStateSegment>() as u32,
         GDT_A_PRESENT | GDT_A_RING_3 | GDT_A_TSS_AVAIL,
         0,
     );
 
-    // Initialize TSS
-    let tss = &mut cpu.tss;
-
-    for i in 0..7 {
-        tss.set_ist(i, &cpu.ist[i] as *const _ as u64);
-    }
-
     // Load GDT
-    let limit = mem::size_of::<GlobalDescriptorTable>().try_into()
-        .expect("GDT too big");
-
-    lgdt(&DescriptorTablePointer {
-        limit,
-        base: &gdt as *const _,
-    });
+    lgdt(&gdt.get_pointer());
 
     load_cs(SegmentSelector::new(1, Ring::Ring0));
     load_ds(SegmentSelector::new(2, Ring::Ring0));
@@ -137,6 +131,17 @@ impl GlobalDescriptorTable {
             kernel_code: GdtEntry::empty(),
             kernel_data: GdtEntry::empty(),
             tss: BigGdtEntry::empty(),
+        }
+    }
+
+    /// Returns a pointer to this GDT.
+    fn get_pointer(&self) -> DescriptorTablePointer<Self> {
+        let limit = mem::size_of::<Self>().try_into()
+            .expect("GDT too big");
+
+        DescriptorTablePointer {
+            limit,
+            base: self as *const GlobalDescriptorTable,
         }
     }
 }
@@ -218,5 +223,15 @@ impl BigGdtEntry {
     pub fn access_bytes(&self) -> u32 {
         let flags = self.flags_limith & 0b11110000;
         (self.access_type as u32) | ((flags as u32) << 8)
+    }
+}
+
+/// An IST stack.
+#[repr(transparent)]
+pub struct IstStack([u8; IST_STACK_SIZE]);
+
+impl IstStack {
+    pub const fn new() -> Self {
+        Self([0u8; IST_STACK_SIZE])
     }
 }

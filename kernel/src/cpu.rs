@@ -7,29 +7,39 @@
 //! - TSS
 //! - IST stack spaces
 //!
-//! We preallocate the structure for CPU 0, and the space for
-//! other CPUs are provided by Cpu capabilities.
+//! We preallocate the structure for CPU 0, and the space for other
+//! CPUs are provided by Cpu capabilities.
+
+use core::ops::{Deref, DerefMut};
+
+use spin::RwLock;
 
 use crate::vmx::vmcs::Vmxon;
-use crate::gdt::{GlobalDescriptorTable, TaskStateSegment};
-
-/// Size of an IST stack.
-pub const IST_STACK_SIZE: usize = 4096;
-
-pub type IstStack = [u8; IST_STACK_SIZE];
+use crate::gdt::{GlobalDescriptorTable, IstStack, TaskStateSegment};
 
 /// Per-processor data for CPU 0.
-pub static mut CPU0: Cpu = Cpu::new();
+static CPU0: RwLock<Cpu> = RwLock::new(Cpu::new());
 
-/// Returns a mutable handle to the current CPU's data structure.
-pub unsafe fn get_current_cpu() -> &'static mut Cpu {
+/// Returns an immutable handle to the current CPU's data structure.
+pub fn get_current() -> impl Deref<Target = Cpu> {
     let id = crate::interrupt::cpu_id();
 
     if id != 0 {
-        unimplemented!()
+        panic!("SMP is not implemented (CPU {})", id)
     }
 
-    &mut CPU0
+    CPU0.read()
+}
+
+/// Returns a mutable handle to the current CPU's data structure.
+pub fn get_current_mut() -> impl DerefMut<Target = Cpu> {
+    let id = crate::interrupt::cpu_id();
+
+    if id != 0 {
+        panic!("SMP is not implemented (CPU {})", id)
+    }
+
+    CPU0.write()
 }
 
 /// Per-processor data for a CPU.
@@ -56,7 +66,15 @@ impl Cpu {
             vmxon: Vmxon::new(),
             gdt: GlobalDescriptorTable::empty(),
             tss: TaskStateSegment::new(),
-            ist: [[0u8; IST_STACK_SIZE]; 7],
+            ist: [
+                IstStack::new(),
+                IstStack::new(),
+                IstStack::new(),
+                IstStack::new(),
+                IstStack::new(),
+                IstStack::new(),
+                IstStack::new(),
+            ],
         }
     }
 }

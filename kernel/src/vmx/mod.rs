@@ -619,7 +619,7 @@ unsafe fn save_host_state() -> VmxResult<()> {
     vmx::vmwrite(GS_BASE, msr::rdmsr(msr::IA32_GS_BASE))?;
 
     let (tr_base, gdt_base) = {
-        let cpu = cpu::get_current_cpu();
+        let cpu = cpu::get_current();
         (&cpu.tss as *const _ as u64, &cpu.gdt as *const _ as u64)
     };
     vmx::vmwrite(TR_BASE, tr_base)?;
@@ -824,7 +824,7 @@ unsafe fn copy_host_state_to_guest() -> VmxResult<()> {
         }
     }
 
-    let cpu = crate::cpu::get_current_cpu();
+    let cpu = crate::cpu::get_current();
 
     // The zeroth bit is A (Accessed). Here we are feeding
     // the access rights directly into the segment cache, so
