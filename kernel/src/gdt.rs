@@ -27,9 +27,6 @@ use x86::task::load_tr;
 use crate::cpu::Cpu;
 
 // GDT access flags
-// TODO: The Access flags in RedLeaf are wrong. Need to fix them
-
-/*
 const GDT_A_PRESENT: u8 = 1 << 7;
 const GDT_A_RING_0: u8 = 0 << 5;
 // const GDT_A_RING_1: u8 = 1 << 5;
@@ -37,17 +34,6 @@ const GDT_A_RING_0: u8 = 0 << 5;
 const GDT_A_RING_3: u8 = 3 << 5;
 const GDT_A_SYSTEM: u8 = 1 << 4;
 const GDT_A_EXECUTABLE: u8 = 1 << 3;
-// const GDT_A_CONFORMING: u8 = 1 << 2;
-const GDT_A_PRIVILEGE: u8 = 1 << 1;
-// const GDT_A_DIRTY: u8 = 1;
-*/
-const GDT_A_PRESENT: u8 = 1 << 7;
-const GDT_A_RING_0: u8 = 0 << 5;
-// const GDT_A_RING_1: u8 = 1 << 5;
-// const GDT_A_RING_2: u8 = 2 << 5;
-const GDT_A_RING_3: u8 = 3 << 5;
-const GDT_A_SYSTEM: u8 = 1 << 4;
-const GDT_A_EXECUTABLE: u8 = 1 << 3; // correct after all???
 // const GDT_A_CONFORMING: u8 = 1 << 2;
 const GDT_A_READABLE: u8 = 1 << 1;
 // const GDT_A_DIRTY: u8 = 1;
