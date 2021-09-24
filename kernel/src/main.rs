@@ -84,18 +84,18 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
         log::info!("Atmosphere was built in debug mode.");
     }
 
-    #[cfg(test)]
-    {
-        log::info!("Atmosphere was built with the test harness");
-        test_main();
-    }
-
     unsafe {
         memory::init();
         memory::init_cpu();
         interrupt::init();
         interrupt::init_cpu();
         capability::init();
+    }
+
+    #[cfg(test)]
+    {
+        log::info!("Atmosphere was built with the test harness");
+        test_main();
     }
 
     unsafe {
