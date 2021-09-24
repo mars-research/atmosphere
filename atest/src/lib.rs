@@ -27,6 +27,5 @@ pub fn test(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #[test_case]
     });
 
-    eprintln!("func: {:?}", func.sig.ident);
     func.into_token_stream().into()
 }
