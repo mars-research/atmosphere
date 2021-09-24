@@ -13,7 +13,7 @@
 
     pkgs = mars-std.legacyPackages.${system};
     pinnedRust = pkgs.rust-bin.nightly.${nightlyVersion}.default.override {
-      extensions = [ "rust-src" "rust-analyzer-preview" ];
+      extensions = [ "rust-src" "rust-analyzer-preview" "clippy" ];
       targets = [ "x86_64-unknown-linux-gnu" ];
     };
     rustPlatform = pkgs.makeRustPlatform {
