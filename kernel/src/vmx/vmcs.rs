@@ -175,9 +175,7 @@ impl BitfieldConstraint {
 
     /// Verifies that the supplied value meets the constraint.
     fn check(&self, value: u32) -> VmxResult<()> {
-        if (!value &  self.allowed_zero) != 0 ||
-           ( value & !self.allowed_one ) != 0
-        {
+        if (!value & self.allowed_zero) != 0 || ( value & !self.allowed_one ) != 0 {
             let explain = ExplainBitfieldConstraint {
                 constraint: self.clone(),
                 value,
