@@ -22,6 +22,9 @@ jobs:
       - name: Run tests on Bochs
         run: nix-shell --run "cd kernel && cargo test"
 
+      - name: Run vmx_test on Bochs
+        run: nix-shell --run "cd kernel && atmo run --script=vmx_test"
+
       - name: Run release-mode clippy (optional)
         continue-on-error: true
         run: nix-shell --run "cd kernel && cargo clippy --release"
