@@ -354,6 +354,6 @@ mod tests {
         let constraint = get_simple_constraint();
         let error = constraint.check(0b1111111111)
             .expect_err("Value must fail 1-constraint");
-        log::info!("Returned error: {}", error);
+        log::info!("Returned error (should say that bits 5-9 must be 0): {}", error);
     }
 }

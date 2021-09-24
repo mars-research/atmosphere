@@ -112,7 +112,7 @@ impl From<x86::vmx::VmFail> for VmxError {
 /// See Intel SDM, Volume 3C, Chapter 30.4.
 #[allow(dead_code)]
 #[non_exhaustive]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum VmxInstructionError {
     /// VMCALL executed in VMX root operation
     VmcallInVmxRoot,
@@ -968,6 +968,9 @@ unsafe fn read_idt_base() -> u64 {
 
 #[cfg(test)]
 mod tests {
+    use x86::bits64::vmx;
+    use x86::vmx::vmcs::control;
+
     use super::*;
     use atest::test;
 
@@ -1012,6 +1015,51 @@ mod tests {
 
             vmm.launch_current(false)
                 .expect("Failed to launch VM");
+        }
+    }
+
+    #[test]
+    fn test_invalid_vm() {
+        unsafe {
+            let mut vmm = Monitor::new(&mut VMXON);
+            vmm.start()
+                .expect("Could not start VMM");
+
+            VMCS.init(vmm.get_vmcs_revision())
+                .expect("Could not initialize VMCS");
+
+            vmm.load_vmcs(&mut VMCS)
+                .expect("Could not load VMCS");
+
+            vmm.init_vmcs_controls()
+                .expect("Could not initialize VMCS Controls");
+
+            vmm.init_vmcs_guest_state()
+                .expect("Could not initialize VMCS Guest State");
+
+            vmm.save_vmcs_host_state()
+                .expect("Could not save VMCS Host State");
+
+            vmm.copy_vmcs_host_state_to_guest()
+                .expect("Could not copy VMCS Host State to Guest State");
+
+            // manually inject an invalid control value
+            vmx::vmwrite(control::PINBASED_EXEC_CONTROLS, u64::MAX)
+                .expect("Could not inject control value");
+
+            let stack_end = (&GUEST_STACK as *const u8).offset(4096) as u64;
+            let target = guest_main as *const () as u64;
+
+            vmm.set_vmcs_guest_entrypoint(target, stack_end)
+                .expect("Failed to set guest entrypoint");
+
+            let launch_err = vmm.launch_current(false)
+                .expect_err("VM launch must fail");
+
+            if let VmxError::VmcsPtrValid = launch_err {
+            } else {
+                panic!("Launch must fail with VmxError::VmcsPtrValid");
+            }
         }
     }
 }
