@@ -2,6 +2,7 @@
 
 members = [
   "astd",
+  "atest",
   "kernel",
   "libcap",
   "ns16550a",

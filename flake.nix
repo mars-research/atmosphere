@@ -34,7 +34,7 @@
 
         self.packages.${system}.build-tool
       ] ++ (with pkgs; [
-        gnumake utillinux
+        gnumake utillinux cargo-expand
 
         gcc10 clang_10 nasm
         grub2 xorriso gdb
