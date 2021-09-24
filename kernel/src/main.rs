@@ -131,7 +131,7 @@ fn test_runner(tests: &[&dyn Fn()]) -> ! {
 /// Prints the Atmosphere logo.
 fn print_logo() {
     let logo = include_str!("logo.txt");
-    for line in logo.split("\n") {
+    for line in logo.split('\n') {
         log::info!("{}", line);
     }
 }

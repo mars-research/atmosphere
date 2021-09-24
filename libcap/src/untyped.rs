@@ -15,6 +15,7 @@
 //! moving `capFreeIndex` (the watermark) forward in the process.
 
 use core::alloc::Layout;
+use core::ptr;
 
 use astd::capability::{CapError, CapResult};
 use super::{Capability, CapPointer, CapType, CSpace, DowncastedCap, PermissionSet};
@@ -99,8 +100,8 @@ impl UntypedCap {
             object,
             data,
             permissions: PermissionSet::maximum(),
-            prev: 0 as *const Capability,
-            next: 0 as *const Capability,
+            prev: ptr::null(),
+            next: ptr::null(),
             depth: self.capability().depth + 1,
         };
 

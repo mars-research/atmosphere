@@ -120,8 +120,8 @@ impl CSpace {
             object: base.add(cnode_size),
             data: CData::Untyped(untyped),
             permissions: PermissionSet::maximum(),
-            prev: 0 as *const Capability,
-            next: 0 as *const Capability,
+            prev: ptr::null(),
+            next: ptr::null(),
             depth: 0,
         };
         cnode.insert(cap).unwrap();
@@ -392,7 +392,7 @@ impl Capability {
     }
 
     /// Returns an iterator over the capability's direct children.
-    pub fn children<'a>(&'a self) -> CapIter<'a> {
+    pub fn children(&self) -> CapIter {
         match unsafe { self.next.as_ref() } {
             None => CapIter::empty(),
             Some(cap) => {
@@ -498,7 +498,13 @@ impl Capability {
     }
 
     /// Returns a mutable reference to this capability.
-    unsafe fn as_mut<'a>(&'a self) -> &'a mut Capability {
+    ///
+    /// # Safety
+    ///
+    /// This method steals a mutable reference unsafely.
+    /// You must make sure that you have exclusive access to this capability.
+    #[allow(clippy::mut_from_ref)]
+    unsafe fn as_mut(&self) -> &mut Capability {
         (self as *const Capability as *mut Capability).as_mut().unwrap()
     }
 

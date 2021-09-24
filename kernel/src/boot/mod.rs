@@ -14,7 +14,7 @@ extern "C" {
     // static stack_top: u64;
 }
 
-static mut COMMAND_LINE: &'static str = "";
+static mut COMMAND_LINE: &str = "";
 
 pub unsafe fn init() {
     let info = get_bootinfo();

@@ -495,7 +495,7 @@ impl<'a> Monitor<'a> {
 
         let error = unsafe { vmx::vmread(VM_INSTRUCTION_ERROR).map_err::<VmxError, _>(|e| e.into())? as u32 };
 
-        Ok(Some(error.into()))
+        Ok(Some(error))
     }
 
     /// Checks that the VMM has started.

@@ -2,6 +2,7 @@
 
 use core::iter::Iterator;
 use core::marker::PhantomData;
+use core::ptr;
 
 use super::Capability;
 
@@ -39,7 +40,7 @@ impl<'a> CapIter<'a> {
 
     /// Creates a new iterator.
     pub(super) unsafe fn new(iter_type: CapIterType, next: *const Capability) -> Self {
-        assert_ne!(next, 0 as *const Capability);
+        assert_ne!(next, ptr::null());
 
         Self {
             iter_type,

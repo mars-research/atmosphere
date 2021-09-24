@@ -102,7 +102,7 @@ impl TryFrom<usize> for Interrupt {
 
     fn try_from(num: usize) -> Result<Self, Self::Error> {
         match num {
-            0..=EXCEPTION_MAX => TryFrom::try_from(num).map(|e| Self::Exception(e)),
+            0..=EXCEPTION_MAX => TryFrom::try_from(num).map(Self::Exception),
             IRQ_OFFSET..=255 => Ok(Self::Irq(num)),
             _ => Err("Invalid interrupt line"),
         }
