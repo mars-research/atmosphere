@@ -22,6 +22,10 @@ pub enum Error {
     #[snafu(display("Invalid kernel command-line component: {:?}", component))]
     InvalidCommandLineOption { component: CommandLineComponent<'static> },
 
+    /// Invalid descriptor type.
+    #[snafu(display("Invalid descriptor type: {:#x}", descriptor_type))]
+    InvalidDescriptorType { descriptor_type: u8 },
+
     /// Other error.
     #[snafu(display("Other error: {}", description))]
     Other { description: &'static str },
