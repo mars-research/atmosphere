@@ -5,19 +5,29 @@ on:
   push:
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Modify this to "ubuntu-latest" for GitHub-hosted runners
+    runs-on: self-hosted
+
     steps:
       - uses: actions/checkout@v2.3.4
+
       - uses: cachix/install-nix-action@v13
         with:
           install_url: https://github.com/numtide/nix-unstable-installer/releases/download/nix-2.4pre20210604_8e6ee1b/install
           extra_nix_config: |
             experimental-features = nix-command flakes
-      - run: nix-env -iA cachix -f https://cachix.org/api/v1/install
-      - run: cachix use mars-research
+
+      - name: Enable binary cache (optional)
+        uses: cachix/cachix-action@v10
+        continue-on-error: true
+        with:
+          name: mars-research
 
       - name: Run release-mode check
         run: nix-shell --run "cd kernel && cargo check --release"
+
+      - name: Run libcap std tests
+        run: nix-shell --run "cd libcap && cargo test"
 
       - name: Run tests on Bochs
         run: nix-shell --run "cd kernel && cargo test"
@@ -25,3 +35,6 @@ jobs:
       - name: Run release-mode clippy (optional)
         continue-on-error: true
         run: nix-shell --run "cd kernel && cargo clippy --release"
+
+      - name: Build documentations
+        run: nix-shell --run "cargo doc -p atmosphere --document-private-items"
