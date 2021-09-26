@@ -5,8 +5,7 @@
 
 use core::ops::Deref;
 
-use spin::RwLock;
-
+use astd::sync::RwLock;
 use crate::error::{Error, Result};
 
 static COMMAND_LINE: RwLock<KernelCommandLine> = RwLock::new(KernelCommandLine::new());

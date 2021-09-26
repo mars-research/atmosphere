@@ -12,8 +12,7 @@
 
 use core::ops::{Deref, DerefMut};
 
-use spin::RwLock;
-
+use astd::sync::RwLock;
 use crate::vmx::vmcs::Vmxon;
 use crate::gdt::{GlobalDescriptorTable, IstStack, TaskStateSegment};
 
