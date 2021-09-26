@@ -31,7 +31,7 @@ bitfield! {
     /// The meaning of bits 0-3 is different for System descriptors (e.g., TSS),
     /// and you should use [SystemAccessByte] instead.
     #[inline]
-    code_data, set_code_data: 4; 
+    code_data, set_code_data: 4;
 
     /// Whether this segment is executable.
     #[inline]
@@ -62,7 +62,7 @@ bitfield! {
     /// ## VT-x
     ///
     /// When setting the Access Bytes of a segment in the Guest-State Area,
-    /// this bit must be 1. This is because you are directly setting the 
+    /// this bit must be 1. This is because you are directly setting the
     /// segment descriptor cache in the internal processor state.
     #[inline]
     accessed, set_accessed: 0;
@@ -100,7 +100,7 @@ bitfield! {
     /// The meaning of bits 0-3 is different for Code and Data descriptors,
     /// and you should use [AccessByte] instead.
     #[inline]
-    code_data, set_code_data: 4; 
+    code_data, set_code_data: 4;
 
     /// Type of the descriptor.
     real_descriptor_type, set_real_descriptor_type: 3, 0;
