@@ -13,6 +13,7 @@ mod types;
 pub mod vmcs;
 
 use core::mem;
+use core::sync::atomic::Ordering;
 
 use displaydoc::Display;
 use x86::bits64::rflags::{read as read_rflags, RFlags};
@@ -22,10 +23,10 @@ use x86::msr;
 use x86::vmx::vmcs::control;
 
 use astd::sync::{Mutex, RwLock};
-use vmcs::{CurrentVmcsField, Vmcs, Vmxon, ExplainBitfieldConstraint};
+use vmcs::{CurrentVmcsField, Vmxon, VCpu, ExplainBitfieldConstraint};
 use crate::cpu;
 use crate::gdt::TaskStateSegment;
-use types::{ExitReason, VmInstructionError};
+use types::{GUEST_CONTEXT_SIZE, ExitReason, GuestContext, GuestRegisterDump, VmcsRevision, VmInstructionError};
 
 type VmxResult<T, E = VmxError> = core::result::Result<T, E>;
 
@@ -46,12 +47,12 @@ macro_rules! copy_host_state {
     };
 }
 
-
 /// A virtualization error.
 ///
 /// The naming of the variants are subject to change.
 #[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Display)]
+#[ignore_extra_doc_attributes]
 pub enum VmxError {
     /// The platform does not support VT-x.
     VmxUnsupported,
@@ -74,8 +75,28 @@ pub enum VmxError {
     /// The VMM has not started.
     VmmNotStarted,
 
-    /// There is no VMCS currently loaded.
-    NoCurrentVmcs,
+    /// The vCPU hasn't been initialized.
+    VCpuNotInitialized,
+
+    /// The vCPU hasn't been configured.
+    VCpuNotConfigured,
+
+    /// The vCPU is already initialized.
+    ///
+    /// It has to be deinitialized before being reused.
+    VCpuAlreadyInitialized,
+
+    /// The vCPU is already configured.
+    VCpuAlreadyConfigured,
+
+    /// The vCPU is currently in use.
+    VCpuInUse,
+
+    /// The vCPU is at an invalid RIP.
+    VCpuBadRip,
+
+    /// There is no vCPU currently loaded.
+    NoCurrentVCpu,
 
     /// The VMCS pointer is not valid.
     VmcsPtrInvalid,
@@ -89,8 +110,8 @@ pub enum VmxError {
     /// A VMCS control field constraint is impossible: {constraint:#x?}.
     VmcsImpossibleConstraint { constraint: u64 },
 
-    /// Other VMCS error: {error}
-    VmcsOtherError { error: &'static str },
+    /// Other error: {0}
+    OtherError(&'static str),
 
     /// VM-instruction error: {0}
     VmInstructionError(VmInstructionError),
@@ -111,7 +132,7 @@ impl From<x86::vmx::VmFail> for VmxError {
 #[derive(Clone, Debug)]
 pub struct PlatformInfo {
     /// The VMCS revision identifier.
-    vmcs_revision: u32,
+    vmcs_revision: VmcsRevision,
 
     /// Size of VMXON/VMCS regions.
     ///
@@ -143,7 +164,7 @@ pub fn get_platform_info() -> Option<PlatformInfo> {
     }
 
     Some(PlatformInfo {
-        vmcs_revision,
+        vmcs_revision: VmcsRevision::new(vmcs_revision),
         vmcs_size,
     })
 }
@@ -153,19 +174,20 @@ pub fn get_platform_info() -> Option<PlatformInfo> {
 /// Here we keep track of all states related to the VMM running
 /// on one physical logical core.
 ///
+/// The VMM is tied to a specific CPU by its APIC ID.
 /// All methods must be called on the correct CPU.
 pub struct Monitor<'a> {
     /// Whether VMX operations are enabled.
     enabled: RwLock<bool>,
 
     /// The VMCS revision identifier.
-    vmcs_revision: u32,
+    vmcs_revision: VmcsRevision,
 
     /// The VMXON region.
     vmxon: &'a mut Vmxon,
 
-    /// The current VMCS.
-    current_vmcs: Mutex<Option<&'a mut Vmcs>>,
+    /// The current vCPU.
+    current_vcpu: Mutex<Option<&'a mut VCpu>>,
 }
 
 impl<'a> Monitor<'a> {
@@ -173,9 +195,9 @@ impl<'a> Monitor<'a> {
     pub fn new(vmxon: &'a mut Vmxon) -> Self {
         Self {
             enabled: RwLock::new(false),
-            vmcs_revision: 0,
+            vmcs_revision: VmcsRevision::invalid(),
             vmxon,
-            current_vmcs: Mutex::new(None),
+            current_vcpu: Mutex::new(None),
         }
     }
 
@@ -261,6 +283,7 @@ impl<'a> Monitor<'a> {
 
     /// Leaves VMX operation and stops the VMM.
     pub fn stop(&mut self) -> VmxResult<()> {
+        let mut current_vcpu = self.current_vcpu.lock();
         let mut vmx_enabled = self.enabled.write();
         if !*vmx_enabled {
             return Err(VmxError::VmmNotStarted);
@@ -272,29 +295,40 @@ impl<'a> Monitor<'a> {
         }
         *vmx_enabled = false;
 
+        if let Some(current_vcpu) = current_vcpu.take() {
+            current_vcpu.loaded.store(false, Ordering::SeqCst);
+        }
+
         Ok(())
     }
 
-    /// Loads the specified VMCS and make it the current VMCS.
-    pub unsafe fn load_vmcs(&mut self, vmcs: &'a mut Vmcs) -> VmxResult<()> {
+    /// Loads the specified vCPU and make it the current vCPU.
+    pub unsafe fn load_vcpu(&mut self, vcpu: &'a mut VCpu) -> VmxResult<()> {
         self.check_vmm_started()?;
 
-        let mut current_vmcs = self.current_vmcs.lock();
+        let mut current_vcpu = self.current_vcpu.lock();
 
-        // Check VMCS alignment
-        vmcs.check_alignment()?;
+        if !vcpu.initialized() {
+            return Err(VmxError::VCpuNotInitialized);
+        }
+
+        if vcpu.loaded.compare_exchange(false, true, Ordering::SeqCst, Ordering::Acquire).is_err() {
+            return Err(VmxError::VCpuInUse);
+        }
 
         // Load VMCS
-        vmx::vmptrld(vmcs.get_physical().as_u64()).unwrap();
+        vmx::vmptrld(vcpu.vmcs.get_physical().as_u64()).unwrap();
 
-        *current_vmcs = Some(vmcs);
+        if let Some(prev_vcpu) = current_vcpu.replace(vcpu) {
+            prev_vcpu.loaded.store(false, Ordering::SeqCst);
+        }
 
         Ok(())
     }
 
     /// Test method to initialize and launch an unconfined VM.
-    pub unsafe fn demo_launch(&mut self) -> VmxResult<()> {
-        self.check_vmcs_loaded()?;
+    pub unsafe fn demo_launch(&mut self) -> VmxResult<ExitReason> {
+        self.check_vcpu_loaded()?;
 
         self.init_vmcs_controls()?;
         self.save_vmcs_host_state()?;
@@ -305,15 +339,14 @@ impl<'a> Monitor<'a> {
         let target = demo_guest_main as *const () as u64;
 
         self.set_vmcs_guest_entrypoint(target, stack_end)?;
+        self.mark_vcpu_ready()?;
 
-        self.launch_current(false)?;
-
-        Ok(())
+        self.launch_current()
     }
 
     /// Initializes VMCS control fields.
     unsafe fn init_vmcs_controls(&mut self) -> VmxResult<()> {
-        self.check_vmcs_loaded()?;
+        self.check_vcpu_loaded()?;
 
         // Set Pin-Based VM-Execution Controls.
         {
@@ -351,6 +384,7 @@ impl<'a> Monitor<'a> {
             )?;
 
             disable_activate_secondary_controls_in_value(&mut value);
+            enable_hlt_exiting_in_value(&mut value);
 
             value.apply()?;
         }
@@ -403,7 +437,7 @@ impl<'a> Monitor<'a> {
 
     /// Initializes the VMCS Guest-State Area.
     unsafe fn init_vmcs_guest_state(&self) -> VmxResult<()> {
-        self.check_vmcs_loaded()?;
+        self.check_vcpu_loaded()?;
 
         // ## Register State
 
@@ -452,20 +486,15 @@ impl<'a> Monitor<'a> {
         // Only has an effect when VMX Preemption Timer is enabled
         vmx::vmwrite(VMX_PREEMPTION_TIMER_VALUE, 0)?;
 
-        // TODO: Support this for performance gain in nested virtualization
         if vmcs_shadowing_is_enabled() {
-            return Err(VmxError::VmcsOtherError {
-                error: "VMCS Shadowing is not implemented",
-            });
+            return Err(VmxError::OtherError("VMCS Shadowing is not implemented"));
         } else {
             vmx::vmwrite(LINK_PTR_FULL, 0xffff_ffff_ffff_ffff)?;
         }
 
         // TODO: Investigate this
         if enable_pml_is_enabled() {
-            return Err(VmxError::VmcsOtherError {
-                error: "Page-Modification Logging is not implemented",
-            });
+            return Err(VmxError::OtherError("Page-Modification Logging is not implemented"));
         } else {
             // vmx::vmwrite(PML_INDEX, 0)?;
         }
@@ -477,7 +506,7 @@ impl<'a> Monitor<'a> {
     unsafe fn save_vmcs_host_state(&self) -> VmxResult<()> {
         // See Intel SDM, Volume 3C, Chapter 24.5.
 
-        self.check_vmcs_loaded()?;
+        self.check_vcpu_loaded()?;
 
         use pal::vmcs::vm_exit_controls::*;
         use x86::segmentation as seg;
@@ -558,7 +587,7 @@ impl<'a> Monitor<'a> {
             TR_ACCESS_RIGHTS,
         };
 
-        self.check_vmcs_loaded()?;
+        self.check_vcpu_loaded()?;
 
         // Copy required host state
         let to_copy = [
@@ -654,10 +683,36 @@ impl<'a> Monitor<'a> {
     unsafe fn set_vmcs_guest_entrypoint(&mut self, rip: u64, rsp: u64) -> VmxResult<()> {
         use x86::vmx::vmcs::guest::{RIP as GUEST_RIP, RSP as GUEST_RSP};
 
-        self.check_vmcs_loaded()?;
+        self.check_vcpu_loaded()?;
 
         vmx::vmwrite(GUEST_RIP, rip)?;
         vmx::vmwrite(GUEST_RSP, rsp)?;
+
+        Ok(())
+    }
+
+    /// Moves the guest RIP to the next instruction.
+    ///
+    /// This can only be done after a VM exit.
+    pub unsafe fn advance_vmcs_guest_rip(&mut self) -> VmxResult<()> {
+        use x86::vmx::vmcs::guest::RIP as GUEST_RIP;
+        use x86::vmx::vmcs::ro::VMEXIT_INSTRUCTION_LEN;
+
+        self.check_vcpu_loaded()?;
+
+        let rip = vmx::vmread(GUEST_RIP)?;
+
+        if rip == 0 {
+            return Err(VmxError::VCpuBadRip);
+        }
+
+        let instruction_length = vmx::vmread(VMEXIT_INSTRUCTION_LEN)?;
+
+        if instruction_length == 0 {
+            return Err(VmxError::OtherError("Instruction length is 0"));
+        }
+
+        vmx::vmwrite(GUEST_RIP, rip + instruction_length)?;
 
         Ok(())
     }
@@ -676,65 +731,139 @@ impl<'a> Monitor<'a> {
     /// Currently, we only return `Err` for the first case ("failure
     /// to pass checks on the VMX controls or on the host-state area") and
     /// return `Ok(VmExitReason::InvalidGuestState)` otherwise.
-    unsafe fn launch_current(&mut self, resume: bool) -> VmxResult<ExitReason> {
+    pub fn launch_current(&mut self) -> VmxResult<ExitReason> {
         use x86::vmx::vmcs::host::{RIP as HOST_RIP, RSP as HOST_RSP};
 
+        let guest_context = self.check_vcpu_ready()?;
+
+        unsafe {
+            self.save_vmcs_host_state()?;
+        }
 
         let failure: usize;
-        asm!(
-            "xor rax, rax",
+        unsafe {
+            asm!(
+                // Input: rax <- guest_context
+                // Output: rax -> failure
 
-            "push rbx",
-            "push rbp",
-            "pushfq",
+                "push rbx",
+                "push rbp",
+                "pushfq",
 
-            "mov rbx, {vmcs_host_rsp}",
-            "vmwrite rbx, rsp",
+                // Save host RSP to GuestContext
+                "mov [rax], rsp",
 
-            "lea rdx, 3f", // -> VM Exit
-            "mov rbx, {vmcs_host_rip}",
-            "vmwrite rbx, rdx",
+                // ... and make the end of GuestContext
+                // the host RSP to restore
+                "mov rbx, rax",
+                "add rbx, {guest_context_size}",
+                "mov rbp, {vmcs_host_rsp}",
+                "vmwrite rbp, rbx",
 
-            "cmp {resume:r}, 1",
-            "je 1f", // -> Resume
+                // Set up VM exit RIP
+                "lea rbx, 3f", // -> VM Exit
+                "mov rbp, {vmcs_host_rip}",
+                "vmwrite rbp, rbx",
 
-            // Launch
-            "vmlaunch",
-            "jmp 2f", // -> Failure
+                // Restore guest state
+                "add rax, 8",
+                "mov rsp, rax",
+                "pop rax",
+                "pop rbx",
+                "pop rcx",
+                "pop rdx",
+                "pop rbp",
+                "pop rdi",
+                "pop rsi",
+                "pop r8",
+                "pop r9",
+                "pop r10",
+                "pop r11",
+                "pop r12",
+                "pop r13",
+                "pop r14",
+                "pop r15", // rsp is now at .launched
 
-            // Resume
-            "1:",
-            "vmresume",
+                "cmp qword ptr [rsp], 0",
+                "je 1f", // -> Launch
 
-            // Failure
-            "2:",
-            "mov rax, 1",
+                // Resume
+                "vmresume",
+                "jmp 2f",
 
-            // VM Exit
-            "3:",
+                // Launch
+                "1:",
+                "mov qword ptr [rsp], 1", // set launched = 1
+                "vmlaunch",
+                "mov qword ptr [rsp], 0", // failed - clear to 0 again
 
-            "popfq",
-            "pop rbp",
-            "pop rbx",
+                // Common Failure
+                "2:", // rsp is now at .launched
+                "add rsp, 8",
+                "sub rsp, {guest_context_size}",
+                "pop rsp",
 
-            vmcs_host_rsp = const HOST_RSP,
-            vmcs_host_rip = const HOST_RIP,
-            resume = in(reg) resume as usize,
+                "popfq",
+                "pop rbp",
+                "pop rbx",
 
-            lateout("rax") failure,
-            lateout("rdx") _,
-            lateout("rdi") _,
-            lateout("rsi") _,
-            lateout("r8") _,
-            lateout("r9") _,
-            lateout("r10") _,
-            lateout("r11") _,
+                "mov rax, 1",
+                "jmp 4f", // -> End
 
-            lateout("r12") _,
-            lateout("r13") _,
-            lateout("r14") _,
-            lateout("r15") _,
-        );
+                // VM Exit
+                // Restored rsp is at the end of GuestContext
+                "3:",
+
+                // Save guest state
+                "sub rsp, 8", // rsp is now at .launched
+                "push r15",
+                "push r14",
+                "push r13",
+                "push r12",
+                "push r11",
+                "push r10",
+                "push r9",
+                "push r8",
+                "push rsi",
+                "push rdi",
+                "push rbp",
+                "push rdx",
+                "push rcx",
+                "push rbx",
+                "push rax",
+
+                "sub rsp, 8", // rsp is at beginning of GuestContext (host_rsp)
+                "pop rsp",
+
+                "popfq",
+                "pop rbp",
+                "pop rbx",
+
+                "xor rax, rax",
+
+                // End
+                "4:",
+
+                vmcs_host_rsp = const HOST_RSP,
+                vmcs_host_rip = const HOST_RIP,
+                guest_context_size = const GUEST_CONTEXT_SIZE,
+
+                inout("rax") guest_context => failure,
+                lateout("rcx") _,
+                lateout("rdx") _,
+                lateout("rdi") _,
+                lateout("rsi") _,
+                lateout("r8") _,
+                lateout("r9") _,
+                lateout("r10") _,
+                lateout("r11") _,
+
+                lateout("r12") _,
+                lateout("r13") _,
+                lateout("r14") _,
+                lateout("r15") _,
+            );
+        }
 
         if failure == 1 {
             let rflags = read_rflags();
@@ -752,8 +881,43 @@ impl<'a> Monitor<'a> {
         Ok(self.read_vm_exit_reason()?)
     }
 
+    /// Returns a dump of the guest context.
+    pub fn dump_guest_registers(&self) -> VmxResult<GuestRegisterDump> {
+        use x86::vmx::vmcs::guest;
+
+        let vcpu = self.current_vcpu.lock();
+        let vcpu = vcpu.as_ref().ok_or(VmxError::NoCurrentVCpu)?;
+
+        let dump = unsafe {
+            GuestRegisterDump {
+                rax: vcpu.context.rax,
+                rbx: vcpu.context.rbx,
+                rcx: vcpu.context.rcx,
+                rdx: vcpu.context.rdx,
+                rbp: vcpu.context.rbp,
+                rdi: vcpu.context.rdi,
+                rsi: vcpu.context.rsi,
+                r8: vcpu.context.r8,
+                r9: vcpu.context.r9,
+                r10: vcpu.context.r10,
+                r11: vcpu.context.r11,
+                r12: vcpu.context.r12,
+                r13: vcpu.context.r13,
+                r14: vcpu.context.r14,
+                r15: vcpu.context.r15,
+                rsp: vmx::vmread(guest::RSP)?,
+                rip: vmx::vmread(guest::RIP)?,
+                cr0: vmx::vmread(guest::CR0)?,
+                cr3: vmx::vmread(guest::CR3)?,
+                cr4: vmx::vmread(guest::CR4)?,
+            }
+        };
+
+        Ok(dump)
+    }
+
     /// Returns the VMCS revision identifier.
-    pub fn get_vmcs_revision(&self) -> u32 {
+    pub fn get_vmcs_revision(&self) -> VmcsRevision {
         self.vmcs_revision
     }
 
@@ -794,6 +958,17 @@ impl<'a> Monitor<'a> {
         }
     }
 
+    /// Marks the currently-loaded vCPU as ready.
+    fn mark_vcpu_ready(&mut self) -> VmxResult<()> {
+        let mut current_vcpu = self.current_vcpu.lock();
+
+        if let Some(vcpu) = current_vcpu.as_mut() {
+            vcpu.mark_ready()
+        } else {
+            Err(VmxError::NoCurrentVCpu)
+        }
+    }
+
     /// Checks that the VMM has started.
     fn check_vmm_started(&self) -> VmxResult<()> {
         let vmx_enabled = self.enabled.read();
@@ -804,16 +979,32 @@ impl<'a> Monitor<'a> {
         Ok(())
     }
 
-    /// Checks that a VMCS is currently loaded.
-    fn check_vmcs_loaded(&self) -> VmxResult<()> {
+    /// Checks that a vCPU is currently loaded.
+    fn check_vcpu_loaded(&self) -> VmxResult<()> {
         self.check_vmm_started()?;
 
-        let current_vmcs = self.current_vmcs.lock();
-        if current_vmcs.is_none() {
-            return Err(VmxError::NoCurrentVmcs);
+        let current_vcpu = self.current_vcpu.lock();
+        if current_vcpu.is_none() {
+            return Err(VmxError::NoCurrentVCpu);
         }
 
         Ok(())
+    }
+
+    /// Checks that a vCPU is currently loaded and ready, returning its context save region.
+    fn check_vcpu_ready(&self) -> VmxResult<*mut GuestContext> {
+        self.check_vmm_started()?;
+
+        let current_vcpu = self.current_vcpu.lock();
+        if let Some(vcpu) = current_vcpu.as_ref() {
+            if vcpu.ready() {
+                Ok(&vcpu.context as *const _ as *mut _)
+            } else {
+                Err(VmxError::VCpuNotConfigured)
+            }
+        } else {
+            Err(VmxError::NoCurrentVCpu)
+        }
     }
 }
 
@@ -828,14 +1019,14 @@ impl<'a> Drop for Monitor<'a> {
 
 #[no_mangle]
 unsafe extern "C" fn demo_guest_main() {
-    log::info!("Hello from VM");
-
-    // Cause an exit
+    log::warn!("VM: Hello from VM");
+    log::warn!("VM: Doing a CPUID");
     asm!("cpuid");
+
+    log::warn!("VM: We have resumed from CPUID :D");
+    log::warn!("VM: Doing a VMCALL");
+    asm!("vmcall");
 }
-
-// FIXME: Also set RIP and RSP
-
 
 /// Reads the value of CR0.
 unsafe fn read_cr0() -> u32 {
@@ -882,18 +1073,25 @@ mod tests {
     use types::{KnownExitReason, KnownVmInstructionError};
 
     static mut VMXON: Vmxon = Vmxon::new();
-    static mut VMCS: Vmcs = Vmcs::new();
+    static mut VCPU: VCpu = VCpu::new();
     static GUEST_STACK: [u8; 4096] = [0u8; 4096];
 
-    const FIRST_RAX_VALUE: u64 = 69;
-    const SECOND_RAX_VALUE: u64 = 420;
+    const FIRST_RAX_VALUE: u64 = 0x01138327;
+    const SECOND_RAX_VALUE: u64 = 0x00069420;
+
+    macro_rules! assert_register_eq {
+        ($vmm:ident, $reg:ident, $value:expr) => {
+            let registers = $vmm.dump_guest_registers().expect("Could not dump guest context");
+            assert_eq!(registers.$reg, $value);
+        }
+    }
 
     unsafe extern "C" fn guest_main() {
         asm!(
             "mov rax, {first}",
             "vmcall",
             "mov rax, {second}",
-            "hlt",
+            "cpuid",
             first = const FIRST_RAX_VALUE,
             second = const SECOND_RAX_VALUE,
         );
@@ -905,10 +1103,10 @@ mod tests {
         vmm.start()
             .expect("Could not start VMM");
 
-        VMCS.init(vmm.get_vmcs_revision())
-            .expect("Could not initialize VMCS");
+        VCPU.init(vmm.get_vmcs_revision())
+            .expect("Could not initialize vCPU");
 
-        vmm.load_vmcs(&mut VMCS)
+        vmm.load_vcpu(&mut VCPU)
             .expect("Could not load VMCS");
 
         vmm.init_vmcs_controls()
@@ -927,24 +1125,39 @@ mod tests {
         let target = guest_main as *const () as u64;
 
         vmm.set_vmcs_guest_entrypoint(target, stack_end)
-            .expect("Failed to set guest entrypoint");
+            .expect("Could not set guest entrypoint");
+
+        vmm.mark_vcpu_ready()
+            .expect("Could not mark vCPU as ready");
 
         vmm
     }
 
     #[test]
     fn test_simple_vm() {
-        use x86::vmx::vmcs::guest;
-
         unsafe {
             let mut vmm = bootstrap_simple_vm();
 
-            let reason = vmm.launch_current(false)
+            // Initial launch
+            let reason = vmm.launch_current()
                 .expect("Failed to launch VM");
 
             assert_eq!(reason, KnownExitReason::Vmcall);
+            assert_register_eq!(vmm, rax, FIRST_RAX_VALUE);
 
-            let rax = vmx::vmread(guest::
+            vmm.advance_vmcs_guest_rip()
+                .expect("Could not advance guest RIP");
+
+            // Resume
+            log::debug!("Trying to resume...");
+            let reason = vmm.launch_current()
+                .expect("Failed to resume VM");
+
+            assert_eq!(reason, KnownExitReason::Cpuid);
+            assert_register_eq!(vmm, rax, SECOND_RAX_VALUE);
+
+            vmm.stop().expect("Could not stop VMM");
+            VCPU.deinit().expect("Could not deinitialize the vCPU");
         }
     }
 
@@ -957,7 +1170,7 @@ mod tests {
             vmx::vmwrite(control::PINBASED_EXEC_CONTROLS, u64::MAX)
                 .expect("Could not inject control value");
 
-            let launch_err = vmm.launch_current(false)
+            let launch_err = vmm.launch_current()
                 .expect_err("VM launch must fail");
 
             if let VmxError::VmInstructionError(err) = launch_err {
@@ -965,6 +1178,9 @@ mod tests {
             } else {
                 panic!("Launch must fail with an VM-instruction error - It failed with {}", launch_err);
             }
+
+            vmm.stop().expect("Could not stop VMM");
+            VCPU.deinit().expect("Could not deinitialize the vCPU");
         }
     }
 }

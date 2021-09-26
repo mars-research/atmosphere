@@ -1,6 +1,123 @@
+use core::mem;
+
 use displaydoc::Display;
 use enum_primitive_derive::Primitive;
 use num_traits::cast::FromPrimitive;
+
+pub const GUEST_CONTEXT_SIZE: usize = mem::size_of::<GuestContext>();
+
+/// The VMCS revision.
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy)]
+pub struct VmcsRevision(u32);
+
+impl VmcsRevision {
+    pub fn new(vmcs_revision: u32) -> Self {
+        Self(vmcs_revision)
+    }
+
+    pub const fn invalid() -> Self {
+        Self(0)
+    }
+}
+
+impl Into<u32> for VmcsRevision {
+    fn into(self) -> u32 {
+        self.0
+    }
+}
+
+/// Guest register state.
+///
+/// VMX will save/restore RIP, RSP and RFLAGS for us, and we need
+/// to do the rest.
+///
+/// FIXME: We will need to save and restore the SIMD registers
+/// as well
+#[repr(C)]
+#[derive(Debug, Clone)]
+pub struct GuestContext {
+    /// The host's original RSP before the VM entry.
+    pub host_rsp: u64,
+
+    pub rax: u64,
+    pub rbx: u64,
+    pub rcx: u64,
+    pub rdx: u64,
+    pub rbp: u64,
+
+    pub rdi: u64,
+    pub rsi: u64,
+    pub r8: u64,
+    pub r9: u64,
+    pub r10: u64,
+    pub r11: u64,
+    pub r12: u64,
+    pub r13: u64,
+    pub r14: u64,
+    pub r15: u64,
+
+    /// Whether the vCPU has been launched before or not.
+    ///
+    /// After restoring all the registers, we will cmp [rsp], 0.
+    /// We use this to determine whether to VMLAUNCH or VMRESUME.
+    launched: u64,
+}
+
+impl GuestContext {
+    pub const fn new() -> Self {
+        Self {
+            host_rsp: 0,
+            rax: 0,
+            rbx: 0,
+            rcx: 0,
+            rdx: 0,
+            rbp: 0,
+            rdi: 0,
+            rsi: 0,
+            r8: 0,
+            r9: 0,
+            r10: 0,
+            r11: 0,
+            r12: 0,
+            r13: 0,
+            r14: 0,
+            r15: 0,
+            launched: 0,
+        }
+    }
+}
+
+/// Guest register dump for debugging.
+///
+/// This is more complete than [GuestContext]. Information like RSP, RIP, and
+/// control registers is read from the Guest State Area.
+#[derive(Debug, Clone)]
+pub struct GuestRegisterDump {
+    pub rax: u64,
+    pub rbx: u64,
+    pub rcx: u64,
+    pub rdx: u64,
+    pub rbp: u64,
+
+    pub rdi: u64,
+    pub rsi: u64,
+    pub r8: u64,
+    pub r9: u64,
+    pub r10: u64,
+    pub r11: u64,
+    pub r12: u64,
+    pub r13: u64,
+    pub r14: u64,
+    pub r15: u64,
+
+    pub rsp: u64,
+    pub rip: u64,
+
+    pub cr0: u64,
+    pub cr3: u64,
+    pub cr4: u64,
+}
 
 /// The reason for a VM exit.
 #[derive(Clone, Copy, Debug, PartialEq, Display)]
