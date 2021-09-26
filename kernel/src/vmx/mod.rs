@@ -13,7 +13,6 @@ pub mod vmcs;
 
 use core::mem;
 
-use bit_field::BitField;
 use snafu::Snafu;
 use x86::bits64::rflags::{read as read_rflags, RFlags};
 use x86::bits64::vmx;
@@ -222,6 +221,8 @@ pub struct PlatformInfo {
 ///
 /// Returns `None` if VT-x is not available.
 pub fn get_platform_info() -> Option<PlatformInfo> {
+    use pal::msr::ia32_vmx_basic;
+
     // Check CPUID VMX bit
     let cpuid = CpuId::new();
     let feature_info = cpuid.get_feature_info()?;
@@ -231,9 +232,9 @@ pub fn get_platform_info() -> Option<PlatformInfo> {
     }
 
     // Check VMXON/VMCS region size
-    let vmx_basic = unsafe { msr::rdmsr(msr::IA32_VMX_BASIC) };
-    let vmcs_revision = vmx_basic.get_bits(0..32) as u32;
-    let vmcs_size = vmx_basic.get_bits(32..45) as usize;
+    let msr = ia32_vmx_basic::get();
+    let vmcs_revision = ia32_vmx_basic::get_revision_id_from_value(msr) as u32;
+    let vmcs_size = ia32_vmx_basic::get_vmxon_vmcs_region_size_from_value(msr) as usize;
 
     if vmcs_size != 4096 {
         log::warn!("Platform requires the VMXON/VMCS regions to be of size {} which we do not support.", vmcs_size);
@@ -324,21 +325,24 @@ impl<'a> Monitor<'a> {
         // Check the IA32_FEATURE_CONTROL MSR
         //
         // We only care about the 3 least significant bits.
-        let mut feature_control = msr::rdmsr(msr::IA32_FEATURE_CONTROL);
-        let lock_bit = feature_control.get_bit(0);
+        {
+            use pal::msr::ia32_feature_control::*;
 
-        if !lock_bit {
-            // Commonly, the BIOS sets the MSR then locks it with this bit,
-            // but somehow it's not set here. Let's enable VMXON outside SMX
-            // operation then lock the MSR.
-            log::warn!("Lock bit in IA32_FEATURE_CONTROL is clear. Enabling VMXON outside SMX and locking...");
-            feature_control.set_bit(2, true); // VMXON outside SMX operation
-            feature_control.set_bit(0, true); // Lock
-            msr::wrmsr(msr::IA32_FEATURE_CONTROL, feature_control);
-        }
+            let mut feature_control = get();
 
-        if !feature_control.get_bit(2) {
-            return Err(VmxError::VmxDisabled);
+            if lock_bit_is_disabled_in_value(feature_control) {
+                // Commonly, the BIOS sets the MSR then locks it with this bit,
+                // but somehow it's not set here. Let's enable VMXON outside SMX
+                // operation then lock the MSR.
+                log::warn!("Lock bit in IA32_FEATURE_CONTROL is clear. Enabling VMXON outside SMX and locking...");
+                enable_enable_vmx_outside_smx_in_value(&mut feature_control);
+                enable_lock_bit_in_value(&mut feature_control);
+                set(feature_control);
+            }
+
+            if !enable_vmx_outside_smx_is_enabled() {
+                return Err(VmxError::VmxDisabled);
+            }
         }
 
         // Check VMXON alignment
@@ -409,13 +413,12 @@ impl<'a> Monitor<'a> {
     unsafe fn init_vmcs_controls(&mut self) -> VmxResult<()> {
         self.check_vmcs_loaded()?;
 
-        let vmx_basic = msr::rdmsr(msr::IA32_VMX_BASIC);
-
         // Set Pin-Based VM-Execution Controls.
         {
+            use pal::msr::ia32_vmx_basic::true_based_controls_is_enabled;
             use pal::vmcs::pin_based_vm_execution_controls::*;
 
-            let msr = if vmx_basic.get_bit(55) {
+            let msr = if true_based_controls_is_enabled() {
                 msr::IA32_VMX_TRUE_PINBASED_CTLS
             } else {
                 msr::IA32_VMX_PINBASED_CTLS
