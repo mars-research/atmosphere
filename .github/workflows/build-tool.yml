@@ -16,4 +16,4 @@ jobs:
       - run: nix-env -iA cachix -f https://cachix.org/api/v1/install
       - run: cachix use mars-research
 
-      - run: nix-shell --run "cd build-tool && cargo build"
+      - run: nix-shell --run "cd build-tool && cargo check"
