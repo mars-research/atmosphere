@@ -9,22 +9,23 @@
 //!
 //! - Descriptors: Check `bx_descriptor_t` in `cpu/descriptor.h`.
 
+mod types;
 pub mod vmcs;
 
 use core::mem;
 
-use snafu::Snafu;
+use displaydoc::Display;
 use x86::bits64::rflags::{read as read_rflags, RFlags};
 use x86::bits64::vmx;
 use x86::cpuid::CpuId;
 use x86::msr;
-// use x86::vmx::vmcs::ro::VM_INSTRUCTION_ERROR;
 use x86::vmx::vmcs::control;
 
 use astd::sync::{Mutex, RwLock};
 use vmcs::{CurrentVmcsField, Vmcs, Vmxon, ExplainBitfieldConstraint};
 use crate::cpu;
 use crate::gdt::TaskStateSegment;
+use types::{ExitReason, VmInstructionError};
 
 type VmxResult<T, E = VmxError> = core::result::Result<T, E>;
 
@@ -50,49 +51,49 @@ macro_rules! copy_host_state {
 ///
 /// The naming of the variants are subject to change.
 #[non_exhaustive]
-#[derive(Clone, Debug, Snafu)]
+#[derive(Clone, Debug, PartialEq, Display)]
 pub enum VmxError {
-    #[snafu(display("The platform does not support VT-x."))]
+    /// The platform does not support VT-x.
     VmxUnsupported,
 
-    #[snafu(display("The platform supports VT-x, but is disabled in BIOS."))]
+    /// The platform supports VT-x, but it's disabled in BIOS.
     VmxDisabled,
 
-    #[snafu(display("The VMCS region size {} is not supported.", size))]
+    /// The VMCS region size {size} is not supported.
     UnsupportedVmcsSize { size: usize },
 
-    #[snafu(display("The VMXON region at {:#x} has bad alignment. It must be 4KiB aligned.", addr))]
+    /// The VMXON region at {addr:#x} has bad alignment. It must be 4KiB aligned.
     VmxonBadAlignment { addr: usize },
 
-    #[snafu(display("The VMCS region at {:#x} has bad alignment. It must be 4KiB aligned.", addr))]
+    /// The VMCS region at {addr:#x} has bad alignment. It must be 4KiB aligned.
     VmcsBadAlignment { addr: usize },
 
-    #[snafu(display("The VMM has already started."))]
+    /// The VMM has already started.
     VmmAlreadyStarted,
 
-    #[snafu(display("The VMM has not started."))]
+    /// The VMM has not started.
     VmmNotStarted,
 
-    #[snafu(display("There is no current VMCS loaded."))]
+    /// There is no VMCS currently loaded.
     NoCurrentVmcs,
 
-    #[snafu(display("The VMCS pointer is not valid."))]
+    /// The VMCS pointer is not valid.
     VmcsPtrInvalid,
 
-    #[snafu(display("The VMCS pointer is valid, but some other error was encountered."))]
+    /// The VMCS pointer is valid, but some other error occurred.
     VmcsPtrValid,
 
-    #[snafu(display("VMCS constraint violation: {}", explain))]
+    /// A VMCS control field constraint wasn't met: {explain}
     VmcsConstraintViolation { explain: ExplainBitfieldConstraint },
 
-    #[snafu(display("VMCS bad constraint: {:#x?}", constraint))]
-    VmcsBadConstraint { constraint: u64 },
+    /// A VMCS control field constraint is impossible: {constraint:#x?}.
+    VmcsImpossibleConstraint { constraint: u64 },
 
-    #[snafu(display("Other VMCS error: {}", error))]
+    /// Other VMCS error: {error}
     VmcsOtherError { error: &'static str },
 
-    #[snafu(display("VM-Instruction error: {:?}.", error))]
-    InstructionError { error: VmxInstructionError },
+    /// VM-instruction error: {0}
+    VmInstructionError(VmInstructionError),
 }
 
 impl From<x86::vmx::VmFail> for VmxError {
@@ -102,105 +103,6 @@ impl From<x86::vmx::VmFail> for VmxError {
         match vmfail {
             VmFailValid => Self::VmcsPtrValid,
             VmFailInvalid => Self::VmcsPtrInvalid,
-        }
-    }
-}
-
-/// A VM-instruction error.
-///
-/// See Intel SDM, Volume 3C, Chapter 30.4.
-#[allow(dead_code)]
-#[non_exhaustive]
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum VmxInstructionError {
-    /// VMCALL executed in VMX root operation
-    VmcallInVmxRoot,
-
-    /// VMCLEAR with invalid physical address
-    VmclearWithInvalidPhysicalAddr,
-
-    /// VMCLEAR with VMXON pointer
-    VmclearWithVmxonPointer,
-
-    /// VMLAUNCH with non-clear VMCS
-    VmlaunchWithNonClearVmcs,
-
-    /// VMRESUME with non-launched VMCS
-    VmresumeWithNonLaunchedVmcs,
-
-    /// VMRESUME after VMXOFF (VMXOFF and VMXON between VMLAUNCH and VMRESUME)
-    VmresumeAfterVmxoff,
-
-    /// VM entry with invalid control field(s)
-    VmEntryWithInvalidControlFields,
-
-    /// VM entry with invalid host-state field(s)
-    VmEntryWithInvalidHostStateFields,
-
-    /// VMPTRLD with invalid physical address
-    VmptrldWithInvalidPhysicalAddr,
-
-    /// VMPTRLD with VMXON pointer
-    VmptrldWithVmxonPointer,
-
-    /// VMPTRLD with incorrect VMCS revision identifier
-    VmptrldWithIncorrectVmcsRevision,
-
-    /// VMREAD/VMWRITE from/to unsupported VMCS component
-    VmcsReadWriteUnsupportedComponent,
-
-    /// VMWRITE to read-only VMCS component
-    VmwriteToReadOnlyComponent,
-
-    /// VMXON executed in VMX root operation
-    VmxonInVmxRoot,
-
-    /// Unknown error
-    Unknown(u32),
-}
-
-impl From<u32> for VmxInstructionError {
-    fn from(error: u32) -> Self {
-        use VmxInstructionError::*;
-        match error {
-            1  => VmcallInVmxRoot,
-            2  => VmclearWithInvalidPhysicalAddr,
-            3  => VmclearWithVmxonPointer,
-            4  => VmlaunchWithNonClearVmcs,
-            5  => VmresumeWithNonLaunchedVmcs,
-            6  => VmresumeAfterVmxoff,
-            7  => VmEntryWithInvalidControlFields,
-            8  => VmEntryWithInvalidHostStateFields,
-            9  => VmptrldWithInvalidPhysicalAddr,
-            10 => VmptrldWithVmxonPointer,
-            11 => VmptrldWithIncorrectVmcsRevision,
-            12 => VmcsReadWriteUnsupportedComponent,
-            13 => VmwriteToReadOnlyComponent,
-            15 => VmxonInVmxRoot,
-            _  => Unknown(error),
-        }
-    }
-}
-
-impl Into<u32> for VmxInstructionError {
-    fn into(self) -> u32 {
-        use VmxInstructionError::*;
-        match self {
-            VmcallInVmxRoot                     => 1,
-            VmclearWithInvalidPhysicalAddr      => 2,
-            VmclearWithVmxonPointer             => 3,
-            VmlaunchWithNonClearVmcs            => 4,
-            VmresumeWithNonLaunchedVmcs         => 5,
-            VmresumeAfterVmxoff                 => 6,
-            VmEntryWithInvalidControlFields     => 7,
-            VmEntryWithInvalidHostStateFields   => 8,
-            VmptrldWithInvalidPhysicalAddr      => 9,
-            VmptrldWithVmxonPointer             => 10,
-            VmptrldWithIncorrectVmcsRevision    => 11,
-            VmcsReadWriteUnsupportedComponent   => 12,
-            VmwriteToReadOnlyComponent          => 13,
-            VmxonInVmxRoot                      => 15,
-            Unknown(error)                      => error,
         }
     }
 }
@@ -761,8 +663,22 @@ impl<'a> Monitor<'a> {
     }
 
     /// Launches or resumes the currently-loaded VMCS (low-level).
-    unsafe fn launch_current(&mut self, resume: bool) -> VmxResult<()> {
+    ///
+    /// From Intel SDM:
+    ///
+    /// > Failure to pass checks on the VMX controls or on the host-state
+    /// > area passes control to the instruction following the VMLAUNCH
+    /// > or VMRESUME instruction. If these pass but checks on the
+    /// > guest-state area fail, the logical processor loads state from
+    /// > the host-state area of the VMCS, passing control to the instruction
+    /// > referenced by the RIP field in the host-state area.
+    ///
+    /// Currently, we only return `Err` for the first case ("failure
+    /// to pass checks on the VMX controls or on the host-state area") and
+    /// return `Ok(VmExitReason::InvalidGuestState)` otherwise.
+    unsafe fn launch_current(&mut self, resume: bool) -> VmxResult<ExitReason> {
         use x86::vmx::vmcs::host::{RIP as HOST_RIP, RSP as HOST_RSP};
+
 
         let failure: usize;
         asm!(
@@ -824,7 +740,8 @@ impl<'a> Monitor<'a> {
             let rflags = read_rflags();
 
             if rflags.contains(RFlags::FLAGS_ZF) {
-                return Err(VmxError::VmcsPtrValid);
+                let error = self.read_vm_fail_valid()?;
+                return Err(error);
             }
 
             if rflags.contains(RFlags::FLAGS_CF) {
@@ -832,7 +749,7 @@ impl<'a> Monitor<'a> {
             }
         }
 
-        Ok(())
+        Ok(self.read_vm_exit_reason()?)
     }
 
     /// Returns the VMCS revision identifier.
@@ -840,23 +757,42 @@ impl<'a> Monitor<'a> {
         self.vmcs_revision
     }
 
-    /*
-    /// Reads the VM-instruction error field of the current VMCS.
-    pub fn get_vm_instruction_error(&self) -> VmxResult<Option<u32>> {
-        self.check_vmm_started()?;
+    /// Reads the VM exit reason from the current VMCS.
+    fn read_vm_exit_reason(&self) -> VmxResult<ExitReason> {
+        use x86::vmx::vmcs::ro::EXIT_REASON;
 
-        {
-            let current_vmcs = self.current_vmcs.lock();
-            if current_vmcs.is_none() {
-                return Err(VmxError::NoCurrentVmcs);
-            }
+        let reason = unsafe { vmx::vmread(EXIT_REASON)? };
+
+        Ok(ExitReason::new(reason))
+    }
+
+    /// Attempts to return a more specific error than VmcsPtrValid.
+    fn read_vm_fail_valid(&self) -> VmxResult<VmxError> {
+        if let Some(err) = self.read_vm_instruction_error()? {
+            Ok(err)
+        } else {
+            Ok(VmxError::VmcsPtrValid)
+        }
+    }
+
+    /// Reads the VM-instruction error field of the current VMCS.
+    fn read_vm_instruction_error(&self) -> VmxResult<Option<VmxError>> {
+        use x86::vmx::vmcs::ro::VM_INSTRUCTION_ERROR;
+
+        let error = unsafe { vmx::vmread(VM_INSTRUCTION_ERROR) };
+
+        // Nested errors can be confusing
+        if let Err(vmfail) = &error {
+            log::error!("Error occurred while trying to read VM-instruction error: {:?}", vmfail);
         }
 
-        let error = unsafe { vmx::vmread(VM_INSTRUCTION_ERROR).map_err::<VmxError, _>(|e| e.into())? as u32 };
-
-        Ok(Some(error))
+        match error? {
+            0 => Ok(None),
+            x => {
+                Ok(Some(VmxError::VmInstructionError(VmInstructionError::new(x))))
+            }
+        }
     }
-    */
 
     /// Checks that the VMM has started.
     fn check_vmm_started(&self) -> VmxResult<()> {
@@ -874,7 +810,7 @@ impl<'a> Monitor<'a> {
 
         let current_vmcs = self.current_vmcs.lock();
         if current_vmcs.is_none() {
-            return Err(VmxError::VmcsPtrInvalid);
+            return Err(VmxError::NoCurrentVmcs);
         }
 
         Ok(())
@@ -943,92 +879,91 @@ mod tests {
 
     use super::*;
     use atest::test;
+    use types::{KnownExitReason, KnownVmInstructionError};
 
     static mut VMXON: Vmxon = Vmxon::new();
     static mut VMCS: Vmcs = Vmcs::new();
     static GUEST_STACK: [u8; 4096] = [0u8; 4096];
 
+    const FIRST_RAX_VALUE: u64 = 69;
+    const SECOND_RAX_VALUE: u64 = 420;
+
     unsafe extern "C" fn guest_main() {
-        asm!("cpuid");
+        asm!(
+            "mov rax, {first}",
+            "vmcall",
+            "mov rax, {second}",
+            "hlt",
+            first = const FIRST_RAX_VALUE,
+            second = const SECOND_RAX_VALUE,
+        );
+    }
+
+    /// Common code to bootstrap a simple VM.
+    unsafe fn bootstrap_simple_vm() -> Monitor<'static> {
+        let mut vmm = Monitor::new(&mut VMXON);
+        vmm.start()
+            .expect("Could not start VMM");
+
+        VMCS.init(vmm.get_vmcs_revision())
+            .expect("Could not initialize VMCS");
+
+        vmm.load_vmcs(&mut VMCS)
+            .expect("Could not load VMCS");
+
+        vmm.init_vmcs_controls()
+            .expect("Could not initialize VMCS Controls");
+
+        vmm.init_vmcs_guest_state()
+            .expect("Could not initialize VMCS Guest State");
+
+        vmm.save_vmcs_host_state()
+            .expect("Could not save VMCS Host State");
+
+        vmm.copy_vmcs_host_state_to_guest()
+            .expect("Could not copy VMCS Host State to Guest State");
+
+        let stack_end = (&GUEST_STACK as *const u8).offset(4096) as u64;
+        let target = guest_main as *const () as u64;
+
+        vmm.set_vmcs_guest_entrypoint(target, stack_end)
+            .expect("Failed to set guest entrypoint");
+
+        vmm
     }
 
     #[test]
     fn test_simple_vm() {
+        use x86::vmx::vmcs::guest;
+
         unsafe {
-            let mut vmm = Monitor::new(&mut VMXON);
-            vmm.start()
-                .expect("Could not start VMM");
+            let mut vmm = bootstrap_simple_vm();
 
-            VMCS.init(vmm.get_vmcs_revision())
-                .expect("Could not initialize VMCS");
-
-            vmm.load_vmcs(&mut VMCS)
-                .expect("Could not load VMCS");
-
-            vmm.init_vmcs_controls()
-                .expect("Could not initialize VMCS Controls");
-
-            vmm.init_vmcs_guest_state()
-                .expect("Could not initialize VMCS Guest State");
-
-            vmm.save_vmcs_host_state()
-                .expect("Could not save VMCS Host State");
-
-            vmm.copy_vmcs_host_state_to_guest()
-                .expect("Could not copy VMCS Host State to Guest State");
-
-            let stack_end = (&GUEST_STACK as *const u8).offset(4096) as u64;
-            let target = guest_main as *const () as u64;
-
-            vmm.set_vmcs_guest_entrypoint(target, stack_end)
-                .expect("Failed to set guest entrypoint");
-
-            vmm.launch_current(false)
+            let reason = vmm.launch_current(false)
                 .expect("Failed to launch VM");
+
+            assert_eq!(reason, KnownExitReason::Vmcall);
+
+            let rax = vmx::vmread(guest::
         }
     }
 
     #[test]
     fn test_invalid_vm() {
         unsafe {
-            let mut vmm = Monitor::new(&mut VMXON);
-            vmm.start()
-                .expect("Could not start VMM");
-
-            VMCS.init(vmm.get_vmcs_revision())
-                .expect("Could not initialize VMCS");
-
-            vmm.load_vmcs(&mut VMCS)
-                .expect("Could not load VMCS");
-
-            vmm.init_vmcs_controls()
-                .expect("Could not initialize VMCS Controls");
-
-            vmm.init_vmcs_guest_state()
-                .expect("Could not initialize VMCS Guest State");
-
-            vmm.save_vmcs_host_state()
-                .expect("Could not save VMCS Host State");
-
-            vmm.copy_vmcs_host_state_to_guest()
-                .expect("Could not copy VMCS Host State to Guest State");
+            let mut vmm = bootstrap_simple_vm();
 
             // manually inject an invalid control value
             vmx::vmwrite(control::PINBASED_EXEC_CONTROLS, u64::MAX)
                 .expect("Could not inject control value");
 
-            let stack_end = (&GUEST_STACK as *const u8).offset(4096) as u64;
-            let target = guest_main as *const () as u64;
-
-            vmm.set_vmcs_guest_entrypoint(target, stack_end)
-                .expect("Failed to set guest entrypoint");
-
             let launch_err = vmm.launch_current(false)
                 .expect_err("VM launch must fail");
 
-            if let VmxError::VmcsPtrValid = launch_err {
+            if let VmxError::VmInstructionError(err) = launch_err {
+                assert_eq!(err, KnownVmInstructionError::VmEntryWithInvalidControlFields);
             } else {
-                panic!("Launch must fail with VmxError::VmcsPtrValid");
+                panic!("Launch must fail with an VM-instruction error - It failed with {}", launch_err);
             }
         }
     }

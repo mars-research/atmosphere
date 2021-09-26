@@ -142,7 +142,7 @@ impl Vmcs {
 ///
 /// - Bits 31:0  - If the bit is zero, then the corresponding bit is allowed to be zero.
 /// - Bits 63:32 - If the bit is one, then the corresponding bit is allowed to be one.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BitfieldConstraint {
     /// Name of the VMCS field, for debugging purposes.
     field_name: &'static str,
@@ -169,7 +169,7 @@ impl BitfieldConstraint {
         let allowed_one = (constraint >> 32) as u32;
 
         if (allowed_zero & !allowed_one) != 0 {
-            return Err(VmxError::VmcsBadConstraint { constraint });
+            return Err(VmxError::VmcsImpossibleConstraint { constraint });
         }
 
         Ok(Self {
@@ -202,7 +202,7 @@ impl BitfieldConstraint {
 }
 
 /// Object that implements Display to explain why a constraint isn't met.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ExplainBitfieldConstraint {
     constraint: BitfieldConstraint,
     value: u32,

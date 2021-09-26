@@ -25,6 +25,9 @@ dependencies = [
  "astd",
  "atest",
  "bit_field",
+ "bitfield",
+ "displaydoc",
+ "enum-primitive-derive",
  "libcap",
  "log",
  "multiboot2",
@@ -32,6 +35,7 @@ dependencies = [
  "ns16550a",
  "num",
  "num-derive",
+ "num-traits",
  "pal",
  "realjump",
  "snafu",
@@ -112,6 +116,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7313c0d620d0cb4dbd9d019e461a4beb501071ff46ec0ab933efb4daa76d73e3"
 
 [[package]]
+name = "displaydoc"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3bf95dc3f046b9da4f2d51833c0d3547d8564ef6910f5c1ed130306a75b92886"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "doc-comment"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -125,6 +140,16 @@ checksum = "db184d3fa27bc7a2344250394c0264144dfe0bc81a4401801dcb964b8dd172ad"
 dependencies = [
  "nb 0.1.3",
  "void",
+]
+
+[[package]]
+name = "enum-primitive-derive"
+version = "0.2.2-alpha.0"
+source = "git+https://gitlab.com/cardoe/enum-primitive-derive?rev=d39f168387362bc64df579d1da85d4e068d36ba4#d39f168387362bc64df579d1da85d4e068d36ba4"
+dependencies = [
+ "num-traits",
+ "quote",
+ "syn",
 ]
 
 [[package]]

@@ -11,15 +11,22 @@ atest = { path = "../atest" }
 libcap = { path = "../libcap" }
 ns16550a = { path = "../ns16550a" }
 
+bitfield = "0.13.2"  # Totally non-confusing crate name
 bit_field = "0.10.1"
+displaydoc = { version = "0.2.3", default-features = false }
 log = "0.4.14"
 multiboot2 = "0.12.1"
 num = { version = "0.4", default-features = false }
 num-derive = "0.3.3"
+num-traits = { version = "0.2.14", default-features = false }
 realjump = "0.1.0"
 snafu = { version = "0.6.10", default-features = false }
 spin = "0.9.2"
 x86 = "0.39.0"
+
+[dependencies.enum-primitive-derive]
+git = "https://gitlab.com/cardoe/enum-primitive-derive"
+rev = "d39f168387362bc64df579d1da85d4e068d36ba4"
 
 [dependencies.pal]
 git = "https://github.com/mars-research/pal"
