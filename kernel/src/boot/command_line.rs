@@ -56,9 +56,7 @@ impl KernelCommandLine {
                         "nocolor" => { self.nocolor = true; }
                         "script_shutdown" => { self.script_shutdown = true; }
                         _ => {
-                            return Err(Error::InvalidCommandLineOption {
-                                component,
-                            });
+                            return Err(Error::InvalidCommandLineOption(component));
                         }
                     }
                 }
@@ -68,20 +66,14 @@ impl KernelCommandLine {
                         "script" => { self.script = Some(value); }
                         "qemu_debug_exit_io_base" => {
                             self.qemu_debug_exit_io_base.replace(value.parse()
-                                .map_err(|_| Error::InvalidCommandLineOption {
-                                    component,
-                                })?);
+                                .map_err(|_| Error::InvalidCommandLineOption (component))?);
                         }
                         "bochs_apm_io_base" => {
                             self.bochs_apm_io_base.replace(value.parse()
-                                .map_err(|_| Error::InvalidCommandLineOption {
-                                    component,
-                                })?);
+                                .map_err(|_| Error::InvalidCommandLineOption (component))?);
                         }
                         _ => {
-                            return Err(Error::InvalidCommandLineOption {
-                                component,
-                            });
+                            return Err(Error::InvalidCommandLineOption(component));
                         }
                     }
                 }

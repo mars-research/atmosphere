@@ -150,7 +150,7 @@ impl TryFrom<u8> for SystemDescriptorType {
         match descriptor_type {
             0b1001 => Ok(Self::AvailableTss),
             0b1011 => Ok(Self::BusyTss),
-            _ => Err(Error::InvalidDescriptorType { descriptor_type }),
+            _ => Err(Error::InvalidDescriptorType(descriptor_type)),
         }
     }
 }
