@@ -59,7 +59,7 @@ pub struct GuestContext {
 
     /// Whether the vCPU has been launched before or not.
     ///
-    /// After restoring all the registers, we will cmp [rsp], 0.
+    /// After restoring all the registers, we will cmp \[rsp\], 0.
     /// We use this to determine whether to VMLAUNCH or VMRESUME.
     launched: u64,
 }

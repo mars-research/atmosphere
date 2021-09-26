@@ -1,12 +1,6 @@
 //! The Atmosphere microkernel.
 //!
-//! ## Kernel Command Line
-//!
-//! Supported kernel command line parameters:
-//! - `nologo`: Disable the logo
-//! - `nocolor`: Disable colored serial output
-//! - `serial=[com1|com2|com3|com4]`: Log to a specified serial port
-//! - `script=NAME`: Run a debug script
+//! See [`KernelCommandLine`](boot::command_line::KernelCommandLine) for a list of accepted kernel command-line options.
 
 #![no_std]
 #![feature(

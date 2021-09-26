@@ -35,7 +35,8 @@ For VSCode, this is the `rust-analyzer.server.path` key in `settings.json`.
 
 ## Documentation
 
-Documentations can be built by running `cargo doc` inside `kernel`.
+We try to document the internals of Atmosphere as much as possible.
+To build documentations, run `cargo doc -p atmosphere --document-private-items`.
 
 ## Licensing
 
