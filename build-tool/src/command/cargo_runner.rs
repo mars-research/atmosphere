@@ -4,6 +4,7 @@
 
 use std::path::PathBuf;
 
+use anyhow::anyhow;
 use clap::Clap;
 
 use crate::error::Result;
@@ -16,6 +17,10 @@ use super::{SubCommand, GlobalOpts};
 pub struct Opts {
     /// Path to the kernel.
     kernel: PathBuf,
+
+    /// Whether we are running benchmarks.
+    #[clap(long)]
+    bench: bool,
 }
 
 pub(super) async fn run(global: GlobalOpts) -> Result<()> {
@@ -25,6 +30,10 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
 
     let run_config = RunConfiguration::default();
     let kernel = Binary::new(local.kernel);
+
+    if local.bench {
+        return Err(anyhow!("Benchmarks are not supported at the moment"));
+    }
 
     let mut emulator = Bochs::new(project.clone());
     let ret = emulator.run(&run_config, &kernel).await?;
