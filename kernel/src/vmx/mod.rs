@@ -304,6 +304,7 @@ impl<'a> Monitor<'a> {
 
     /// Loads the specified vCPU and make it the current vCPU.
     pub unsafe fn load_vcpu(&mut self, vcpu: &'a mut VCpu) -> VmxResult<()> {
+        #[cfg(debug_assertions)]
         self.check_vmm_started()?;
 
         let mut current_vcpu = self.current_vcpu.lock();
@@ -346,6 +347,7 @@ impl<'a> Monitor<'a> {
 
     /// Initializes VMCS control fields.
     unsafe fn init_vmcs_controls(&mut self) -> VmxResult<()> {
+        #[cfg(debug_assertions)]
         self.check_vcpu_loaded()?;
 
         // Set Pin-Based VM-Execution Controls.
@@ -437,6 +439,7 @@ impl<'a> Monitor<'a> {
 
     /// Initializes the VMCS Guest-State Area.
     unsafe fn init_vmcs_guest_state(&self) -> VmxResult<()> {
+        #[cfg(debug_assertions)]
         self.check_vcpu_loaded()?;
 
         // ## Register State
@@ -506,6 +509,7 @@ impl<'a> Monitor<'a> {
     unsafe fn save_vmcs_host_state(&self) -> VmxResult<()> {
         // See Intel SDM, Volume 3C, Chapter 24.5.
 
+        #[cfg(debug_assertions)]
         self.check_vcpu_loaded()?;
 
         use pal::vmcs::vm_exit_controls::*;
@@ -587,6 +591,7 @@ impl<'a> Monitor<'a> {
             TR_ACCESS_RIGHTS,
         };
 
+        #[cfg(debug_assertions)]
         self.check_vcpu_loaded()?;
 
         // Copy required host state
@@ -683,6 +688,7 @@ impl<'a> Monitor<'a> {
     unsafe fn set_vmcs_guest_entrypoint(&mut self, rip: u64, rsp: u64) -> VmxResult<()> {
         use x86::vmx::vmcs::guest::{RIP as GUEST_RIP, RSP as GUEST_RSP};
 
+        #[cfg(debug_assertions)]
         self.check_vcpu_loaded()?;
 
         vmx::vmwrite(GUEST_RIP, rip)?;
@@ -698,6 +704,7 @@ impl<'a> Monitor<'a> {
         use x86::vmx::vmcs::guest::RIP as GUEST_RIP;
         use x86::vmx::vmcs::ro::VMEXIT_INSTRUCTION_LEN;
 
+        #[cfg(debug_assertions)]
         self.check_vcpu_loaded()?;
 
         let rip = vmx::vmread(GUEST_RIP)?;
@@ -734,7 +741,10 @@ impl<'a> Monitor<'a> {
     pub fn launch_current(&mut self) -> VmxResult<ExitReason> {
         use x86::vmx::vmcs::host::{RIP as HOST_RIP, RSP as HOST_RSP};
 
-        let guest_context = self.check_vcpu_ready()?;
+        #[cfg(debug_assertions)]
+        self.check_vcpu_ready()?;
+
+        let guest_context = self.get_guest_context_region()?;
 
         unsafe {
             self.save_vmcs_host_state()?;
@@ -969,7 +979,23 @@ impl<'a> Monitor<'a> {
         }
     }
 
+    /// Returns the context save region for the currently-loaded VMCS.
+    fn get_guest_context_region(&self) -> VmxResult<*mut GuestContext> {
+        #[cfg(debug_assertions)]
+        self.check_vmm_started()?;
+
+        let current_vcpu = self.current_vcpu.lock();
+        if let Some(vcpu) = current_vcpu.as_ref() {
+            Ok(&vcpu.context as *const _ as *mut _)
+        } else {
+            Err(VmxError::NoCurrentVCpu)
+        }
+    }
+
+    // sanity checks
+
     /// Checks that the VMM has started.
+    #[allow(dead_code)] // calls are stripped out in release mode
     fn check_vmm_started(&self) -> VmxResult<()> {
         let vmx_enabled = self.enabled.read();
         if !*vmx_enabled {
@@ -981,6 +1007,7 @@ impl<'a> Monitor<'a> {
 
     /// Checks that a vCPU is currently loaded.
     fn check_vcpu_loaded(&self) -> VmxResult<()> {
+        #[cfg(debug_assertions)]
         self.check_vmm_started()?;
 
         let current_vcpu = self.current_vcpu.lock();
@@ -991,14 +1018,16 @@ impl<'a> Monitor<'a> {
         Ok(())
     }
 
-    /// Checks that a vCPU is currently loaded and ready, returning its context save region.
-    fn check_vcpu_ready(&self) -> VmxResult<*mut GuestContext> {
+    /// Checks that a vCPU is currently loaded and ready.
+    #[allow(dead_code)] // calls are stripped out in release mode
+    fn check_vcpu_ready(&self) -> VmxResult<()> {
+        #[cfg(debug_assertions)]
         self.check_vmm_started()?;
 
         let current_vcpu = self.current_vcpu.lock();
         if let Some(vcpu) = current_vcpu.as_ref() {
             if vcpu.ready() {
-                Ok(&vcpu.context as *const _ as *mut _)
+                Ok(())
             } else {
                 Err(VmxError::VCpuNotConfigured)
             }
