@@ -232,12 +232,6 @@ impl<'a> Monitor<'a> {
         // > Thus, each bit in CR0 is either fixed to 0 (with value 0 in both MSRs), fixed to
         // > 1 (1 in both MSRs), or flexible (0 in IA32_VMX_CR0_FIXED0 and 1 in
         // > IA32_VMX_CR0_FIXED1).
-        //
-        // Thus, in boolean logic, to compute the new value of a register:
-        //
-        // ```
-        // new = (old | fixed0) & fixed1
-        // ```
         let cr0_fixed0 = msr::rdmsr(msr::IA32_VMX_CR0_FIXED0) as u32;
         let cr0_fixed1 = msr::rdmsr(msr::IA32_VMX_CR0_FIXED1) as u32;
         write_cr0((read_cr0() | cr0_fixed0) & cr0_fixed1);
