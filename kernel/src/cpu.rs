@@ -1,6 +1,7 @@
-//! Per-CPU data structures.
+//! The per-CPU data structure.
 //!
-//! Currently consists of the following:
+//! The [`Cpu`] data structure is set as the `GS` base on the CPU.
+//! It currently consists of the following:
 //!
 //! - VMXON region
 //! - GDT
@@ -10,42 +11,54 @@
 //! We preallocate the structure for CPU 0, and the space for other
 //! CPUs are provided by Cpu capabilities.
 
-use core::ops::{Deref, DerefMut};
+use core::mem;
+use core::ptr;
 
-use astd::sync::RwLock;
-use crate::vmx::vmcs::Vmxon;
+use x86::msr;
+
 use crate::gdt::{GlobalDescriptorTable, IstStack, TaskStateSegment};
+use crate::vmx::vmcs::Vmxon;
 
 /// Per-processor data for CPU 0.
-static CPU0: RwLock<Cpu> = RwLock::new(Cpu::new());
+static mut CPU0: Cpu = Cpu::new();
 
-/// Returns an immutable handle to the current CPU's data structure.
-pub fn get_current() -> impl Deref<Target = Cpu> {
-    let id = crate::interrupt::cpu_id();
+/// Offset of GS where the pointer to `Cpu` is stored.
+const GS_SELF_PTR_OFFSET: usize = mem::size_of::<Vmxon>() as usize;
 
-    if id != 0 {
-        panic!("SMP is not implemented (CPU {})", id)
+/// Returns a handle to the current CPU's data structure.
+pub fn get_current() -> &'static mut Cpu {
+    let address: u64;
+
+    unsafe {
+        asm!(
+            "mov rax, gs:[{gs_offset}]",
+            gs_offset = const GS_SELF_PTR_OFFSET,
+            lateout("rax") address,
+        );
     }
 
-    CPU0.read()
-}
+    let address = address as *mut Cpu;
 
-/// Returns a mutable handle to the current CPU's data structure.
-pub fn get_current_mut() -> impl DerefMut<Target = Cpu> {
-    let id = crate::interrupt::cpu_id();
-
-    if id != 0 {
-        panic!("SMP is not implemented (CPU {})", id)
-    }
-
-    CPU0.write()
+    unsafe { &mut *address }
 }
 
 /// Per-processor data for a CPU.
 #[repr(align(4096))]
 pub struct Cpu {
+    // WARNING: If you change the position of `self_ptr`, you must also
+    // change `GS_SELF_PTR_OFFSET` above!
+
     /// The VMXON region.
     pub vmxon: Vmxon,
+
+    // WARNING: If you change the position of `self_ptr`, you must also
+    // change `GS_SELF_PTR_OFFSET` above!
+
+    /// A pointer to ourselves.
+    ///
+    /// We do a `mov rax, gs:[CPU_GS_OFFSET]` to get our own address.
+    /// We also want to be able to easily access other fields directly.
+    pub self_ptr: *const Cpu,
 
     /// The Global Descriptor Table.
     ///
@@ -59,10 +72,14 @@ pub struct Cpu {
     pub ist: [IstStack; 7],
 }
 
+unsafe impl Send for Cpu {}
+unsafe impl Sync for Cpu {}
+
 impl Cpu {
     pub const fn new() -> Self {
         Self {
             vmxon: Vmxon::new(),
+            self_ptr: ptr::null(),
             gdt: GlobalDescriptorTable::empty(),
             tss: TaskStateSegment::new(),
             ist: [
@@ -76,4 +93,15 @@ impl Cpu {
             ],
         }
     }
+}
+
+/// Initialize the CPU-local data structure for CPU 0.
+///
+/// This should only be called once.
+pub unsafe fn init_cpu0() {
+    let address = &CPU0 as *const Cpu;
+
+    CPU0.self_ptr = address;
+
+    msr::wrmsr(msr::IA32_GS_BASE, address as u64);
 }

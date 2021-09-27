@@ -23,7 +23,7 @@ use x86::Ring;
 pub use x86::bits64::task::TaskStateSegment;
 use x86::bits64::segmentation::load_cs;
 use x86::dtables::{lgdt, DescriptorTablePointer};
-use x86::segmentation::{load_ds, load_es, load_fs, load_gs, load_ss, SegmentSelector};
+use x86::segmentation::{load_ds, load_es, load_ss, SegmentSelector};
 use x86::task::load_tr;
 
 use types::{AccessByte, SystemAccessByte, SystemDescriptorType};
@@ -40,7 +40,7 @@ const GDT_F_LONG_MODE: u8 = 1 << 5;
 ///
 /// This must be called only once for each CPU reset.
 pub unsafe fn init_cpu() {
-    let mut cpu = crate::cpu::get_current_mut();
+    let cpu = crate::cpu::get_current();
 
     // Initialize TSS
     let tss_addr = {
@@ -97,11 +97,11 @@ pub unsafe fn init_cpu() {
     // Load GDT
     lgdt(&gdt.get_pointer());
 
+    // We don't load FS and GS
+    // GS is used for the CPU-local structure (crate::cpu).
     load_cs(SegmentSelector::new(1, Ring::Ring0));
     load_ds(SegmentSelector::new(2, Ring::Ring0));
     load_es(SegmentSelector::new(2, Ring::Ring0));
-    load_fs(SegmentSelector::new(2, Ring::Ring0));
-    load_gs(SegmentSelector::new(2, Ring::Ring0));
     load_ss(SegmentSelector::new(2, Ring::Ring0));
     load_tr(SegmentSelector::new(3, Ring::Ring0));
 }

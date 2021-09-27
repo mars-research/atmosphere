@@ -77,6 +77,13 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
         console::early_init();
         logging::early_init();
 
+        cpu::init_cpu0(); // Now get_current() can be used
+
+        interrupt::init();
+        interrupt::init_cpu();
+
+        gdt::init_cpu();
+
         boot::init();
         console::init();
         logging::init();
@@ -97,9 +104,6 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
     unsafe {
         memory::init();
         memory::init_cpu();
-        gdt::init_cpu();
-        interrupt::init();
-        interrupt::init_cpu();
         capability::init();
     }
 

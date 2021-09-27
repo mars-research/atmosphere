@@ -146,11 +146,9 @@ pub fn cpu_id() -> u32 {
 
     ebx >> 24
 
-    /*
-    let reg = unsafe {
-        ptr::read_volatile((LAPIC + LAPIC_ID) as *const u32)
-    };
+    // let reg = unsafe {
+    //     ptr::read_volatile((LAPIC + LAPIC_ID) as *const u32)
+    // };
 
-    reg >> 24
-    */
+    // reg >> 24
 }
