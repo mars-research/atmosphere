@@ -11,10 +11,11 @@
 //! We preallocate the structure for CPU 0, and the space for other
 //! CPUs are provided by Cpu capabilities.
 
-use core::mem;
+use core::mem::{self, MaybeUninit};
 use core::ptr;
 
 use x86::msr;
+use x86::apic::xapic::XAPIC;
 
 use crate::gdt::{GlobalDescriptorTable, IstStack, TaskStateSegment};
 use crate::vmx::vmcs::Vmxon;
@@ -60,6 +61,9 @@ pub struct Cpu {
     /// We also want to be able to easily access other fields directly.
     pub self_ptr: *const Cpu,
 
+    /// State for the xAPIC driver.
+    pub xapic: MaybeUninit<XAPIC>,
+
     /// The Global Descriptor Table.
     ///
     /// See [crate::gdt] for a list of indices and their associated usages.
@@ -80,6 +84,7 @@ impl Cpu {
         Self {
             vmxon: Vmxon::new(),
             self_ptr: ptr::null(),
+            xapic: MaybeUninit::uninit(),
             gdt: GlobalDescriptorTable::empty(),
             tss: TaskStateSegment::new(),
             ist: [
