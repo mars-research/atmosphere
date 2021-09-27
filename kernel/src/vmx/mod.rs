@@ -1074,10 +1074,25 @@ mod tests {
 
     static mut VMXON: Vmxon = Vmxon::new();
     static mut VCPU: VCpu = VCpu::new();
-    static GUEST_STACK: [u8; 4096] = [0u8; 4096];
 
-    const FIRST_RAX_VALUE: u64 = 0x01138327;
-    const SECOND_RAX_VALUE: u64 = 0x00069420;
+    static GUEST_STACK: [u8; 4096] = [0u8; 4096];
+    static EXPECTED_VALUES: [u64; 15] = [
+        0x8000000000000001,
+        0x8000000000000011,
+        0x8000000000000101,
+        0x8000000000001001,
+        0x8000000000010001,
+        0x8000000000100001,
+        0x8000000001000001,
+        0x8000000010000001,
+        0x8000000100000001,
+        0x8000001000000001,
+        0x8000010000000001,
+        0x8000100000000001,
+        0x8001000000000001,
+        0x8010000000000001,
+        0x8100000000000001,
+    ];
 
     macro_rules! assert_register_eq {
         ($vmm:ident, $reg:ident, $value:expr) => {
@@ -1088,12 +1103,53 @@ mod tests {
 
     unsafe extern "C" fn guest_main() {
         asm!(
-            "mov rax, {first}",
-            "vmcall",
-            "mov rax, {second}",
+            "mov rax, 0x8000000000000001",
+            "mov rbx, 0x8000000000000011",
+            "mov rcx, 0x8000000000000101",
+            "mov rdx, 0x8000000000001001",
+            "mov rbp, 0x8000000000010001",
+            "mov rdi, 0x8000000000100001",
+            "mov rsi, 0x8000000001000001",
+            "mov  r8, 0x8000000010000001",
+            "mov  r9, 0x8000000100000001",
+            "mov r10, 0x8000001000000001",
+            "mov r11, 0x8000010000000001",
+            "mov r12, 0x8000100000000001",
+            "mov r13, 0x8001000000000001",
+            "mov r14, 0x8010000000000001",
+            "mov r15, 0x8100000000000001",
+
+            "vmcall", // We will set rax to &EXPECTED_VALUES
+
+            // Verify that registers have been restored correctly
+            "cmp rbx, [rax +   8]", "jne 2f",
+            "cmp rcx, [rax +  16]", "jne 2f",
+            "cmp rdx, [rax +  24]", "jne 2f",
+            "cmp rbp, [rax +  32]", "jne 2f",
+            "cmp rdi, [rax +  40]", "jne 2f",
+            "cmp rsi, [rax +  48]", "jne 2f",
+            "cmp  r8, [rax +  56]", "jne 2f",
+            "cmp  r9, [rax +  64]", "jne 2f",
+            "cmp r10, [rax +  72]", "jne 2f",
+            "cmp r11, [rax +  80]", "jne 2f",
+            "cmp r12, [rax +  88]", "jne 2f",
+            "cmp r13, [rax +  96]", "jne 2f",
+            "cmp r14, [rax + 104]", "jne 2f",
+            "cmp r15, [rax + 112]", "jne 2f",
+
+            "jmp 3f",
+
+            // Failure
+            "2:",
+            "xchg bx, bx",
+            "hlt",
+            "jmp 2b",
+
+            // Success
+            "3:",
+
+            "mov rax, 0xc000000000000001",
             "cpuid",
-            first = const FIRST_RAX_VALUE,
-            second = const SECOND_RAX_VALUE,
         );
     }
 
@@ -1143,7 +1199,28 @@ mod tests {
                 .expect("Failed to launch VM");
 
             assert_eq!(reason, KnownExitReason::Vmcall);
-            assert_register_eq!(vmm, rax, FIRST_RAX_VALUE);
+            assert_register_eq!(vmm, rax, 0x8000000000000001);
+            assert_register_eq!(vmm, rbx, 0x8000000000000011);
+            assert_register_eq!(vmm, rcx, 0x8000000000000101);
+            assert_register_eq!(vmm, rdx, 0x8000000000001001);
+            assert_register_eq!(vmm, rbp, 0x8000000000010001);
+            assert_register_eq!(vmm, rdi, 0x8000000000100001);
+            assert_register_eq!(vmm, rsi, 0x8000000001000001);
+            assert_register_eq!(vmm,  r8, 0x8000000010000001);
+            assert_register_eq!(vmm,  r9, 0x8000000100000001);
+            assert_register_eq!(vmm, r10, 0x8000001000000001);
+            assert_register_eq!(vmm, r11, 0x8000010000000001);
+            assert_register_eq!(vmm, r12, 0x8000100000000001);
+            assert_register_eq!(vmm, r13, 0x8001000000000001);
+            assert_register_eq!(vmm, r14, 0x8010000000000001);
+            assert_register_eq!(vmm, r15, 0x8100000000000001);
+
+            // Inject RAX
+            {
+                let mut vcpu = vmm.current_vcpu.lock();
+                let mut vcpu = vcpu.as_mut().unwrap();
+                vcpu.context.rax = &EXPECTED_VALUES as *const _ as u64;
+            }
 
             vmm.advance_vmcs_guest_rip()
                 .expect("Could not advance guest RIP");
@@ -1154,7 +1231,7 @@ mod tests {
                 .expect("Failed to resume VM");
 
             assert_eq!(reason, KnownExitReason::Cpuid);
-            assert_register_eq!(vmm, rax, SECOND_RAX_VALUE);
+            assert_register_eq!(vmm, rax, 0xc000000000000001);
 
             vmm.stop().expect("Could not stop VMM");
             VCPU.deinit().expect("Could not deinitialize the vCPU");
