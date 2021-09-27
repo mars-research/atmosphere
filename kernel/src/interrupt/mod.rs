@@ -17,11 +17,12 @@ use core::convert::{Into, TryFrom};
 use bit_field::BitField;
 use x86::bits64::paging::VAddr;
 
-use astd::sync::Mutex;
 pub use exception::Exception;
+pub use lapic::cpu_id;
+use astd::sync::Mutex;
 use exception::EXCEPTION_MAX;
 use idt::Idt;
-pub use lapic::cpu_id;
+use crate::boot::spin_forever;
 
 /// The IRQ offset.
 pub const IRQ_OFFSET: usize = 32;
@@ -40,43 +41,43 @@ pub type HandlerFunc = unsafe extern "C" fn(&mut PtRegs);
 
 /// A handler function for an exception that pushes an error code.
 pub type HandlerFuncWithErrCode =
-    extern "x86-interrupt" fn(&mut InterruptStackFrame, u64);
+    unsafe extern "x86-interrupt" fn(&mut InterruptStackFrame, u64);
 
 /// A page fault handler function that pushes a page fault error code.
 pub type PageFaultHandlerFunc =
-    extern "x86-interrupt" fn(&mut InterruptStackFrame, PageFaultErrorCode);
+    unsafe extern "x86-interrupt" fn(&mut InterruptStackFrame, PageFaultErrorCode);
 
 /// Invalid Opcode handler.
 unsafe extern "C" fn invalid_opcode(regs: &mut PtRegs) {
     log::error!("Invalid Opcode: {:#x?}", regs);
-    loop {}
+    spin_forever();
 }
 
 /// Double Fault handler.
 unsafe extern "C" fn double_fault(regs: &mut PtRegs) {
     log::error!("Double Fault: {:#x?}", regs);
-    loop {}
+    spin_forever();
 }
 
 /// Stack Segment Fault handler
-extern "x86-interrupt" fn stack_segment_fault(frame: &mut InterruptStackFrame, error_code: u64) {
+unsafe extern "x86-interrupt" fn stack_segment_fault(frame: &mut InterruptStackFrame, error_code: u64) {
     log::error!("General Protection Fault (error code {:#b}): {:#x?}", error_code, frame);
-    loop {}
+    spin_forever();
 }
 
 /// General Protection Fault handler.
-extern "x86-interrupt" fn general_protection_fault(frame: &mut InterruptStackFrame, error_code: u64) {
+unsafe extern "x86-interrupt" fn general_protection_fault(frame: &mut InterruptStackFrame, error_code: u64) {
     log::error!("General Protection Fault (error code {:#b}): {:#x?}", error_code, frame);
-    loop {}
+    spin_forever();
 }
 
 /// Page Fault handler.
-extern "x86-interrupt" fn page_fault(frame: &mut InterruptStackFrame, error_code: PageFaultErrorCode) {
+unsafe extern "x86-interrupt" fn page_fault(frame: &mut InterruptStackFrame, error_code: PageFaultErrorCode) {
     log::info!("Page Fault (error code {:?}): {:#x?}", error_code, frame);
 
     // FIXME
 
-    loop {}
+    spin_forever();
 }
 
 /// An interrupt.
@@ -89,9 +90,9 @@ pub enum Interrupt {
     Irq(usize),
 }
 
-impl Into<usize> for Interrupt {
-    fn into(self) -> usize {
-        match self {
+impl From<Interrupt> for usize {
+    fn from(interrupt: Interrupt) -> usize {
+        match interrupt {
             Interrupt::Exception(ex) => ex.into(),
             Interrupt::Irq(num) => IRQ_OFFSET + num,
         }

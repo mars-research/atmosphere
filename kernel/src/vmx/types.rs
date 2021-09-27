@@ -21,9 +21,9 @@ impl VmcsRevision {
     }
 }
 
-impl Into<u32> for VmcsRevision {
-    fn into(self) -> u32 {
-        self.0
+impl From<VmcsRevision> for u32 {
+    fn from(revision: VmcsRevision) -> u32 {
+        revision.0
     }
 }
 

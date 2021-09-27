@@ -878,7 +878,7 @@ impl<'a> Monitor<'a> {
             }
         }
 
-        Ok(self.read_vm_exit_reason()?)
+        self.read_vm_exit_reason()
     }
 
     /// Returns a dump of the guest context.

@@ -134,11 +134,11 @@ pub enum SystemDescriptorType {
     BusyTss,
 }
 
-impl Into<u8> for SystemDescriptorType {
-    fn into(self) -> u8 {
-        match self {
-            Self::AvailableTss => 0b1001,
-            Self::BusyTss => 0b1011,
+impl From<SystemDescriptorType> for u8 {
+    fn from(descriptor_type: SystemDescriptorType) -> u8 {
+        match descriptor_type {
+            SystemDescriptorType::AvailableTss => 0b1001,
+            SystemDescriptorType::BusyTss => 0b1011,
         }
     }
 }

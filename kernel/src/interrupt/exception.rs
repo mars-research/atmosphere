@@ -1,6 +1,6 @@
 //! X86 Exceptions.
 
-use core::convert::{Into, TryFrom};
+use core::convert::TryFrom;
 
 pub const EXCEPTION_MAX: usize = 31;
 
@@ -77,11 +77,11 @@ pub enum Exception {
     Reserved(usize),
 }
 
-impl Into<usize> for Exception {
-    fn into(self) -> usize {
+impl From<Exception> for usize {
+    fn from(exception: Exception) -> usize {
         use Exception::*;
 
-        match self {
+        match exception {
             DivideByZero => 0x0,
             Debug => 0x1,
             NonMaskableInterrupt => 0x2,

@@ -309,9 +309,9 @@ pub enum GateType {
     Trap16,
 }
 
-impl Into<u8> for GateType {
-    fn into(self) -> u8 {
-        match self {
+impl From<GateType> for u8 {
+    fn from(gate_type: GateType) -> u8 {
+        match gate_type {
             GateType::Int32  => 0b1110,
             GateType::Trap32 => 0b1111,
 

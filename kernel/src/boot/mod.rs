@@ -75,13 +75,17 @@ pub unsafe fn shutdown(success: bool) -> ! {
         }
     }
 
-    // ACPI shutdown
-    //
-    // PM1a_CNT <- SLP_TYPa | SLP_EN
-    outw(0x604, 0x2000 | 0x0);
+    // QEMU
+    outw(0x604, 0x2000);
 
     log::info!("It is now safe to turn off your computer"); // ;)
 
-    asm!("hlt");
-    loop {}
+    spin_forever();
+}
+
+/// Enters a busy loop.
+pub unsafe fn spin_forever() -> ! {
+    loop {
+        asm!("hlt");
+    }
 }

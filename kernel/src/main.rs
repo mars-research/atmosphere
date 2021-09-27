@@ -23,11 +23,19 @@
     asm_sub_register,
     deprecated,
     missing_abi,
-    rustdoc::bare_urls,
-    rustdoc::broken_intra_doc_links,
     unused_macros,
     unused_must_use,
     unused_unsafe,
+)]
+
+#![deny(
+    clippy::from_over_into,
+    clippy::needless_question_mark,
+)]
+
+#![deny(
+    rustdoc::bare_urls,
+    rustdoc::broken_intra_doc_links,
 )]
 
 #![cfg_attr(not(debug_assertions), deny(
@@ -103,9 +111,8 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
     unsafe {
         scripts::run_script_from_command_line();
+        boot::spin_forever();
     }
-
-    loop {}
 }
 
 /// Runs all tests.
@@ -149,5 +156,7 @@ fn panic(info: &PanicInfo) -> ! {
 
     // FIXME: Signal all other CPUs to halt
 
-    loop {}
+    unsafe {
+        boot::spin_forever();
+    }
 }
