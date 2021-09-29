@@ -20,7 +20,7 @@ num = { version = "0.4", default-features = false }
 num-derive = "0.3.3"
 num-traits = { version = "0.2.14", default-features = false }
 realjump = "0.1.0"
-x86 = "0.39.0"
+x86 = "0.42.1"
 
 [dependencies.enum-primitive-derive]
 git = "https://gitlab.com/cardoe/enum-primitive-derive"

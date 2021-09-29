@@ -7,4 +7,4 @@ publish = false
 [dependencies]
 atomic_refcell = "0.1.7"
 spin = "0.9.0"
-heapless = "0.7.0"
+heapless = "0.7.7"

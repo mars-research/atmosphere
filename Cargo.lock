@@ -162,12 +162,13 @@ dependencies = [
 
 [[package]]
 name = "heapless"
-version = "0.7.0"
+version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e94c13b78b595d2adbd708bce276664f1047f98fc32ddbf463b4c191158334a6"
+checksum = "fe65ef062f1af5b1b189842b0bc45bd671c38e1d22c6aa22e6ada03d01026d53"
 dependencies = [
  "atomic-polyfill",
  "hash32",
+ "spin",
  "stable_deref_trait",
 ]
 
@@ -339,9 +340,9 @@ dependencies = [
 
 [[package]]
 name = "raw-cpuid"
-version = "9.0.0"
+version = "10.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c27cb5785b85bd05d4eb171556c9a1a514552e26123aeae6bb7d811353148026"
+checksum = "929f54e29691d4e6a9cc558479de70db7aa3d98cd6fe7ab86d7507aa2886b9d2"
 dependencies = [
  "bitflags",
 ]
@@ -437,9 +438,9 @@ dependencies = [
 
 [[package]]
 name = "x86"
-version = "0.39.0"
+version = "0.42.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7726a0732fa834954e0cceacadb224b7a0deb55d6ea498e2fc1b591397bca57f"
+checksum = "6e13f8554bbd337f900fceb0d9db85ceec5f1d6ea40c15cee2404c4e6eba55be"
 dependencies = [
  "bit_field",
  "bitflags",
