@@ -9,6 +9,8 @@
 //!
 //! - Descriptors: Check `bx_descriptor_t` in `cpu/descriptor.h`.
 
+#[allow(dead_code)] // used in tests
+mod scheduler;
 mod types;
 
 use core::mem;
