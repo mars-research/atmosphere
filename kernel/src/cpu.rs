@@ -18,8 +18,7 @@ use x86::msr;
 use x86::apic::xapic::XAPIC;
 
 use crate::gdt::{GlobalDescriptorTable, IstStack, TaskStateSegment};
-use crate::vmx::vmcs::Vmxon;
-use crate::vmx::Monitor;
+use crate::vmx::{Monitor, Vmxon};
 
 /// Per-processor data for CPU 0.
 static mut CPU0: Cpu = Cpu::new();
