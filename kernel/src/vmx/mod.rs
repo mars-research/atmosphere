@@ -379,7 +379,7 @@ impl Monitor {
     /// Loads the specified vCPU and make it the current vCPU.
     ///
     /// The previously-loaded vCPU will be returned if there is one.
-    pub unsafe fn load_vcpu(&mut self, vcpu: VCpuHandle) -> VmxResult<Option<VCpuHandle>> {
+    pub fn load_vcpu(&mut self, vcpu: VCpuHandle) -> VmxResult<Option<VCpuHandle>> {
         #[cfg(debug_assertions)]
         self.check_vmm_started()?;
 
@@ -392,7 +392,9 @@ impl Monitor {
         }
 
         // Load VMCS
-        vmx::vmptrld(vcpu.vmcs.get_physical().as_u64())?;
+        unsafe {
+            vmx::vmptrld(vcpu.vmcs.get_physical().as_u64())?;
+        }
 
         if let Some(prev_vcpu) = self.current_vcpu.replace(vcpu) {
             prev_vcpu.loaded.store(false, Ordering::Release);
@@ -473,7 +475,6 @@ impl Monitor {
         self.check_vcpu_loaded()?;
 
         self.init_vmcs_controls()?;
-        self.save_vmcs_host_state()?;
         self.init_vmcs_guest_state()?;
         self.copy_vmcs_host_state_to_guest()?;
 
@@ -579,8 +580,7 @@ impl Monitor {
     }
 
     /// Initializes the VMCS Guest-State Area.
-    unsafe fn init_vmcs_guest_state(&self) -> VmxResult<()> {
-        #[cfg(debug_assertions)]
+    pub fn init_vmcs_guest_state(&self) -> VmxResult<()> {
         self.check_vcpu_loaded()?;
 
         // ## Register State
@@ -588,59 +588,62 @@ impl Monitor {
         // Limits
         // If G(Granularity) = 0, then we must mask out the higher bits
         let unlimited = u32::MAX as u64 & !0xfff00000;
-        vmx::vmwrite(CS_LIMIT, unlimited)?;
-        vmx::vmwrite(SS_LIMIT, unlimited)?;
-        vmx::vmwrite(DS_LIMIT, unlimited)?;
-        vmx::vmwrite(ES_LIMIT, unlimited)?;
-        vmx::vmwrite(FS_LIMIT, unlimited)?;
-        vmx::vmwrite(GS_LIMIT, unlimited)?;
-        vmx::vmwrite(LDTR_LIMIT, unlimited)?;
-        vmx::vmwrite(TR_LIMIT, mem::size_of::<TaskStateSegment>() as u64)?;
 
-        vmx::vmwrite(GDTR_LIMIT, 0xffff)?;
-        vmx::vmwrite(IDTR_LIMIT, 0xffff)?;
+        unsafe {
+            vmx::vmwrite(CS_LIMIT, unlimited)?;
+            vmx::vmwrite(SS_LIMIT, unlimited)?;
+            vmx::vmwrite(DS_LIMIT, unlimited)?;
+            vmx::vmwrite(ES_LIMIT, unlimited)?;
+            vmx::vmwrite(FS_LIMIT, unlimited)?;
+            vmx::vmwrite(GS_LIMIT, unlimited)?;
+            vmx::vmwrite(LDTR_LIMIT, unlimited)?;
+            vmx::vmwrite(TR_LIMIT, mem::size_of::<TaskStateSegment>() as u64)?;
 
-        // Access Rights
-        // Attention: Here we disable all access. This must be initialized
-        // correctly before the machine can be started.
-        //
-        // TODO: Implement a builder interface that can be shared between
-        //       here and gdt.
-        vmx::vmwrite(CS_ACCESS_RIGHTS, 0b10000000000000000)?;
-        vmx::vmwrite(SS_ACCESS_RIGHTS, 0b10000000000000000)?;
-        vmx::vmwrite(DS_ACCESS_RIGHTS, 0b10000000000000000)?;
-        vmx::vmwrite(ES_ACCESS_RIGHTS, 0b10000000000000000)?;
-        vmx::vmwrite(FS_ACCESS_RIGHTS, 0b10000000000000000)?;
-        vmx::vmwrite(GS_ACCESS_RIGHTS, 0b10000000000000000)?;
-        vmx::vmwrite(LDTR_ACCESS_RIGHTS, 0b10000000000000000)?;
-        vmx::vmwrite(TR_ACCESS_RIGHTS, 0b10000000000000000)?;
+            vmx::vmwrite(GDTR_LIMIT, 0xffff)?;
+            vmx::vmwrite(IDTR_LIMIT, 0xffff)?;
 
-        // ## Non-register State
-        use x86::vmx::vmcs::guest::*;
-        use pal::vmcs::secondary_processor_based_vm_execution_controls::{
-            vmcs_shadowing_is_enabled,
-            enable_pml_is_enabled,
-        };
+            // Access Rights
+            // Attention: Here we disable all access. This must be initialized
+            // correctly before the machine can be started.
+            //
+            // TODO: Implement a builder interface that can be shared between
+            //       here and gdt.
+            vmx::vmwrite(CS_ACCESS_RIGHTS, 0b10000000000000000)?;
+            vmx::vmwrite(SS_ACCESS_RIGHTS, 0b10000000000000000)?;
+            vmx::vmwrite(DS_ACCESS_RIGHTS, 0b10000000000000000)?;
+            vmx::vmwrite(ES_ACCESS_RIGHTS, 0b10000000000000000)?;
+            vmx::vmwrite(FS_ACCESS_RIGHTS, 0b10000000000000000)?;
+            vmx::vmwrite(GS_ACCESS_RIGHTS, 0b10000000000000000)?;
+            vmx::vmwrite(LDTR_ACCESS_RIGHTS, 0b10000000000000000)?;
+            vmx::vmwrite(TR_ACCESS_RIGHTS, 0b10000000000000000)?;
 
-        vmx::vmwrite(ACTIVITY_STATE, 0)?;
+            // ## Non-register State
+            use x86::vmx::vmcs::guest::*;
+            use pal::vmcs::secondary_processor_based_vm_execution_controls::{
+                vmcs_shadowing_is_enabled,
+                enable_pml_is_enabled,
+            };
 
-        // Only has an effect when Virtual Interrupt Delivery is enabled
-        vmx::vmwrite(INTERRUPT_STATUS, 0)?;
+            vmx::vmwrite(ACTIVITY_STATE, 0)?;
 
-        // Only has an effect when VMX Preemption Timer is enabled
-        vmx::vmwrite(VMX_PREEMPTION_TIMER_VALUE, 0)?;
+            // Only has an effect when Virtual Interrupt Delivery is enabled
+            vmx::vmwrite(INTERRUPT_STATUS, 0)?;
 
-        if vmcs_shadowing_is_enabled() {
-            return Err(VmxError::OtherError("VMCS Shadowing is not implemented"));
-        } else {
-            vmx::vmwrite(LINK_PTR_FULL, 0xffff_ffff_ffff_ffff)?;
-        }
+            // Only has an effect when VMX Preemption Timer is enabled
+            vmx::vmwrite(VMX_PREEMPTION_TIMER_VALUE, 0)?;
 
-        // TODO: Investigate this
-        if enable_pml_is_enabled() {
-            return Err(VmxError::OtherError("Page-Modification Logging is not implemented"));
-        } else {
-            // vmx::vmwrite(PML_INDEX, 0)?;
+            if vmcs_shadowing_is_enabled() {
+                return Err(VmxError::OtherError("VMCS Shadowing is not implemented"));
+            } else {
+                vmx::vmwrite(LINK_PTR_FULL, 0xffff_ffff_ffff_ffff)?;
+            }
+
+            // TODO: Investigate this
+            if enable_pml_is_enabled() {
+                return Err(VmxError::OtherError("Page-Modification Logging is not implemented"));
+            } else {
+                // vmx::vmwrite(PML_INDEX, 0)?;
+            }
         }
 
         Ok(())
@@ -718,7 +721,11 @@ impl Monitor {
     }
 
     /// Copies values from the Host-State Area to the Guest-State Area.
-    unsafe fn copy_vmcs_host_state_to_guest(&self) -> VmxResult<()> {
+    ///
+    /// ## Safety
+    ///
+    /// This causes information leak from the host to guest.
+    pub unsafe fn copy_vmcs_host_state_to_guest(&self) -> VmxResult<()> {
         use pal::vmcs::vm_entry_controls::*;
         use x86::vmx::vmcs::guest::{
             RFLAGS as GUEST_RFLAGS,
@@ -732,8 +739,9 @@ impl Monitor {
             TR_ACCESS_RIGHTS,
         };
 
-        #[cfg(debug_assertions)]
         self.check_vcpu_loaded()?;
+
+        self.save_vmcs_host_state()?;
 
         // Copy required host state
         let to_copy = [
@@ -1127,7 +1135,12 @@ impl Monitor {
     }
 
     /// Marks the currently-loaded vCPU as ready.
-    fn mark_vcpu_ready(&mut self) -> VmxResult<()> {
+    ///
+    /// ## Safety
+    ///
+    /// The caller must ensure all required control fields and states are
+    /// set up.
+    pub unsafe fn mark_vcpu_ready(&mut self) -> VmxResult<()> {
         if let Some(vcpu) = self.current_vcpu.as_mut() {
             vcpu.mark_ready()
         } else {
@@ -1173,6 +1186,7 @@ impl Monitor {
     }
 
     /// Checks that a vCPU is currently loaded and ready.
+    #[allow(dead_code)] // calls are stripped out in release mode
     fn check_vcpu_ready(&self) -> VmxResult<()> {
         #[cfg(debug_assertions)]
         self.check_vmm_started()?;
@@ -1512,7 +1526,7 @@ mod tests {
     use types::{KnownExitReason, KnownVmInstructionError};
     use crate::cpu::get_current_vmm;
 
-    struct VmmTestSession {
+    pub struct VmmTestSession {
         vmm: &'static mut Monitor,
         vcpu: &'static AtomicRefCell<VCpu>,
     }
@@ -1649,9 +1663,6 @@ mod tests {
         vmm.init_vmcs_guest_state()
             .expect("Could not initialize VMCS Guest State");
 
-        vmm.save_vmcs_host_state()
-            .expect("Could not save VMCS Host State");
-
         vmm.copy_vmcs_host_state_to_guest()
             .expect("Could not copy VMCS Host State to Guest State");
 
@@ -1756,7 +1767,7 @@ mod tests {
     #[test]
     fn test_unload_vcpu() {
         let mut vmm = unsafe { bootstrap_simple_vm() };
-        let old = vmm.unload_vcpu().expect("Failed to unload vCPU");
+        vmm.unload_vcpu().expect("Failed to unload vCPU");
 
         // Ensure that it really isn't loaded
         let vmptr = unsafe { vmx::vmptrst().unwrap() };
