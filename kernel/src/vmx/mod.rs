@@ -24,10 +24,19 @@ use x86::vmx::vmcs::control;
 
 use astd::sync::RwLock;
 use astd::cell::AtomicRefMut;
-use vmcs::{CurrentVmcsField, Vmxon, VCpu, ExplainBitfieldConstraint};
+use vmcs::{Vmxon, VCpu};
 use crate::cpu;
 use crate::gdt::TaskStateSegment;
-use types::{GUEST_CONTEXT_SIZE, ExitReason, GuestContext, GuestRegisterDump, VmcsRevision, VmInstructionError};
+use types::{
+    GUEST_CONTEXT_SIZE,
+    CurrentVmcsField,
+    ExitReason,
+    GuestContext,
+    GuestRegisterDump,
+    VmcsRevision,
+    VmInstructionError,
+    ExplainBitfieldConstraint,
+};
 
 type VmxResult<T, E = VmxError> = core::result::Result<T, E>;
 
