@@ -1309,7 +1309,7 @@ pub struct VCpu {
     ///
     /// This value is dependent on the Preemption Timer Rate
     /// of the platform, so this field should only be set via
-    /// [`Monitor::set_vmcs_preemption_timer_value`](super::Monitor::set_vmcs_preemption_timer_value)
+    /// [`Monitor::set_vmcs_preemption_timer_value`]
     /// which does the conversion for you.
     ///
     /// A value of `Some(0)` is guaranteed to cause an exit before any
