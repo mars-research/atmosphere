@@ -1,9 +1,11 @@
 //! Run the OS in QEMU.
 
+use std::path::PathBuf;
+
 use clap::Clap;
 
 use crate::error::Result;
-use crate::project::{BuildOptions, Project};
+use crate::project::{Binary, BuildOptions, Project};
 use crate::emulator::{CpuModel, Emulator, EmulatorExit, GdbServer, RunConfiguration, Qemu, Bochs};
 use super::{SubCommand, GlobalOpts};
 
@@ -43,6 +45,12 @@ pub struct Opts {
     /// finishes.
     #[clap(long)]
     no_shutdown: bool,
+
+    /// (Hidden) Kernel file to execute.
+    ///
+    /// This is used by the Cargo runner.
+    #[clap(long, hidden = true)]
+    cargo_runner: Option<PathBuf>,
 }
 
 pub(super) async fn run(global: GlobalOpts) -> Result<()> {
@@ -55,9 +63,13 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
     opts.release = global.release;
     opts.verbose = global.verbose;
 
-    let kernel_crate = project.kernel();
-    let kernel = kernel_crate.build(&opts).await?
-        .expect("No binary was produced");
+    let kernel = if let Some(prebuilt) = local.cargo_runner {
+        Binary::new(prebuilt)
+    } else {
+        let kernel_crate = project.kernel();
+        kernel_crate.build(&opts).await?
+            .expect("No binary was produced")
+    };
 
     let mut run_config = RunConfiguration::default();
     run_config.auto_shutdown(!local.no_shutdown);

@@ -12,7 +12,6 @@ macro_rules! unwrap_command {
 
 mod run;
 mod build;
-mod cargo_runner;
 
 use clap::{Clap, IntoApp};
 
@@ -23,7 +22,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
     match &opts.cmd {
         SubCommand::Run(_) => run::run(opts).await?,
         SubCommand::Build(_) => build::run(opts).await?,
-        SubCommand::CargoRunner(_) => cargo_runner::run(opts).await?,
         SubCommand::GenCompletions(local) => {
             gen_completions(&local.shell);
         }
@@ -51,9 +49,6 @@ struct GlobalOpts {
 enum SubCommand {
     Run(run::Opts),
     Build(build::Opts),
-
-    #[clap(setting(clap::AppSettings::Hidden))]
-    CargoRunner(cargo_runner::Opts),
 
     #[clap(setting(clap::AppSettings::Hidden))]
     GenCompletions(GenCompletions),
