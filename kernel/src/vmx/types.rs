@@ -18,7 +18,7 @@ pub const GUEST_CONTEXT_SIZE: usize = mem::size_of::<GuestContext>();
 pub struct VmcsRevision(u32);
 
 impl VmcsRevision {
-    pub fn new(vmcs_revision: u32) -> Self {
+    pub const fn new(vmcs_revision: u32) -> Self {
         Self(vmcs_revision)
     }
 
@@ -188,6 +188,9 @@ pub enum KnownExitReason {
 
     /// EPT violation.
     EptViolation = 48,
+
+    /// Preemption Timer Expired.
+    PreemptionTimerExpired = 52,
 }
 
 /// A VM-instruction error.

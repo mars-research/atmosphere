@@ -1,13 +1,12 @@
 use astd::cell::AtomicRefCell;
 use crate::error::Result;
 use crate::cpu::get_current_vmm;
-use crate::vmx::VCpu;
-use crate::vmx;
+use crate::vmx::{PlatformInfo, VCpu};
 
 static VCPU: AtomicRefCell<VCpu> = AtomicRefCell::new(VCpu::new());
 
 pub unsafe fn run() -> Result<()> {
-    log::debug!("VT-x platform info: {:?}", vmx::get_platform_info());
+    log::debug!("VT-x platform info: {:#?}", PlatformInfo::detect());
 
     let vmm = get_current_vmm();
 

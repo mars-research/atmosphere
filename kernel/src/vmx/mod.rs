@@ -33,6 +33,7 @@ use types::{
     ExitReason,
     GuestContext,
     GuestRegisterDump,
+    KnownExitReason,
     VmcsRevision,
     VmInstructionError,
     ExplainBitfieldConstraint,
@@ -120,6 +121,9 @@ pub enum VmxError {
     /// A VMCS control field constraint is impossible: {constraint:#x?}.
     VmcsImpossibleConstraint { constraint: u64 },
 
+    /// The VMX Preemption Timer is not supported by the system.
+    PreemptionTimerUnavailable,
+
     /// Other error: {0}
     OtherError(&'static str),
 
@@ -148,35 +152,81 @@ pub struct PlatformInfo {
     ///
     /// We only support 4KiB (4096).
     vmcs_size: usize,
+
+    /// The rate at which the VMX Preemption Timer ticks down with respect to guest TSC.
+    ///
+    /// The value X here means that the preemption timer will decrease
+    /// by 1 every time the guest TSC changes by X. This is converted
+    /// from the value in IA32_VMX_MISC MSR which contains N as in
+    /// `X = 2^N`.
+    ///
+    /// Take note that the guest TSC may be running at a multiplier of
+    /// the host TSC.
+    ///
+    /// If this value is `None`, then the VMX Preemption Timer is not
+    /// supported by this platform.
+    preemption_timer_rate: Option<u32>,
 }
 
-/// Returns VT-x platform information.
-///
-/// Returns `None` if VT-x is not available.
-pub fn get_platform_info() -> Option<PlatformInfo> {
-    use pal::msr::ia32_vmx_basic;
-
-    // Check CPUID VMX bit
-    let cpuid = CpuId::new();
-    let feature_info = cpuid.get_feature_info()?;
-
-    if !feature_info.has_vmx() {
-        return None;
+impl PlatformInfo {
+    pub const fn invalid() -> Self {
+        Self {
+            vmcs_revision: VmcsRevision::invalid(),
+            vmcs_size: 0,
+            preemption_timer_rate: None,
+        }
     }
 
-    // Check VMXON/VMCS region size
-    let msr = ia32_vmx_basic::get();
-    let vmcs_revision = ia32_vmx_basic::get_revision_id_from_value(msr) as u32;
-    let vmcs_size = ia32_vmx_basic::get_vmxon_vmcs_region_size_from_value(msr) as usize;
+    /// Detects VT-x platform information.
+    ///
+    /// Returns `None` if VT-x is not available.
+    pub fn detect() -> Option<Self> {
+        use pal::msr::ia32_vmx_basic::{self, *};
 
-    if vmcs_size != 4096 {
-        log::warn!("Platform requires the VMXON/VMCS regions to be of size {} which we do not support.", vmcs_size);
+        // Check CPUID VMX bit
+        let cpuid = CpuId::new();
+        let feature_info = cpuid.get_feature_info()?;
+
+        if !feature_info.has_vmx() {
+            return None;
+        }
+
+        // Check VMXON/VMCS region size
+        let msr = ia32_vmx_basic::get();
+        let vmcs_revision = get_revision_id_from_value(msr) as u32;
+        let vmcs_size = get_vmxon_vmcs_region_size_from_value(msr) as usize;
+
+        // Check Preemption Timer support
+        let preemption_timer_rate = {
+            let constraint = {
+                let msr = if true_based_controls_is_enabled() {
+                    msr::IA32_VMX_TRUE_PINBASED_CTLS
+                } else {
+                    msr::IA32_VMX_PINBASED_CTLS
+                };
+
+                unsafe { msr::rdmsr(msr) }
+            };
+
+            let one_constraint = constraint >> 32;
+            if (one_constraint & (1 << 6)) != 0 {
+                let rate = pal::msr::ia32_vmx_misc::get_preemption_timer_decrement();
+                Some(1 << rate as u32)
+            } else {
+                None
+            }
+        };
+
+        if vmcs_size != 4096 {
+            log::warn!("Platform requires the VMXON/VMCS regions to be of size {} which we do not support.", vmcs_size);
+        }
+
+        Some(PlatformInfo {
+            vmcs_revision: VmcsRevision::new(vmcs_revision),
+            vmcs_size,
+            preemption_timer_rate,
+        })
     }
-
-    Some(PlatformInfo {
-        vmcs_revision: VmcsRevision::new(vmcs_revision),
-        vmcs_size,
-    })
 }
 
 /// A Virtual Machine Monitor (VMM).
@@ -189,8 +239,8 @@ pub struct Monitor {
     /// Whether VMX operations are enabled.
     enabled: RwLock<bool>,
 
-    /// The VMCS revision identifier.
-    vmcs_revision: VmcsRevision,
+    /// The platform information.
+    platform_info: PlatformInfo,
 
     /// The VMXON region.
     vmxon: &'static mut Vmxon,
@@ -204,7 +254,7 @@ impl Monitor {
     pub fn new(vmxon: &'static mut Vmxon) -> Self {
         Self {
             enabled: RwLock::new(false),
-            vmcs_revision: VmcsRevision::invalid(),
+            platform_info: PlatformInfo::invalid(),
             vmxon,
             current_vcpu: None,
         }
@@ -222,14 +272,14 @@ impl Monitor {
             return Err(VmxError::VmmAlreadyStarted);
         }
 
-        let platform_info = get_platform_info()
+        let platform_info = PlatformInfo::detect()
             .ok_or(VmxError::VmxUnsupported)?;
-
-        self.vmcs_revision = platform_info.vmcs_revision;
 
         if platform_info.vmcs_size != mem::size_of::<Vmcs>() {
             return Err(VmxError::UnsupportedVmcsSize { size: platform_info.vmcs_size });
         }
+
+        self.platform_info = platform_info;
 
         // Check the IA32_VMX_CR{0,4}_FIXED{0,1} MSRs
         //
@@ -281,7 +331,7 @@ impl Monitor {
         self.vmxon.check_alignment()?;
 
         // Enter VMX operation
-        self.vmxon.set_revision(self.vmcs_revision);
+        self.vmxon.set_revision(self.platform_info.vmcs_revision);
         vmx::vmxon(self.vmxon.get_physical().as_u64())?;
 
         *vmx_enabled = true;
@@ -330,6 +380,53 @@ impl Monitor {
         }
 
         Ok(())
+    }
+
+    /// Sets the preemption timer value in the currently loaded VMCS.
+    ///
+    /// The value returned by this function is the deviation between
+    /// the supplied value and the value that is actually set. It
+    /// tells you how many cycles *sooner* it will trigger than your
+    /// supplied time.
+    ///
+    /// This is because that the VMX Preemption Timer ticks at a fixed
+    /// rate that is a power of two. If you supplied a value of 10
+    /// cycles and the Preemption Timer ticks down every 4 cycles,
+    /// the actual applied value will be 8 cycles and 2 will be
+    /// returned.
+    pub fn set_vmcs_preemption_timer_value(&mut self, tsc: Option<u32>) -> VmxResult<u32> {
+        use pal::vmcs::vm_exit_controls::*;
+        use pal::vmcs::pin_based_vm_execution_controls::*;
+        use pal::vmcs::guest_preemption_timer_value;
+
+        let vcpu = self.current_vcpu.as_mut()
+            .ok_or(VmxError::NoCurrentVCpu)?;
+
+        match tsc {
+            None => {
+                // Disable Timer
+                disable_activate_vmx_preeemption_timer();
+                disable_save_vmxpreemption_timer_value();
+
+                Ok(0)
+            }
+            Some(tsc) => {
+                // Enable Timer
+                let rate = self.platform_info.preemption_timer_rate
+                    .ok_or(VmxError::PreemptionTimerUnavailable)?;
+
+                let value = tsc / rate;
+                let remainder = tsc % rate;
+
+                vcpu.preemption_timer = Some(value);
+
+                guest_preemption_timer_value::set(value);
+                enable_activate_vmx_preeemption_timer();
+                enable_save_vmxpreemption_timer_value();
+
+                Ok(remainder)
+            }
+        }
     }
 
     /// Test method to initialize and launch an unconfined VM.
@@ -932,16 +1029,28 @@ impl Monitor {
 
     /// Returns the VMCS revision identifier.
     pub fn get_vmcs_revision(&self) -> VmcsRevision {
-        self.vmcs_revision
+        self.platform_info.vmcs_revision
     }
 
     /// Reads the VM exit reason from the current VMCS.
+    ///
+    /// This will also reset the preemption timer if it's the reason
+    /// of the VM exit.
     fn read_vm_exit_reason(&self) -> VmxResult<ExitReason> {
+        use pal::vmcs::guest_preemption_timer_value;
         use x86::vmx::vmcs::ro::EXIT_REASON;
 
-        let reason = unsafe { vmx::vmread(EXIT_REASON)? };
+        let reason = unsafe { ExitReason::new(vmx::vmread(EXIT_REASON)?) };
 
-        Ok(ExitReason::new(reason))
+        if reason == KnownExitReason::PreemptionTimerExpired {
+            let vcpu = self.current_vcpu.as_ref().unwrap();
+            let timer_value = vcpu.preemption_timer
+                .expect("The preemption timer value must exist");
+
+            guest_preemption_timer_value::set(timer_value);
+        }
+
+        Ok(reason)
     }
 
     /// Attempts to return a more specific error than VmcsPtrValid.
@@ -1194,6 +1303,21 @@ pub struct VCpu {
 
     /// The guest register state.
     context: GuestContext,
+
+    /// The preemption timer value.
+    ///
+    /// This value is dependent on the Preemption Timer Rate
+    /// of the platform, so this field should only be set via
+    /// [`Monitor::set_vmcs_preemption_timer_value`](super::Monitor::set_vmcs_preemption_timer_value)
+    /// which does the conversion for you.
+    ///
+    /// A value of `Some(0)` is guaranteed to cause an exit before any
+    /// instruction is executed. However, take note that certain
+    /// other exit reasons may take precendence over the preemption
+    /// timer and cause an exit before the timer is checked.
+    ///
+    /// A value of `None` means that the Preemption Timer is disabled.
+    preemption_timer: Option<u32>,
 }
 
 impl VCpu {
@@ -1204,6 +1328,7 @@ impl VCpu {
             state: VCpuState::Uninitialized,
             loaded: AtomicBool::new(false),
             context: GuestContext::new(),
+            preemption_timer: None,
         }
     }
 
@@ -1403,7 +1528,11 @@ mod tests {
         }
     }
 
-    unsafe extern "C" fn guest_main() {
+    unsafe extern "C" fn guest_infinite_loop() {
+        loop {}
+    }
+
+    unsafe extern "C" fn guest_reg_test() {
         asm!(
             "mov rax, 0x8000000000000001",
             "mov rbx, 0x8000000000000011",
@@ -1473,7 +1602,7 @@ mod tests {
             .expect("Could not copy VMCS Host State to Guest State");
 
         let stack_end = (&GUEST_STACK as *const u8).offset(4096) as u64;
-        let target = guest_main as *const () as u64;
+        let target = guest_reg_test as *const () as u64;
 
         vmm.set_vmcs_guest_entrypoint(target, stack_end)
             .expect("Could not set guest entrypoint");
@@ -1546,6 +1675,27 @@ mod tests {
             } else {
                 panic!("Launch must fail with an VM-instruction error - It failed with {}", launch_err);
             }
+        }
+    }
+
+    #[test]
+    fn test_vm_preemption() {
+        unsafe {
+            let mut vmm = bootstrap_simple_vm();
+
+            let stack_end = (&GUEST_STACK as *const u8).offset(4096) as u64;
+            let target = guest_infinite_loop as *const () as u64;
+
+            vmm.set_vmcs_guest_entrypoint(target, stack_end)
+                .expect("Could not set guest entrypoint");
+
+            vmm.set_vmcs_preemption_timer_value(Some(100))
+                .expect("Could not set preemption timer");
+
+            let reason = vmm.launch_current()
+                .expect("Failed to launch VM");
+
+            assert_eq!(reason, KnownExitReason::PreemptionTimerExpired);
         }
     }
 
