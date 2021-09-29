@@ -1,18 +1,21 @@
+use astd::cell::AtomicRefCell;
 use crate::error::Result;
-use crate::vmx::vmcs::{VCpu, Vmxon};
-use crate::vmx::{self, Monitor};
+use crate::cpu::get_current_vmm;
+use crate::vmx::vmcs::VCpu;
+use crate::vmx;
 
-static mut VMXON: Vmxon = Vmxon::new();
-static mut VCPU: VCpu = VCpu::new();
+static VCPU: AtomicRefCell<VCpu> = AtomicRefCell::new(VCpu::new());
 
 pub unsafe fn run() -> Result<()> {
     log::debug!("VT-x platform info: {:?}", vmx::get_platform_info());
 
-    let mut vmm = Monitor::new(&mut VMXON);
+    let vmm = get_current_vmm();
+
     log::info!("VMM start -> {:?}", vmm.start());
 
-    VCPU.init(vmm.get_vmcs_revision())?;
-    log::info!("Load VMCS -> {:?}", vmm.load_vcpu(&mut VCPU));
+    let mut vcpu = VCPU.borrow_mut(); // FIXME: This could panic
+    vcpu.init(vmm.get_vmcs_revision())?;
+    log::info!("Load VMCS -> {:?}", vmm.load_vcpu(vcpu));
 
     log::info!("Trying to launch...");
     log::info!("Launch -> {:?}", vmm.demo_launch()?);
@@ -26,7 +29,8 @@ pub unsafe fn run() -> Result<()> {
 
     log::info!("VMM stop -> {:?}", vmm.stop());
 
-    VCPU.deinit().expect("Could not deinitialize the vCPU");
+    let mut vcpu = VCPU.borrow_mut(); // FIXME: This could panic
+    vcpu.deinit().expect("Could not deinitialize the vCPU");
 
     Ok(())
 }

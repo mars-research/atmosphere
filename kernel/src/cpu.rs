@@ -19,6 +19,7 @@ use x86::apic::xapic::XAPIC;
 
 use crate::gdt::{GlobalDescriptorTable, IstStack, TaskStateSegment};
 use crate::vmx::vmcs::Vmxon;
+use crate::vmx::Monitor;
 
 /// Per-processor data for CPU 0.
 static mut CPU0: Cpu = Cpu::new();
@@ -43,6 +44,15 @@ pub fn get_current() -> &'static mut Cpu {
     unsafe { &mut *address }
 }
 
+/// Returns a handle to the current CPU's VMM.
+pub fn get_current_vmm() -> &'static mut Monitor {
+    let cpu = get_current();
+
+    unsafe {
+        cpu.vmm.assume_init_mut()
+    }
+}
+
 /// Per-processor data for a CPU.
 #[repr(align(4096))]
 pub struct Cpu {
@@ -57,12 +67,15 @@ pub struct Cpu {
 
     /// A pointer to ourselves.
     ///
-    /// We do a `mov rax, gs:[CPU_GS_OFFSET]` to get our own address.
+    /// We do a `mov rax, gs:[GS_SELF_PTR_OFFSET]` to get our own address.
     /// We also want to be able to easily access other fields directly.
     pub self_ptr: *const Cpu,
 
     /// State for the xAPIC driver.
     pub xapic: MaybeUninit<XAPIC>,
+
+    /// State for the VMM.
+    pub vmm: MaybeUninit<Monitor>,
 
     /// The Global Descriptor Table.
     ///
@@ -85,6 +98,7 @@ impl Cpu {
             vmxon: Vmxon::new(),
             self_ptr: ptr::null(),
             xapic: MaybeUninit::uninit(),
+            vmm: MaybeUninit::uninit(),
             gdt: GlobalDescriptorTable::empty(),
             tss: TaskStateSegment::new(),
             ist: [
@@ -107,6 +121,7 @@ pub unsafe fn init_cpu0() {
     let address = &CPU0 as *const Cpu;
 
     CPU0.self_ptr = address;
+    CPU0.vmm.write(Monitor::new(&mut CPU0.vmxon));
 
     msr::wrmsr(msr::IA32_GS_BASE, address as u64);
 }

@@ -22,7 +22,8 @@ use x86::cpuid::CpuId;
 use x86::msr;
 use x86::vmx::vmcs::control;
 
-use astd::sync::{Mutex, RwLock};
+use astd::sync::RwLock;
+use astd::cell::AtomicRefMut;
 use vmcs::{CurrentVmcsField, Vmxon, VCpu, ExplainBitfieldConstraint};
 use crate::cpu;
 use crate::gdt::TaskStateSegment;
@@ -174,9 +175,8 @@ pub fn get_platform_info() -> Option<PlatformInfo> {
 /// Here we keep track of all states related to the VMM running
 /// on one physical logical core.
 ///
-/// The VMM is tied to a specific CPU by its APIC ID.
 /// All methods must be called on the correct CPU.
-pub struct Monitor<'a> {
+pub struct Monitor {
     /// Whether VMX operations are enabled.
     enabled: RwLock<bool>,
 
@@ -184,24 +184,29 @@ pub struct Monitor<'a> {
     vmcs_revision: VmcsRevision,
 
     /// The VMXON region.
-    vmxon: &'a mut Vmxon,
+    vmxon: &'static mut Vmxon,
 
     /// The current vCPU.
-    current_vcpu: Mutex<Option<&'a mut VCpu>>,
+    current_vcpu: Option<AtomicRefMut<'static, VCpu>>,
 }
 
-impl<'a> Monitor<'a> {
+impl Monitor {
     /// Creates a new VMM.
-    pub fn new(vmxon: &'a mut Vmxon) -> Self {
+    pub fn new(vmxon: &'static mut Vmxon) -> Self {
         Self {
             enabled: RwLock::new(false),
             vmcs_revision: VmcsRevision::invalid(),
             vmxon,
-            current_vcpu: Mutex::new(None),
+            current_vcpu: None,
         }
     }
 
     /// Initializes the VMM and enters VMX root operation mode.
+    ///
+    /// ## Safety
+    ///
+    /// This is unsafe because the control registers may be modified during
+    /// the procedure.
     pub unsafe fn start(&mut self) -> VmxResult<()> {
         let mut vmx_enabled = self.enabled.write();
         if *vmx_enabled {
@@ -277,7 +282,6 @@ impl<'a> Monitor<'a> {
 
     /// Leaves VMX operation and stops the VMM.
     pub fn stop(&mut self) -> VmxResult<()> {
-        let mut current_vcpu = self.current_vcpu.lock();
         let mut vmx_enabled = self.enabled.write();
         if !*vmx_enabled {
             return Err(VmxError::VmmNotStarted);
@@ -289,33 +293,31 @@ impl<'a> Monitor<'a> {
         }
         *vmx_enabled = false;
 
-        if let Some(current_vcpu) = current_vcpu.take() {
-            current_vcpu.loaded.store(false, Ordering::SeqCst);
+        if let Some(current_vcpu) = self.current_vcpu.take() {
+            current_vcpu.loaded.store(false, Ordering::Release);
         }
 
         Ok(())
     }
 
     /// Loads the specified vCPU and make it the current vCPU.
-    pub unsafe fn load_vcpu(&mut self, vcpu: &'a mut VCpu) -> VmxResult<()> {
+    pub unsafe fn load_vcpu(&mut self, vcpu: AtomicRefMut<'static, VCpu>) -> VmxResult<()> {
         #[cfg(debug_assertions)]
         self.check_vmm_started()?;
-
-        let mut current_vcpu = self.current_vcpu.lock();
 
         if !vcpu.initialized() {
             return Err(VmxError::VCpuNotInitialized);
         }
 
-        if vcpu.loaded.compare_exchange(false, true, Ordering::SeqCst, Ordering::Acquire).is_err() {
+        if vcpu.loaded.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_err() {
             return Err(VmxError::VCpuInUse);
         }
 
         // Load VMCS
         vmx::vmptrld(vcpu.vmcs.get_physical().as_u64()).unwrap();
 
-        if let Some(prev_vcpu) = current_vcpu.replace(vcpu) {
-            prev_vcpu.loaded.store(false, Ordering::SeqCst);
+        if let Some(prev_vcpu) = self.current_vcpu.replace(vcpu) {
+            prev_vcpu.loaded.store(false, Ordering::Release);
         }
 
         Ok(())
@@ -889,8 +891,7 @@ impl<'a> Monitor<'a> {
     pub fn dump_guest_registers(&self) -> VmxResult<GuestRegisterDump> {
         use x86::vmx::vmcs::guest;
 
-        let vcpu = self.current_vcpu.lock();
-        let vcpu = vcpu.as_ref().ok_or(VmxError::NoCurrentVCpu)?;
+        let vcpu = self.current_vcpu.as_ref().ok_or(VmxError::NoCurrentVCpu)?;
 
         let dump = unsafe {
             GuestRegisterDump {
@@ -964,9 +965,7 @@ impl<'a> Monitor<'a> {
 
     /// Marks the currently-loaded vCPU as ready.
     fn mark_vcpu_ready(&mut self) -> VmxResult<()> {
-        let mut current_vcpu = self.current_vcpu.lock();
-
-        if let Some(vcpu) = current_vcpu.as_mut() {
+        if let Some(vcpu) = self.current_vcpu.as_mut() {
             vcpu.mark_ready()
         } else {
             Err(VmxError::NoCurrentVCpu)
@@ -978,8 +977,7 @@ impl<'a> Monitor<'a> {
         #[cfg(debug_assertions)]
         self.check_vmm_started()?;
 
-        let current_vcpu = self.current_vcpu.lock();
-        if let Some(vcpu) = current_vcpu.as_ref() {
+        if let Some(vcpu) = self.current_vcpu.as_ref() {
             Ok(&vcpu.context as *const _ as *mut _)
         } else {
             Err(VmxError::NoCurrentVCpu)
@@ -1004,8 +1002,7 @@ impl<'a> Monitor<'a> {
         #[cfg(debug_assertions)]
         self.check_vmm_started()?;
 
-        let current_vcpu = self.current_vcpu.lock();
-        if current_vcpu.is_none() {
+        if self.current_vcpu.is_none() {
             return Err(VmxError::NoCurrentVCpu);
         }
 
@@ -1018,8 +1015,7 @@ impl<'a> Monitor<'a> {
         #[cfg(debug_assertions)]
         self.check_vmm_started()?;
 
-        let current_vcpu = self.current_vcpu.lock();
-        if let Some(vcpu) = current_vcpu.as_ref() {
+        if let Some(vcpu) = self.current_vcpu.as_ref() {
             if vcpu.ready() {
                 Ok(())
             } else {
@@ -1031,7 +1027,7 @@ impl<'a> Monitor<'a> {
     }
 }
 
-impl<'a> Drop for Monitor<'a> {
+impl Drop for Monitor {
     fn drop(&mut self) {
         let vmx_enabled = *self.enabled.read();
         if vmx_enabled {
@@ -1088,15 +1084,60 @@ unsafe fn read_idt_base() -> u64 {
 
 #[cfg(test)]
 mod tests {
+    use core::ops::{Deref, DerefMut};
+
     use x86::bits64::vmx;
     use x86::vmx::vmcs::control;
 
     use super::*;
+    use astd::cell::AtomicRefCell;
     use atest::test;
     use types::{KnownExitReason, KnownVmInstructionError};
+    use crate::cpu::get_current_vmm;
 
-    static mut VMXON: Vmxon = Vmxon::new();
-    static mut VCPU: VCpu = VCpu::new();
+    struct VmmTestSession {
+        vmm: &'static mut Monitor,
+        vcpu: &'static AtomicRefCell<VCpu>,
+    }
+
+    impl VmmTestSession {
+        /// Creates a new test session.
+        unsafe fn new(vmm: &'static mut Monitor, vcpu: &'static AtomicRefCell<VCpu>) -> VmxResult<Self> {
+            vmm.start()?;
+
+            let mut vcpu_mut = vcpu.borrow_mut();
+            vcpu_mut.init(vmm.get_vmcs_revision())?;
+
+            vmm.load_vcpu(vcpu_mut)?;
+
+            Ok(Self {
+                vmm,
+                vcpu,
+            })
+        }
+    }
+
+    impl Drop for VmmTestSession {
+        fn drop(&mut self) {
+            self.vmm.stop().unwrap();
+            self.vcpu.borrow_mut().deinit().unwrap();
+        }
+    }
+
+    impl Deref for VmmTestSession {
+        type Target = Monitor;
+        fn deref(&self) -> &Monitor {
+            self.vmm
+        }
+    }
+
+    impl DerefMut for VmmTestSession {
+        fn deref_mut(&mut self) -> &mut Monitor {
+            self.vmm
+        }
+    }
+
+    static VCPU: AtomicRefCell<VCpu> = AtomicRefCell::new(VCpu::new());
 
     static GUEST_STACK: [u8; 4096] = [0u8; 4096];
     static EXPECTED_VALUES: [u64; 15] = [
@@ -1177,16 +1218,9 @@ mod tests {
     }
 
     /// Common code to bootstrap a simple VM.
-    unsafe fn bootstrap_simple_vm() -> Monitor<'static> {
-        let mut vmm = Monitor::new(&mut VMXON);
-        vmm.start()
+    unsafe fn bootstrap_simple_vm() -> VmmTestSession {
+        let mut vmm = VmmTestSession::new(get_current_vmm(), &VCPU)
             .expect("Could not start VMM");
-
-        VCPU.init(vmm.get_vmcs_revision())
-            .expect("Could not initialize vCPU");
-
-        vmm.load_vcpu(&mut VCPU)
-            .expect("Could not load VMCS");
 
         vmm.init_vmcs_controls()
             .expect("Could not initialize VMCS Controls");
@@ -1240,8 +1274,7 @@ mod tests {
 
             // Inject RAX
             {
-                let mut vcpu = vmm.current_vcpu.lock();
-                let mut vcpu = vcpu.as_mut().unwrap();
+                let vcpu = vmm.current_vcpu.as_mut().unwrap();
                 vcpu.context.rax = &EXPECTED_VALUES as *const _ as u64;
             }
 
@@ -1255,9 +1288,6 @@ mod tests {
 
             assert_eq!(reason, KnownExitReason::Cpuid);
             assert_register_eq!(vmm, rax, 0xc000000000000001);
-
-            vmm.stop().expect("Could not stop VMM");
-            VCPU.deinit().expect("Could not deinitialize the vCPU");
         }
     }
 
@@ -1278,9 +1308,6 @@ mod tests {
             } else {
                 panic!("Launch must fail with an VM-instruction error - It failed with {}", launch_err);
             }
-
-            vmm.stop().expect("Could not stop VMM");
-            VCPU.deinit().expect("Could not deinitialize the vCPU");
         }
     }
 }
