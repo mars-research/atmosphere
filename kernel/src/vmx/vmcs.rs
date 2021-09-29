@@ -14,9 +14,6 @@ use super::types::{GuestContext, VmcsRevision};
 
 /// A VMXON region.
 ///
-/// We allocate a VMXON region for each logical core. The allocation
-/// is done in compile-time.
-///
 /// The size of the VMXON region is not defined by the ISA, and is
 /// read from the IA32_VMX_BASIC MSR. We make an assumption that
 /// it's 4KiB and crash during the initialization process if it's
@@ -421,6 +418,7 @@ impl DerefMut for CurrentVmcsField {
 
 #[cfg(test)]
 mod tests {
+    use astd::cell::AtomicRefCell;
     use atest::test;
     use super::*;
 
@@ -473,5 +471,11 @@ mod tests {
         let error = constraint.check(0b1111111111)
             .expect_err("Value must fail 1-constraint");
         log::info!("Returned error (should say that bits 5-9 must be 0): {}", error);
+    }
+
+    #[test]
+    fn test_member_alignment() {
+        let vmxon = AtomicRefCell::new(Vmxon::new());
+        vmxon.borrow().check_alignment().unwrap();
     }
 }

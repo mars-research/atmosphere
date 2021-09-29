@@ -6,6 +6,7 @@ version = 3
 name = "astd"
 version = "0.1.0"
 dependencies = [
+ "atomic_refcell",
  "heapless",
  "spin",
 ]
@@ -49,6 +50,12 @@ checksum = "30302dda7a66f8c55932ebf208f7def840743ff64d495e9ceffcd97c18f11d39"
 dependencies = [
  "cortex-m",
 ]
+
+[[package]]
+name = "atomic_refcell"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "681b971236e0f76b20fcafca0236b8718c9186ee778d67cd78bd5f28fd85427f"
 
 [[package]]
 name = "autocfg"
