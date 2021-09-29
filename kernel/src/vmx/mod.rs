@@ -39,7 +39,14 @@ use types::{
     ExplainBitfieldConstraint,
 };
 
-type VmxResult<T, E = VmxError> = core::result::Result<T, E>;
+pub type VmxResult<T, E = VmxError> = core::result::Result<T, E>;
+
+/// An exclusive handle to a vCPU.
+///
+/// In Atmosphere, vCpus themselves are managed by capabilities
+/// and have their addresses pinned in place in memory. They can
+/// never be moved.
+pub type VCpuHandle = AtomicRefMut<'static, VCpu>;
 
 static GUEST_STACK: [u8; 4096] = [0u8; 4096];
 
@@ -235,7 +242,13 @@ impl PlatformInfo {
 /// on one physical logical core.
 ///
 /// All methods must be called on the correct CPU.
+#[repr(align(4096))]
 pub struct Monitor {
+    /// A dummy VMCS.
+    ///
+    /// This is loaded in order to unload the current VMCS.
+    dummy_vmcs: Vmcs,
+
     /// Whether VMX operations are enabled.
     enabled: RwLock<bool>,
 
@@ -246,13 +259,14 @@ pub struct Monitor {
     vmxon: &'static mut Vmxon,
 
     /// The current vCPU.
-    current_vcpu: Option<AtomicRefMut<'static, VCpu>>,
+    current_vcpu: Option<VCpuHandle>,
 }
 
 impl Monitor {
     /// Creates a new VMM.
     pub fn new(vmxon: &'static mut Vmxon) -> Self {
         Self {
+            dummy_vmcs: Vmcs::new(),
             enabled: RwLock::new(false),
             platform_info: PlatformInfo::invalid(),
             vmxon,
@@ -334,6 +348,9 @@ impl Monitor {
         self.vmxon.set_revision(self.platform_info.vmcs_revision);
         vmx::vmxon(self.vmxon.get_physical().as_u64())?;
 
+        // Initialize the dummy VMCS
+        self.dummy_vmcs.init(self.platform_info.vmcs_revision)?;
+
         *vmx_enabled = true;
 
         Ok(())
@@ -360,7 +377,9 @@ impl Monitor {
     }
 
     /// Loads the specified vCPU and make it the current vCPU.
-    pub unsafe fn load_vcpu(&mut self, vcpu: AtomicRefMut<'static, VCpu>) -> VmxResult<()> {
+    ///
+    /// The previously-loaded vCPU will be returned if there is one.
+    pub unsafe fn load_vcpu(&mut self, vcpu: VCpuHandle) -> VmxResult<Option<VCpuHandle>> {
         #[cfg(debug_assertions)]
         self.check_vmm_started()?;
 
@@ -373,13 +392,32 @@ impl Monitor {
         }
 
         // Load VMCS
-        vmx::vmptrld(vcpu.vmcs.get_physical().as_u64()).unwrap();
+        vmx::vmptrld(vcpu.vmcs.get_physical().as_u64())?;
 
         if let Some(prev_vcpu) = self.current_vcpu.replace(vcpu) {
             prev_vcpu.loaded.store(false, Ordering::Release);
-        }
 
-        Ok(())
+            Ok(Some(prev_vcpu))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Unloads the current vCPU.
+    ///
+    /// This loads a dummy VMCS to take its place.
+    #[allow(dead_code)] // used in tests
+    pub fn unload_vcpu(&mut self) -> VmxResult<VCpuHandle> {
+        if let Some(prev_vcpu) = self.current_vcpu.take() {
+            unsafe {
+                vmx::vmptrld(self.dummy_vmcs.get_physical().as_u64())?;
+            }
+
+            prev_vcpu.loaded.store(false, Ordering::Release);
+            Ok(prev_vcpu)
+        } else {
+            Err(VmxError::NoCurrentVCpu)
+        }
     }
 
     /// Sets the preemption timer value in the currently loaded VMCS.
@@ -1033,6 +1071,12 @@ impl Monitor {
         self.platform_info.vmcs_revision
     }
 
+    /// Returns an mutable reference to the current-loaded VCpu.
+    pub fn get_current_vcpu(&mut self) -> Option<&mut VCpu> {
+    // pub fn get_current_vcpu(&mut self) -> Option<&impl DerefMut<Target = VCpu>> {
+        self.current_vcpu.as_mut().map(|r| &mut **r)
+    }
+
     /// Reads the VM exit reason from the current VMCS.
     ///
     /// This will also reset the preemption timer if it's the reason
@@ -1129,7 +1173,6 @@ impl Monitor {
     }
 
     /// Checks that a vCPU is currently loaded and ready.
-    #[allow(dead_code)] // calls are stripped out in release mode
     fn check_vcpu_ready(&self) -> VmxResult<()> {
         #[cfg(debug_assertions)]
         self.check_vmm_started()?;
@@ -1221,6 +1264,7 @@ impl Vmxon {
 /// using VMREAD/VMWRITE instructions.
 #[repr(align(4096))]
 #[repr(C)]
+#[derive(Debug)]
 pub struct Vmcs {
     /// The VMCS revision identifier.
     vmcs_revision: VmcsRevision,
@@ -1285,6 +1329,14 @@ enum VCpuState {
 
     /// Ready to be launched or resumed.
     Ready,
+
+    /*
+    /// Cannot be launched or resumed.
+    ///
+    /// The CPU may be waiting for an SIPI (Start-up IPI), for
+    /// example.
+    NotReady,
+    */
 }
 
 /// A vCPU.
@@ -1292,6 +1344,7 @@ enum VCpuState {
 /// FIXME: We need to figure out how this plays with our VM
 /// abstraction as well as SMP/parallelization.
 #[repr(align(4096))]
+#[derive(Debug)]
 pub struct VCpu {
     /// The VMCS region.
     vmcs: Vmcs,
@@ -1698,6 +1751,16 @@ mod tests {
 
             assert_eq!(reason, KnownExitReason::PreemptionTimerExpired);
         }
+    }
+
+    #[test]
+    fn test_unload_vcpu() {
+        let mut vmm = unsafe { bootstrap_simple_vm() };
+        let old = vmm.unload_vcpu().expect("Failed to unload vCPU");
+
+        // Ensure that it really isn't loaded
+        let vmptr = unsafe { vmx::vmptrst().unwrap() };
+        assert_eq!(vmptr, vmm.dummy_vmcs.get_physical().as_u64());
     }
 
     #[test]
