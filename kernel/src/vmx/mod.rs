@@ -394,6 +394,7 @@ impl Monitor {
     /// cycles and the Preemption Timer ticks down every 4 cycles,
     /// the actual applied value will be 8 cycles and 2 will be
     /// returned.
+    #[allow(dead_code)] // used in tests
     pub fn set_vmcs_preemption_timer_value(&mut self, tsc: Option<u32>) -> VmxResult<u32> {
         use pal::vmcs::vm_exit_controls::*;
         use pal::vmcs::pin_based_vm_execution_controls::*;
