@@ -53,7 +53,7 @@
         cmake
       ]) ++ (with pkgs.python3Packages; [
         # Bareflank pal.py code generator
-        lxml pyyaml
+        lxml pyyaml colorama
       ]);
 
       inputsFrom = [

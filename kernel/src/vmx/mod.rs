@@ -201,14 +201,16 @@ impl PlatformInfo {
         }
 
         // Check VMXON/VMCS region size
-        let msr = ia32_vmx_basic::get();
-        let vmcs_revision = get_revision_id_from_value(msr) as u32;
-        let vmcs_size = get_vmxon_vmcs_region_size_from_value(msr) as usize;
+        let msr = unsafe { ia32_vmx_basic::get() };
+        let vmcs_revision = unsafe { get_revision_id_from_value(msr) } as u32;
+        let vmcs_size = unsafe { get_vmxon_vmcs_region_size_from_value(msr) } as usize;
 
         // Check Preemption Timer support
         let preemption_timer_rate = {
             let constraint = {
-                let msr = if true_based_controls_is_enabled() {
+                let true_based_controls = unsafe { true_based_controls_is_enabled() };
+
+                let msr = if true_based_controls {
                     msr::IA32_VMX_TRUE_PINBASED_CTLS
                 } else {
                     msr::IA32_VMX_PINBASED_CTLS
@@ -219,7 +221,7 @@ impl PlatformInfo {
 
             let one_constraint = constraint >> 32;
             if (one_constraint & (1 << 6)) != 0 {
-                let rate = pal::msr::ia32_vmx_misc::get_preemption_timer_decrement();
+                let rate = unsafe { pal::msr::ia32_vmx_misc::get_preemption_timer_decrement() };
                 Some(1 << rate as u32)
             } else {
                 None
@@ -448,8 +450,11 @@ impl Monitor {
         match tsc {
             None => {
                 // Disable Timer
-                disable_activate_vmx_preeemption_timer();
-                disable_save_vmxpreemption_timer_value();
+
+                unsafe {
+                    disable_activate_vmx_preeemption_timer();
+                    disable_save_vmxpreemption_timer_value();
+                }
 
                 Ok(0)
             }
@@ -463,9 +468,11 @@ impl Monitor {
 
                 vcpu.preemption_timer = Some(value);
 
-                guest_preemption_timer_value::set(value);
-                enable_activate_vmx_preeemption_timer();
-                enable_save_vmxpreemption_timer_value();
+                unsafe {
+                    guest_preemption_timer_value::set(value);
+                    enable_activate_vmx_preeemption_timer();
+                    enable_save_vmxpreemption_timer_value();
+                }
 
                 Ok(remainder)
             }
@@ -1102,7 +1109,9 @@ impl Monitor {
             let timer_value = vcpu.preemption_timer
                 .expect("The preemption timer value must exist");
 
-            guest_preemption_timer_value::set(timer_value);
+            unsafe {
+                guest_preemption_timer_value::set(timer_value);
+            }
         }
 
         Ok(reason)

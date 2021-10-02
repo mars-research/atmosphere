@@ -28,7 +28,7 @@ rev = "d39f168387362bc64df579d1da85d4e068d36ba4"
 
 [dependencies.pal]
 git = "https://github.com/mars-research/pal"
-rev = "dc9fd90da7b920eb4523db8907cdcf547ac7ce23"
+rev = "36802117b2eb78088719a4178e0caa1b91cc856a"
 default-features = false
 features = [ "intel_64bit_systemv_nasm" ]
 

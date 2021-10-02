@@ -308,7 +308,7 @@ dependencies = [
 [[package]]
 name = "pal"
 version = "0.1.0"
-source = "git+https://github.com/mars-research/pal?rev=dc9fd90da7b920eb4523db8907cdcf547ac7ce23#dc9fd90da7b920eb4523db8907cdcf547ac7ce23"
+source = "git+https://github.com/mars-research/pal?rev=36802117b2eb78088719a4178e0caa1b91cc856a#36802117b2eb78088719a4178e0caa1b91cc856a"
 dependencies = [
  "cty",
  "pkg-config",
