@@ -10,11 +10,17 @@ It's inspired by the design of [seL4](https://sel4.systems/Info/Docs/seL4-manual
 [Nix](https://github.com/numtide/nix-unstable-installer) is required to install development dependencies.
 With Nix installed, enter the prepared nix-shell environment with `nix-shell` or `nix develop` (Nix 2.4).
 
-You can now build and run Atmosphere with `cargo run`.
+You can now build and run Atmosphere with `cd kernel && cargo run`.
 The kernel test cases can be run with `cargo test`.
-To run the kernel on QEMU with KVM and nested virtualization, use `atmo run --qemu`.
+To run the kernel on QEMU with KVM and nested virtualization, use `atmo run --qemu` or `cargo run -- --qemu` (see [Atmo](#atmo) for more information).
 
 The kernel has a set of "debug scripts" which can be run with `atmo run --script=NAME`.
+
+### Atmo
+Atmosphere builds with `atmo`, a build system that extends Cargo. Run `atmo help` for more information.
+
+`atmo` is set as the runner executable in `kernel/.cargo/config`. All `atmo` arguments can be passed through to `cargo run` and `cargo test` using `--`.
+For example, `atmo run --release` is an alias of `cargo run -- --release`.
 
 ### Direnv
 
