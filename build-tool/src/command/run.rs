@@ -24,8 +24,12 @@ pub struct Opts {
     #[clap(long = "cmdline")]
     command_line: Option<String>,
 
-    /// Whether to enable the GDB server.
+    /// Whether to enable the debugger.
     #[clap(long)]
+    debugger: bool,
+
+    /// Whether to enable the GDB server.
+    #[clap(long, hidden = true)]
     gdb: bool,
 
     /// Whether to use QEMU.
@@ -88,6 +92,15 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
 
     if local.full_output {
         run_config.suppress_initial_outputs(false);
+    }
+
+    if local.debugger {
+        if local.qemu {
+            unimplemented!();
+        }
+
+        run_config.suppress_initial_outputs(false);
+        run_config.freeze_on_startup(true);
     }
 
     // FIXME: Make this configurable
