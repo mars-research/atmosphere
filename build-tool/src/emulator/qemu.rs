@@ -45,15 +45,17 @@ impl Emulator for Qemu {
             + &format!(" qemu_debug_exit_io_base={}", self.debug_exit_io_base);
 
         // FIXME: Make this cachable
-        let grub = BootableImage::generate(command_line, None).await?;
+        let grub = BootableImage::generate(command_line, Some(kernel)).await?;
         let hda = format!(
             "file={},format=raw,index=0,media=disk",
             grub.iso_path().to_str().expect("Path contains non-UTF-8")
         );
+        /*
         let hdb = format!(
             "file=fat:rw:{},format=raw,index=1,media=disk",
             kernel.path().parent().unwrap().to_str().expect("Path contains non-UTF-8"),
         );
+        */
 
         let mut command = Command::new(self.qemu_binary.as_os_str());
         command
@@ -63,7 +65,7 @@ impl Emulator for Qemu {
             // .args(&["-serial", "file:serial.log"])
             .args(&["-m", &format!("{}", memory)])
             .arg("-drive").arg(&hda)
-            .arg("-drive").arg(&hdb)
+            // .arg("-drive").arg(&hdb)
             .args(&["-device", &format!("isa-debug-exit,iobase={:#x},iosize=0x04", self.debug_exit_io_base)])
             .args(config.cpu_model.to_qemu()?);
 
