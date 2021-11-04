@@ -3,7 +3,7 @@
 with builtins;
 
 let
-  cargoSha256 = "sha256-ccXjj3sWa997sCUrViD2P3rwNlc1FK8luFleSPkCHQ0=";
+  cargoSha256 = "sha256-T2V4xI2phGzay9HpuZUJ6uxcJcS9DomuM1gNvkwGbCg=";
 in rustPlatform.buildRustPackage {
   pname = "build-tool";
   version = "0.1.0";

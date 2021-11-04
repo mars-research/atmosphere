@@ -9,12 +9,10 @@ name = "atmo"
 path = "src/main.rs"
 
 [dependencies]
-# nightly 2021-09-01 (required for Rust 2021 edition)
-cargo = { git = "https://github.com/rust-lang/cargo", rev = "18751dd3f238d94d384a7fe967abfac06cbfe0b9" }
-
 anyhow = "1.0"
 async-trait = "0.1.51"
 byte-unit = "4.0.12"
+cargo = "0.57.0"
 clap = "3.0.0-beta.4"
 clap_generate = "3.0.0-beta.4"
 env_logger = "0.9.0"
