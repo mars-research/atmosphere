@@ -27,7 +27,6 @@ pub type ProjectHandle = Arc<Project>;
 #[derive(Debug)]
 pub struct Project {
     cargo_toml: PathBuf,
-    cargo_config: CargoConfig,
     root: PathBuf,
 }
 
@@ -59,7 +58,6 @@ impl Project {
 
         Ok(Arc::new(Self {
             cargo_toml: root.join("Cargo.toml"),
-            cargo_config,
             root,
         }))
     }
