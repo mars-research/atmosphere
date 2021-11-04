@@ -18,7 +18,7 @@ use core::alloc::Layout;
 use core::ptr;
 
 use astd::capability::{CapError, CapResult};
-use super::{Capability, CapPointer, CapType, CSpace, DowncastedCap, PermissionSet};
+use super::{Capability, CapPointer, CapType, CSpace, DowncastedCap};
 
 /// A capability to an untyped memory region.
 #[derive(Debug)]
@@ -99,7 +99,7 @@ impl UntypedCap {
         let capability = Capability {
             object,
             data,
-            permissions: PermissionSet::maximum(),
+            // permissions: PermissionSet::maximum(),
             prev: ptr::null(),
             next: ptr::null(),
             depth: self.capability().depth + 1,

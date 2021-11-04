@@ -60,7 +60,6 @@ use astd::capability::{
     CapError,
     CapType,
     CapPointer,
-    PermissionSet,
 };
 use iterator::{CapIter, CapIterType};
 
@@ -119,7 +118,7 @@ impl CSpace {
         let cap = Capability {
             object: base.add(cnode_size),
             data: CData::Untyped(untyped),
-            permissions: PermissionSet::maximum(),
+            // permissions: PermissionSet::maximum(),
             prev: ptr::null(),
             next: ptr::null(),
             depth: 0,
@@ -372,8 +371,10 @@ pub struct Capability {
     /// Type-specific data of the capability.
     data: CData,
 
+    /*
     /// Permissions afforded by the capability.
     permissions: PermissionSet,
+    */
 
     /// The previous capability in pre-order traversal.
     prev: *const Capability,
