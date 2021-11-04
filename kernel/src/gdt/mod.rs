@@ -153,6 +153,7 @@ impl GlobalDescriptorTable {
 /// A 8-byte GDT Code/Data entry.
 #[derive(Copy, Clone, Debug)]
 #[repr(packed)]
+#[allow(dead_code)] // "field is never read" - used by platform
 pub struct GdtEntry {
     limitl: u16,
     offsetl: u16,
@@ -192,6 +193,7 @@ impl GdtEntry {
 /// This is described in Figure 4-22 in AMD Vol. 2.
 #[derive(Copy, Clone, Debug)]
 #[repr(packed)]
+#[allow(dead_code)] // "field is never read" - used by platform
 pub struct BigGdtEntry {
     limitl: u16,
     offsetl: u16,
@@ -200,7 +202,7 @@ pub struct BigGdtEntry {
     flags_limith: u8,
     offseth: u8,
     offsetx: u32,
-    reserved: u32,
+    _reserved: u32,
 }
 
 impl BigGdtEntry {
@@ -219,7 +221,7 @@ impl BigGdtEntry {
             flags_limith: flags & 0xF0 | ((limit >> 16) as u8) & 0x0F,
             offsetx: (offset >> 32) as u32,
             offseth: (offset >> 24) as u8,
-            reserved: 0,
+            _reserved: 0,
         }
     }
 
