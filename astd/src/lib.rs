@@ -1,6 +1,5 @@
 #![no_std]
 #![forbid(unsafe_code)]
-#![feature(const_fn_trait_bound)]
 
 #![deny(missing_docs)]
 

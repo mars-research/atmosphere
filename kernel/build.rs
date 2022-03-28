@@ -1,3 +1,5 @@
+#![deny(unused_must_use)]
+
 extern crate nasm_rs;
 
 macro_rules! source {
@@ -27,7 +29,7 @@ fn x86_64_asm(source: &str) {
     mb.file(&format!("{}/{}", arch_dir, source));
     mb.target("");
     mb.flag("-felf64");
-    mb.compile(source);
+    mb.compile(source).unwrap();
 
     static_link!(source);
 }

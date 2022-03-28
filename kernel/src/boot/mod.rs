@@ -4,6 +4,8 @@
 
 pub mod command_line;
 
+use core::arch::asm;
+
 use multiboot2::BootInformation;
 use x86::io::{outb, outw};
 

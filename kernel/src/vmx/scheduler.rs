@@ -140,6 +140,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use core::arch::asm;
+
     use astd::cell::AtomicRefCell;
     use atest::test;
     use crate::vmx::KnownExitReason;

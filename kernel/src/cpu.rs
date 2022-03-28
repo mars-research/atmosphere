@@ -11,6 +11,7 @@
 //! We preallocate the structure for CPU 0, and the space for other
 //! CPUs are provided by Cpu capabilities.
 
+use core::arch::asm;
 use core::mem::{self, MaybeUninit};
 use core::ptr;
 

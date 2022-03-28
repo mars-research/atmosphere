@@ -14,17 +14,14 @@ ns16550a = { path = "../ns16550a" }
 bitfield = "0.13.2"  # Totally non-confusing crate name
 bit_field = "0.10.1"
 displaydoc = { version = "0.2.3", default-features = false }
+enum-primitive-derive = "0.2.2"
 log = "0.4.14"
-multiboot2 = "0.12.1"
+multiboot2 = "0.13.1"
 num = { version = "0.4", default-features = false }
 num-derive = "0.3.3"
 num-traits = { version = "0.2.14", default-features = false }
-realjump = "0.1.0"
-x86 = "0.42.1"
-
-[dependencies.enum-primitive-derive]
-git = "https://gitlab.com/cardoe/enum-primitive-derive"
-rev = "d39f168387362bc64df579d1da85d4e068d36ba4"
+realjump = "0.2.0"
+x86 = "0.47.0"
 
 [dependencies.pal]
 git = "https://github.com/mars-research/pal"
@@ -33,4 +30,4 @@ default-features = false
 features = [ "intel_64bit_systemv_nasm" ]
 
 [build-dependencies]
-nasm-rs = "0.1.5"
+nasm-rs = "0.2.4"

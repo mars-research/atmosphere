@@ -4,14 +4,12 @@
 
 #![no_std]
 #![feature(
-    asm,
+    asm_const,
     abi_x86_interrupt,
     alloc_error_handler,
     arbitrary_self_types,
-    const_fn_fn_ptr_basics,
     const_mut_refs,
     const_ptr_offset,
-    const_raw_ptr_deref,
     const_slice_from_raw_parts,
     custom_test_frameworks,
     naked_functions,

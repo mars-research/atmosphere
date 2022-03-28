@@ -9,7 +9,7 @@
   outputs = { self, mars-std, kexec-tools, ... }: let
     supportedSystems = [ "x86_64-linux" ];
   in mars-std.lib.eachSystem supportedSystems (system: let
-    nightlyVersion = "2021-11-03";
+    nightlyVersion = "2022-03-27";
 
     pkgs = mars-std.legacyPackages.${system};
     pinnedRust = pkgs.rust-bin.nightly.${nightlyVersion}.default.override {
@@ -34,7 +34,7 @@
 
         self.packages.${system}.build-tool
       ] ++ (with pkgs; [
-        gnumake utillinux cargo-expand
+        gnumake utillinux cargo-expand cargo-outdated cargo-edit
 
         gcc10 clang_10 nasm
         grub2 xorriso gdb

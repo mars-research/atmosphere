@@ -28,7 +28,6 @@
 //! - <http://byterunner.com/16550.html>
 
 #![no_std]
-#![feature(asm)]
 
 #![deny(
     asm_sub_register,
@@ -43,6 +42,7 @@
     unused_variables,
 )]
 
+use core::arch::asm;
 use core::fmt::{Write, Result as FmtResult};
 
 /// Receive Holding Register

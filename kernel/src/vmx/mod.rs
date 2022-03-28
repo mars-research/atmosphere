@@ -13,6 +13,7 @@
 mod scheduler;
 mod types;
 
+use core::arch::asm;
 use core::mem;
 use core::sync::atomic::{AtomicBool, Ordering};
 
