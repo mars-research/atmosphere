@@ -9,7 +9,6 @@
     alloc_error_handler,
     arbitrary_self_types,
     const_mut_refs,
-    const_ptr_offset,
     const_slice_from_raw_parts,
     custom_test_frameworks,
     naked_functions,

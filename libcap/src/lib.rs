@@ -18,7 +18,6 @@
 
 #![feature(
     arbitrary_self_types,
-    const_ptr_offset,
 )]
 
 #![deny(

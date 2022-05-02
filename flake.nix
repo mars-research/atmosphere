@@ -9,7 +9,7 @@
   outputs = { self, mars-std, kexec-tools, ... }: let
     supportedSystems = [ "x86_64-linux" ];
   in mars-std.lib.eachSystem supportedSystems (system: let
-    nightlyVersion = "2022-03-27";
+    nightlyVersion = "2022-05-01";
 
     pkgs = mars-std.legacyPackages.${system};
     pinnedRust = pkgs.rust-bin.nightly.${nightlyVersion}.default.override {
