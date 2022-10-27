@@ -3,9 +3,15 @@
 
   inputs = {
     mars-std.url = "github:mars-research/mars-std";
+    crane = {
+      url = "github:ipetkov/crane";
+      inputs.nixpkgs.follows = "mars-std/nixpkgs";
+      inputs.flake-utils.follows = "mars-std/flake-utils";
+      inputs.flake-compat.follows = "mars-std/flake-compat";
+    };
   };
 
-  outputs = { self, mars-std, ... }: let
+  outputs = { self, mars-std, crane, ... }: let
     supportedSystems = [ "x86_64-linux" ];
   in mars-std.lib.eachSystem supportedSystems (system: let
     nightlyVersion = "2022-05-01";
@@ -19,11 +25,15 @@
       rustc = pinnedRust;
       cargo = pinnedRust;
     };
+
+    craneLib = (crane.mkLib pkgs).overrideToolchain pinnedRust;
   in {
     packages = {
-      build-tool = pkgs.callPackage ./build-tool {
-        inherit rustPlatform;
-        cargo = pinnedRust;
+      build-tool = craneLib.buildPackage {
+        src = craneLib.cleanCargoSource ./.;
+        cargoExtraArgs = "-p build-tool";
+        buildInputs = [ pkgs.openssl ];
+        nativeBuildInputs = [ pkgs.pkg-config ];
       };
     };
 

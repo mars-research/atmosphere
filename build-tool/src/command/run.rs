@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use clap::Clap;
+use clap::Parser;
 
 use crate::error::Result;
 use crate::project::{Binary, BuildOptions, Project};
@@ -10,7 +10,7 @@ use crate::emulator::{CpuModel, Emulator, EmulatorExit, GdbServer, RunConfigurat
 use super::{SubCommand, GlobalOpts};
 
 /// Run Atmosphere.
-#[derive(Debug, Clap)]
+#[derive(Debug, Parser)]
 pub struct Opts {
     /// The CPU model to emulate.
     #[clap(long = "cpu")]

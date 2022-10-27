@@ -13,7 +13,8 @@ macro_rules! unwrap_command {
 mod run;
 mod build;
 
-use clap::{Clap, IntoApp};
+use clap::{CommandFactory, Parser};
+use clap_complete::Shell;
 
 /// Run the CLI.
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -23,7 +24,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         SubCommand::Run(_) => run::run(opts).await?,
         SubCommand::Build(_) => build::run(opts).await?,
         SubCommand::GenCompletions(local) => {
-            gen_completions(&local.shell);
+            gen_completions(local.shell);
         }
     }
 
@@ -31,7 +32,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 
 /// Atmosphere build utility.
-#[derive(Debug, Clap)]
+#[derive(Debug, Parser)]
 struct GlobalOpts {
     #[clap(subcommand)]
     cmd: SubCommand,
@@ -45,7 +46,7 @@ struct GlobalOpts {
     release: bool,
 }
 
-#[derive(Debug, Clap)]
+#[derive(Debug, Parser)]
 enum SubCommand {
     Run(run::Opts),
     Build(build::Opts),
@@ -54,25 +55,12 @@ enum SubCommand {
     GenCompletions(GenCompletions),
 }
 
-#[derive(Debug, Clap)]
+#[derive(Debug, Parser)]
 struct GenCompletions {
     #[clap(index = 1)]
-    shell: String,
+    shell: Shell,
 }
 
-macro_rules! generate_for {
-    ($shell:ty) => {
-        clap_generate::generate::<$shell, _>(&mut GlobalOpts::into_app(), "atmo", &mut std::io::stdout())
-    }
-}
-
-fn gen_completions(shell: &str) {
-    use clap_generate::generators::{Bash, Fish, Zsh};
-
-    match shell {
-        "bash" => generate_for!(Bash),
-        "fish" => generate_for!(Fish),
-        "zsh" => generate_for!(Zsh),
-        _ => panic!("{} is not supported", shell),
-    }
+fn gen_completions(shell: Shell) {
+    clap_complete::generate(shell, &mut GlobalOpts::into_app(), "atmo", &mut std::io::stdout())
 }

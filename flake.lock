@@ -1,5 +1,34 @@
 {
   "nodes": {
+    "crane": {
+      "inputs": {
+        "flake-compat": [
+          "mars-std",
+          "flake-compat"
+        ],
+        "flake-utils": [
+          "mars-std",
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "mars-std",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1665356181,
+        "narHash": "sha256-ONEzlKL5LN4Y1TRfFY6C39G2Am1YFEjArwMYJONFhhs=",
+        "owner": "ipetkov",
+        "repo": "crane",
+        "rev": "d78cb0453b9823d2102f7b22bb98686215462416",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ipetkov",
+        "repo": "crane",
+        "type": "github"
+      }
+    },
     "flake-compat": {
       "flake": false,
       "locked": {
@@ -101,6 +130,7 @@
     },
     "root": {
       "inputs": {
+        "crane": "crane",
         "mars-std": "mars-std"
       }
     },

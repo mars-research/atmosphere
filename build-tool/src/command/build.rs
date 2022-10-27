@@ -5,7 +5,7 @@ use std::str::FromStr;
 use std::path::PathBuf;
 
 use anyhow::anyhow;
-use clap::Clap;
+use clap::Parser;
 use tokio::fs;
 
 use crate::error::{Error, Result};
@@ -64,7 +64,7 @@ impl OutputType {
 }
 
 /// Build the OS.
-#[derive(Debug, Clap)]
+#[derive(Debug, Parser)]
 pub struct Opts {
     /// Type of the output.
     #[clap(short = 't', long, default_value = "mb2")]
