@@ -5,8 +5,7 @@ on:
   push:
 jobs:
   test:
-    # Modify this to "ubuntu-latest" for GitHub-hosted runners
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v3.0.2
