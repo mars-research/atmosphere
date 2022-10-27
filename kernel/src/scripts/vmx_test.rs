@@ -1,7 +1,7 @@
-use astd::cell::AtomicRefCell;
-use crate::error::Result;
 use crate::cpu::get_current_vmm;
+use crate::error::Result;
 use crate::vmx::{PlatformInfo, VCpu};
+use astd::cell::AtomicRefCell;
 
 static VCPU: AtomicRefCell<VCpu> = AtomicRefCell::new(VCpu::new());
 

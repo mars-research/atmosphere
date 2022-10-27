@@ -29,9 +29,7 @@ impl AllocCSpace {
     fn new() -> Self {
         let size = 10 * 1024 * 1024; // 10MiB
         let memory = Vec::with_capacity(size);
-        let cspace = unsafe {
-            CSpace::bootstrap_system(memory.as_ptr(), size).unwrap()
-        };
+        let cspace = unsafe { CSpace::bootstrap_system(memory.as_ptr(), size).unwrap() };
 
         Self {
             cspace,
@@ -52,7 +50,8 @@ fn test_cspace_sanity() {
 
     let cnode = cspace.root_object();
 
-    cnode.get(0)
+    cnode
+        .get(0)
         .expect("Slot 0 must exist")
         .as_ref()
         .expect("Slot 0 must not be empty")
@@ -64,16 +63,24 @@ fn test_cspace_sanity() {
 fn test_untyped_retype() {
     let cspace = AllocCSpace::new();
     let cnode = cspace.root_object();
-    let untyped = cnode.get(0).unwrap().as_ref().unwrap().as_untyped().unwrap();
+    let untyped = cnode
+        .get(0)
+        .unwrap()
+        .as_ref()
+        .unwrap()
+        .as_untyped()
+        .unwrap();
 
     let destination = {
         let first_layer = 1;
         (first_layer << (32 - 8)).into()
     };
-    untyped.retype(CapType::Cpu, &cspace, destination)
+    untyped
+        .retype(CapType::Cpu, &cspace, destination)
         .expect("Failed to retype");
 
-    cnode.get(1)
+    cnode
+        .get(1)
         .expect("Slot 1 must exist")
         .as_ref()
         .expect("Slot 1 must not be empty")

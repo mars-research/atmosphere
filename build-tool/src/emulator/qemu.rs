@@ -9,11 +9,13 @@ use byte_unit::ByteUnit;
 use tokio::io::{self, BufReader};
 use tokio::process::Command;
 
-use crate::grub::BootableImage;
-use crate::project::{ProjectHandle, Binary};
-use crate::error::Result;
-use super::{CpuModel, Emulator, EmulatorExit, GdbServer, RunConfiguration, /*InitialOutputFilter*/};
 use super::output_filter::InitialOutputFilter;
+use super::{
+    CpuModel, Emulator, EmulatorExit, GdbServer, RunConfiguration, /*InitialOutputFilter*/
+};
+use crate::error::Result;
+use crate::grub::BootableImage;
+use crate::project::{Binary, ProjectHandle};
 
 /// A QEMU instance.
 pub struct Qemu {
@@ -38,8 +40,7 @@ impl Qemu {
 impl Emulator for Qemu {
     /// Start the QEMU process.
     async fn run(&mut self, config: &RunConfiguration, kernel: &Binary) -> Result<EmulatorExit> {
-        let memory = config.memory.get_adjusted_unit(ByteUnit::MiB)
-            .get_value() as usize;
+        let memory = config.memory.get_adjusted_unit(ByteUnit::MiB).get_value() as usize;
 
         let command_line = config.full_command_line()
             + &format!(" qemu_debug_exit_io_base={}", self.debug_exit_io_base);
@@ -64,9 +65,16 @@ impl Emulator for Qemu {
             .args(&["-serial", "mon:stdio"])
             // .args(&["-serial", "file:serial.log"])
             .args(&["-m", &format!("{}", memory)])
-            .arg("-drive").arg(&hda)
+            .arg("-drive")
+            .arg(&hda)
             // .arg("-drive").arg(&hdb)
-            .args(&["-device", &format!("isa-debug-exit,iobase={:#x},iosize=0x04", self.debug_exit_io_base)])
+            .args(&[
+                "-device",
+                &format!(
+                    "isa-debug-exit,iobase={:#x},iosize=0x04",
+                    self.debug_exit_io_base
+                ),
+            ])
             .args(config.cpu_model.to_qemu()?);
 
         if config.suppress_initial_outputs {
@@ -91,7 +99,10 @@ impl Emulator for Qemu {
 
         if config.suppress_initial_outputs {
             let stdout = {
-                let reader = child.stdout.take().expect("Could not capture emulator stdout");
+                let reader = child
+                    .stdout
+                    .take()
+                    .expect("Could not capture emulator stdout");
                 BufReader::new(reader)
             };
 
@@ -140,7 +151,9 @@ impl QemuArgs for GdbServer {
 
         match self {
             GdbServer::Unix(path) => {
-                let path = path.to_str().expect("Socket path contains non-UTF-8 characters");
+                let path = path
+                    .to_str()
+                    .expect("Socket path contains non-UTF-8 characters");
                 result.push(format!("unix:{},server,nowait", path).into());
             }
             GdbServer::Tcp(port) => {

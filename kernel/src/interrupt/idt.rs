@@ -16,7 +16,7 @@ use core::marker::PhantomData;
 use core::mem;
 
 use bit_field::BitField;
-use x86::{Ring, segmentation};
+use x86::{segmentation, Ring};
 
 use super::{HandlerFunc, HandlerFuncWithErrCode, PageFaultHandlerFunc};
 
@@ -312,10 +312,10 @@ pub enum GateType {
 impl From<GateType> for u8 {
     fn from(gate_type: GateType) -> u8 {
         match gate_type {
-            GateType::Int32  => 0b1110,
+            GateType::Int32 => 0b1110,
             GateType::Trap32 => 0b1111,
 
-            GateType::Int16  => 0b0110,
+            GateType::Int16 => 0b0110,
             GateType::Trap16 => 0b0111,
         }
     }

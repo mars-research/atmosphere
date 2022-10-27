@@ -15,8 +15,8 @@ use core::arch::asm;
 use core::mem::{self, MaybeUninit};
 use core::ptr;
 
-use x86::msr;
 use x86::apic::xapic::XAPIC;
+use x86::msr;
 
 use crate::gdt::{GlobalDescriptorTable, IstStack, TaskStateSegment};
 use crate::vmx::{Monitor, Vmxon};
@@ -48,9 +48,7 @@ pub fn get_current() -> &'static mut Cpu {
 pub fn get_current_vmm() -> &'static mut Monitor {
     let cpu = get_current();
 
-    unsafe {
-        cpu.vmm.assume_init_mut()
-    }
+    unsafe { cpu.vmm.assume_init_mut() }
 }
 
 /// Per-processor data for a CPU.
@@ -58,13 +56,11 @@ pub fn get_current_vmm() -> &'static mut Monitor {
 pub struct Cpu {
     // WARNING: If you change the position of `self_ptr`, you must also
     // change `GS_SELF_PTR_OFFSET` above!
-
     /// The VMXON region.
     pub vmxon: Vmxon,
 
     // WARNING: If you change the position of `self_ptr`, you must also
     // change `GS_SELF_PTR_OFFSET` above!
-
     /// A pointer to ourselves.
     ///
     /// We do a `mov rax, gs:[GS_SELF_PTR_OFFSET]` to get our own address.

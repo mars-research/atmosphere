@@ -1,17 +1,17 @@
 //! Build the OS.
 
 use std::env;
-use std::str::FromStr;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use anyhow::anyhow;
 use clap::Parser;
 use tokio::fs;
 
+use super::{GlobalOpts, SubCommand};
 use crate::error::{Error, Result};
-use crate::project::{BuildOptions, Project};
 use crate::grub::BootableImage;
-use super::{SubCommand, GlobalOpts};
+use crate::project::{BuildOptions, Project};
 
 #[derive(Debug)]
 enum OutputType {
@@ -54,7 +54,8 @@ impl OutputType {
         let dir = if path.file_name().is_none() {
             &path
         } else {
-            path.parent().ok_or(anyhow!("Could not get parent directory of output path"))?
+            path.parent()
+                .ok_or(anyhow!("Could not get parent directory of output path"))?
         };
 
         fs::create_dir_all(dir).await?;
@@ -89,7 +90,9 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
     opts.verbose = global.verbose;
 
     let kernel_crate = project.kernel();
-    let kernel = kernel_crate.build(&opts).await?
+    let kernel = kernel_crate
+        .build(&opts)
+        .await?
         .expect("No binary was produced");
 
     let output_path = local.output_type.prepare_output(local.output).await?;
@@ -106,8 +109,12 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
         }
     }
 
-    println!("{}", output_path.to_str().expect("Output path is not valid UTF-8"));
+    println!(
+        "{}",
+        output_path
+            .to_str()
+            .expect("Output path is not valid UTF-8")
+    );
 
     Ok(())
 }
-

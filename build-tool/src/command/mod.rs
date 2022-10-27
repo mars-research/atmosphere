@@ -7,11 +7,11 @@ macro_rules! unwrap_command {
         } else {
             panic!("Invalid command {:?}", $global.cmd)
         }
-    }
+    };
 }
 
-mod run;
 mod build;
+mod run;
 
 use clap::{CommandFactory, Parser};
 use clap_complete::Shell;
@@ -62,5 +62,10 @@ struct GenCompletions {
 }
 
 fn gen_completions(shell: Shell) {
-    clap_complete::generate(shell, &mut GlobalOpts::into_app(), "atmo", &mut std::io::stdout())
+    clap_complete::generate(
+        shell,
+        &mut GlobalOpts::into_app(),
+        "atmo",
+        &mut std::io::stdout(),
+    )
 }

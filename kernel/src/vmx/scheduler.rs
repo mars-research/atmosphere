@@ -2,9 +2,9 @@
 
 use displaydoc::Display;
 
-use astd::collections::deque::Deque;
 use super::{ExitReason, VCpu, VCpuHandle, VmxError, VmxResult};
 use crate::cpu::get_current_vmm;
+use astd::collections::deque::Deque;
 
 /// An action to be taken by the scheduler.
 #[derive(Debug)]
@@ -121,7 +121,7 @@ where
                 let vcpu = vmm.get_current_vcpu().unwrap();
 
                 match self.handler.vm_exit(vcpu, exit_reason) {
-                    SchedulerAction::Continue => {},
+                    SchedulerAction::Continue => {}
                     SchedulerAction::Abort => {
                         let vcpu = vmm.unload_vcpu()?;
                         self.queue.push_back(vcpu).unwrap(); // FIXME: This may not succeed!
@@ -142,10 +142,10 @@ where
 mod tests {
     use core::arch::asm;
 
+    use super::*;
+    use crate::vmx::KnownExitReason;
     use astd::cell::AtomicRefCell;
     use atest::test;
-    use crate::vmx::KnownExitReason;
-    use super::*;
 
     static VCPU0: AtomicRefCell<VCpu> = AtomicRefCell::new(VCpu::new());
     static VCPU1: AtomicRefCell<VCpu> = AtomicRefCell::new(VCpu::new());
@@ -162,15 +162,12 @@ mod tests {
             "shl rdx, 32",
             "or rax, rdx",
             "mov rcx, rax",
-
             "2:",
-
             // rdi <- tsc
             "rdtsc",
             "shl rdx, 32",
             "or rax, rdx",
             "mov rdi, rax",
-
             "jmp 2b",
             options(noreturn),
         );
@@ -225,9 +222,7 @@ mod tests {
 
     impl Run100TimesHandler {
         fn new() -> Self {
-            Self {
-                counter: 0,
-            }
+            Self { counter: 0 }
         }
     }
 
@@ -290,7 +285,6 @@ mod tests {
             panic!("Cycle difference must be under 10%");
         }
 
-        vmm.stop()
-            .expect("Could not stop VMM");
+        vmm.stop().expect("Could not stop VMM");
     }
 }

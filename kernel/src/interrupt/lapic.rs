@@ -4,9 +4,9 @@
 
 use core::slice;
 
-use x86::msr;
-use x86::apic::ApicControl;
 use x86::apic::xapic::XAPIC;
+use x86::apic::ApicControl;
+use x86::msr;
 
 use crate::cpu;
 

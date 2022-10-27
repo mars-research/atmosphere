@@ -47,7 +47,9 @@ pub unsafe fn init() {
 
     serial.init();
     if invalid_serial {
-        log::error!("Invalid serial port specified - Valid values for `serial` are: com1, com2, com3, com4");
+        log::error!(
+            "Invalid serial port specified - Valid values for `serial` are: com1, com2, com3, com4"
+        );
     }
 
     /*

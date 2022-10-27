@@ -34,7 +34,9 @@ pub fn get_kernel_end() -> u64 {
 pub unsafe fn init() {
     let mut ram_regions = RAM_REGIONS.lock();
     let bootinfo = crate::boot::get_bootinfo();
-    let memory_map = bootinfo.memory_map_tag().expect("Could not find valid memory map");
+    let memory_map = bootinfo
+        .memory_map_tag()
+        .expect("Could not find valid memory map");
     let kernel_end = get_kernel_end();
 
     log::info!("Physical RAM map:");
@@ -60,5 +62,4 @@ pub unsafe fn init() {
 /// Initializes memory.
 ///
 /// This should be called only once per CPU.
-pub unsafe fn init_cpu() {
-}
+pub unsafe fn init_cpu() {}

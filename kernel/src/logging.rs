@@ -7,7 +7,7 @@
 
 use core::fmt::Write;
 
-use log::{Record, Level, Metadata};
+use log::{Level, Metadata, Record};
 
 use crate::boot;
 
@@ -42,7 +42,6 @@ pub struct Logger {
     ///
     /// This can be disabled via the kernel command-line with `nocolors`.
     use_colors: bool,
-
     ///// Target prefixes to display debug messages for.
     /////
     ///// Targets in `log` are module paths like `atmosphere::interrupt`.
@@ -72,7 +71,14 @@ impl log::Log for Logger {
             let mut writer = crate::console::get_writer();
             if self.use_colors {
                 let color = Self::get_color(record.level());
-                writeln!(writer, "{}{:>5} {}\x1b[0m", color, record.level(), record.args()).unwrap();
+                writeln!(
+                    writer,
+                    "{}{:>5} {}\x1b[0m",
+                    color,
+                    record.level(),
+                    record.args()
+                )
+                .unwrap();
             } else {
                 writeln!(writer, "{:>5} {}", record.level(), record.args()).unwrap();
             }

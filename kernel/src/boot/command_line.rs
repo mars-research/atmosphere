@@ -5,8 +5,8 @@
 
 use core::ops::Deref;
 
-use astd::sync::RwLock;
 use crate::error::{Error, Result};
+use astd::sync::RwLock;
 
 static COMMAND_LINE: RwLock<KernelCommandLine> = RwLock::new(KernelCommandLine::new());
 
@@ -50,33 +50,45 @@ impl KernelCommandLine {
     fn parse(&mut self, iter: Iterator<'static>) -> Result<()> {
         for component in iter {
             match component {
-                Component::Flag(flag) => {
-                    match flag {
-                        "nologo" => { self.nologo = true; }
-                        "nocolor" => { self.nocolor = true; }
-                        "script_shutdown" => { self.script_shutdown = true; }
-                        _ => {
-                            return Err(Error::InvalidCommandLineOption(component));
-                        }
+                Component::Flag(flag) => match flag {
+                    "nologo" => {
+                        self.nologo = true;
                     }
-                }
-                Component::KeyValue((key, value)) => {
-                    match key {
-                        "serial" => { self.serial = value; }
-                        "script" => { self.script = Some(value); }
-                        "qemu_debug_exit_io_base" => {
-                            self.qemu_debug_exit_io_base.replace(value.parse()
-                                .map_err(|_| Error::InvalidCommandLineOption (component))?);
-                        }
-                        "bochs_apm_io_base" => {
-                            self.bochs_apm_io_base.replace(value.parse()
-                                .map_err(|_| Error::InvalidCommandLineOption (component))?);
-                        }
-                        _ => {
-                            return Err(Error::InvalidCommandLineOption(component));
-                        }
+                    "nocolor" => {
+                        self.nocolor = true;
                     }
-                }
+                    "script_shutdown" => {
+                        self.script_shutdown = true;
+                    }
+                    _ => {
+                        return Err(Error::InvalidCommandLineOption(component));
+                    }
+                },
+                Component::KeyValue((key, value)) => match key {
+                    "serial" => {
+                        self.serial = value;
+                    }
+                    "script" => {
+                        self.script = Some(value);
+                    }
+                    "qemu_debug_exit_io_base" => {
+                        self.qemu_debug_exit_io_base.replace(
+                            value
+                                .parse()
+                                .map_err(|_| Error::InvalidCommandLineOption(component))?,
+                        );
+                    }
+                    "bochs_apm_io_base" => {
+                        self.bochs_apm_io_base.replace(
+                            value
+                                .parse()
+                                .map_err(|_| Error::InvalidCommandLineOption(component))?,
+                        );
+                    }
+                    _ => {
+                        return Err(Error::InvalidCommandLineOption(component));
+                    }
+                },
             }
         }
 

@@ -1,7 +1,7 @@
 //! Capabilities.
 
-use libcap::CSpace;
 use crate::memory::RAM_REGIONS;
+use libcap::CSpace;
 
 /// Initializes capabilities.
 ///

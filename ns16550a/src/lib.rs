@@ -28,7 +28,6 @@
 //! - <http://byterunner.com/16550.html>
 
 #![no_std]
-
 #![deny(
     asm_sub_register,
     dead_code,
@@ -39,11 +38,11 @@
     unused_must_use,
     unused_mut,
     unused_unsafe,
-    unused_variables,
+    unused_variables
 )]
 
 use core::arch::asm;
-use core::fmt::{Write, Result as FmtResult};
+use core::fmt::{Result as FmtResult, Write};
 
 /// Receive Holding Register
 const RHR: usize = 0;
@@ -69,89 +68,85 @@ const LSR: usize = 5;
 // Shared logic
 macro_rules! impl_serial {
     ($name:ident, $write:ident, $read:ident) => {
-
-pub struct $name {
-    base: usize,
-}
-
-impl $name {
-    pub const unsafe fn new(base: usize) -> Self {
-        Self {
-            base: base as usize,
+        pub struct $name {
+            base: usize,
         }
-    }
 
-    /// Initializes the serial port.
-    ///
-    /// Currently hardcoded to do 115200 8N1
-    pub fn init(&self) {
-        unsafe {
-            // Disable interrupts
-            $write(self.base, IER, 0x00);
-
-            // Enable DLAB to set baud rate
-            $write(self.base, LCR, 0x80);
-
-            // Set 115200 baud
-            $write(self.base, 0, 0x01);
-            $write(self.base, 1, 0x00);
-
-            // Disable DLAB, and 8N1
-            $write(self.base, LCR, 0x03);
-
-            // Reset and enable FIFOs
-            $write(self.base, FCR, 0xc7);
-        }
-    }
-
-    /// Puts a byte to the serial port.
-    pub fn putc(&mut self, c: u8) {
-        unsafe {
-            while $read(self.base, LSR) & (1 << 5) == 0 {
+        impl $name {
+            pub const unsafe fn new(base: usize) -> Self {
+                Self {
+                    base: base as usize,
+                }
             }
 
-            if c == '\n' as u8 {
-                $write(self.base, THR, '\r' as u8);
-                $write(self.base, THR, '\n' as u8);
-            } else {
-                $write(self.base, THR, c);
-            }
-        }
-    }
+            /// Initializes the serial port.
+            ///
+            /// Currently hardcoded to do 115200 8N1
+            pub fn init(&self) {
+                unsafe {
+                    // Disable interrupts
+                    $write(self.base, IER, 0x00);
 
-    /// Reads a byte from the serial port.
-    ///
-    /// Returns `None` if there the input buffer is empty.
-    pub fn getc(&mut self) -> Option<u8> {
-        unsafe {
-            if $read(self.base, LSR) & 0x1 == 1 {
-                Some($read(self.base, RHR))
-            } else {
-                None
-            }
-        }
-    }
+                    // Enable DLAB to set baud rate
+                    $write(self.base, LCR, 0x80);
 
-    /// Reads a byte from the serial port (blocking).
-    pub fn getc_blocking(&self) -> u8 {
-        unsafe {
-            while $read(self.base, LSR) & 0x1 == 0 {
+                    // Set 115200 baud
+                    $write(self.base, 0, 0x01);
+                    $write(self.base, 1, 0x00);
+
+                    // Disable DLAB, and 8N1
+                    $write(self.base, LCR, 0x03);
+
+                    // Reset and enable FIFOs
+                    $write(self.base, FCR, 0xc7);
+                }
             }
 
-            $read(self.base, RHR)
-        }
-    }
-}
+            /// Puts a byte to the serial port.
+            pub fn putc(&mut self, c: u8) {
+                unsafe {
+                    while $read(self.base, LSR) & (1 << 5) == 0 {}
 
-impl Write for $name {
-    fn write_str(&mut self, s: &str) -> FmtResult {
-        for byte in s.as_bytes() {
-            self.putc(*byte);
-        }
-        Ok(())
-    }
-}
+                    if c == '\n' as u8 {
+                        $write(self.base, THR, '\r' as u8);
+                        $write(self.base, THR, '\n' as u8);
+                    } else {
+                        $write(self.base, THR, c);
+                    }
+                }
+            }
 
+            /// Reads a byte from the serial port.
+            ///
+            /// Returns `None` if there the input buffer is empty.
+            pub fn getc(&mut self) -> Option<u8> {
+                unsafe {
+                    if $read(self.base, LSR) & 0x1 == 1 {
+                        Some($read(self.base, RHR))
+                    } else {
+                        None
+                    }
+                }
+            }
+
+            /// Reads a byte from the serial port (blocking).
+            pub fn getc_blocking(&self) -> u8 {
+                unsafe {
+                    while $read(self.base, LSR) & 0x1 == 0 {}
+
+                    $read(self.base, RHR)
+                }
+            }
+        }
+
+        impl Write for $name {
+            fn write_str(&mut self, s: &str) -> FmtResult {
+                for byte in s.as_bytes() {
+                    self.putc(*byte);
+                }
+                Ok(())
+            }
+        }
     };
 }
 

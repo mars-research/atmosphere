@@ -1,8 +1,8 @@
 //! Emulators/Virtualizers.
 
 pub mod bochs;
-pub mod qemu;
 mod output_filter;
+pub mod qemu;
 
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -13,8 +13,8 @@ use byte_unit::{Byte, ByteUnit};
 
 use crate::error::{Error, Result};
 use crate::project::Binary;
-pub use qemu::Qemu;
 pub use bochs::Bochs;
+pub use qemu::Qemu;
 
 #[async_trait]
 pub trait Emulator {

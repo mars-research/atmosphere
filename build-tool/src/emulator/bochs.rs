@@ -14,14 +14,14 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use byte_unit::ByteUnit;
 use tempfile::NamedTempFile;
-use tokio::io::{self, AsyncRead, AsyncBufRead, BufReader, ReadBuf};
+use tokio::io::{self, AsyncBufRead, AsyncRead, BufReader, ReadBuf};
 use tokio::process::Command;
 
+use super::output_filter::InitialOutputFilter;
+use super::{CpuModel, Emulator, EmulatorExit, GdbServer, RunConfiguration};
 use crate::error::Result;
 use crate::grub::BootableImage;
-use crate::project::{ProjectHandle, Binary};
-use super::{CpuModel, Emulator, EmulatorExit, GdbServer, RunConfiguration};
-use super::output_filter::InitialOutputFilter;
+use crate::project::{Binary, ProjectHandle};
 
 /// A Bochs instance.
 pub struct Bochs {
@@ -46,15 +46,14 @@ impl Bochs {
 impl Emulator for Bochs {
     /// Start the Bochs process.
     async fn run(&mut self, config: &RunConfiguration, kernel: &Binary) -> Result<EmulatorExit> {
-        let memory = config.memory.get_adjusted_unit(ByteUnit::MiB)
-            .get_value() as usize;
+        let memory = config.memory.get_adjusted_unit(ByteUnit::MiB).get_value() as usize;
 
         if memory > 2048 {
             return Err(anyhow!("Memory > 2 GiB is not supported by Bochs"));
         }
 
-        let command_line = config.full_command_line()
-            + &format!(" bochs_apm_io_base={}", self.apm_io_base);
+        let command_line =
+            config.full_command_line() + &format!(" bochs_apm_io_base={}", self.apm_io_base);
 
         // FIXME: Make this cachable
         let grub = BootableImage::generate(command_line, Some(kernel)).await?;
@@ -66,13 +65,20 @@ impl Emulator for Bochs {
                 // If gdbstub support is not enabled in Bochs, the gdbstub config must not appear
                 // at all (even enabled=0 will cause an error)
                 None => String::new(),
-                Some(GdbServer::Tcp(port)) => format!("gdbstub: enabled=1, port={}, text_base=0, data_base=0, bss_base=0", port),
+                Some(GdbServer::Tcp(port)) => format!(
+                    "gdbstub: enabled=1, port={}, text_base=0, data_base=0, bss_base=0",
+                    port
+                ),
                 Some(unsupported) => {
-                    return Err(anyhow!("GDB server {:?} is not supported by Bochs", unsupported));
+                    return Err(anyhow!(
+                        "GDB server {:?} is not supported by Bochs",
+                        unsupported
+                    ));
                 }
             };
 
-            let boshsrc = format!(r#"
+            let boshsrc = format!(
+                r#"
                 log: -
                 logprefix: %t%e%d
                 debugger_log: -
@@ -131,7 +137,8 @@ impl Emulator for Bochs {
 
         let mut command = Command::new(self.bochs_binary.as_os_str());
         command
-            .arg("-f").arg(bochsrc.as_os_str())
+            .arg("-f")
+            .arg(bochsrc.as_os_str())
             .arg("-q")
             .stdout(Stdio::piped());
 
@@ -142,7 +149,10 @@ impl Emulator for Bochs {
         let mut child = command.spawn()?;
 
         let mut stdout: Box<dyn AsyncBufRead + Unpin + Send> = {
-            let reader = child.stdout.take().expect("Could not capture emulator stdout");
+            let reader = child
+                .stdout
+                .take()
+                .expect("Could not capture emulator stdout");
             Box::new(BufReader::new(reader))
         };
 
@@ -176,7 +186,9 @@ impl Emulator for Bochs {
 fn bochs_cpu_model(cpu_model: &CpuModel) -> Result<String> {
     match cpu_model {
         CpuModel::Haswell => Ok("corei7_haswell_4770".to_string()),
-        CpuModel::Host => Err(anyhow!("Bochs does not support host passthrough configuration")),
+        CpuModel::Host => Err(anyhow!(
+            "Bochs does not support host passthrough configuration"
+        )),
     }
 }
 
@@ -193,7 +205,7 @@ where
     R: AsyncRead + Unpin + Sized,
 {
     reader: Pin<Box<R>>,
-    buffer: VecDeque::<u8>,
+    buffer: VecDeque<u8>,
 }
 
 impl<R> AsyncRead for BochsOutputFilter<R>

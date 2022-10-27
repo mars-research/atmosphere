@@ -15,11 +15,7 @@
 //! require special parameters to initialize.
 
 #![no_std]
-
-#![feature(
-    arbitrary_self_types,
-)]
-
+#![feature(arbitrary_self_types)]
 #![deny(
     asm_sub_register,
     dead_code,
@@ -30,7 +26,7 @@
     unused_must_use,
     unused_mut,
     unused_unsafe,
-    unused_variables,
+    unused_variables
 )]
 
 #[cfg(test)]
@@ -45,20 +41,15 @@ pub mod untyped;
 #[cfg(test)]
 mod tests;
 
-use core::fmt;
-use core::mem;
-use core::ptr;
 use core::alloc::Layout;
+use core::fmt;
+use core::marker::PhantomData;
+use core::mem;
 use core::ops::Deref;
 use core::ops::DerefMut;
-use core::marker::PhantomData;
+use core::ptr;
 
-use astd::capability::{
-    CapResult,
-    CapError,
-    CapType,
-    CapPointer,
-};
+use astd::capability::{CapError, CapPointer, CapResult, CapType};
 use iterator::{CapIter, CapIterType};
 
 pub type CSlot = Option<Capability>;
@@ -69,10 +60,9 @@ macro_rules! downcast_method {
         #[doc = $cap_name]
         pub fn $name<'cap>(&'cap self) -> Option<DowncastedCap<'cap, $inner_type>> {
             if self.data.capability_type() == $cap_type {
-                Some(unsafe { DowncastedCap::new_unchecked(
-                    self as *const Capability,
-                    self.data.data(),
-                ) })
+                Some(unsafe {
+                    DowncastedCap::new_unchecked(self as *const Capability, self.data.data())
+                })
             } else {
                 None
             }
@@ -94,7 +84,9 @@ impl CSpace {
     /// Resolves a CapPointer and returns a reference to the CSlot.
     pub fn resolve(&self, pointer: CapPointer) -> Option<&mut CSlot> {
         let resolution = CapPointerResolution::new(pointer);
-        self.root_object().resolve_ptr(resolution).map(|p| unsafe { &mut *p })
+        self.root_object()
+            .resolve_ptr(resolution)
+            .map(|p| unsafe { &mut *p })
     }
 
     /// Bootstraps a CSpace with system-level capabilities.
@@ -136,9 +128,7 @@ impl CSpace {
 
 impl fmt::Display for CSpace {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let state = CSpaceDisplay {
-            depth: 0,
-        };
+        let state = CSpaceDisplay { depth: 0 };
         writeln!(f, "[CSpace]")?;
         self.root_object().display_recursive(f, state)
     }
@@ -219,17 +209,13 @@ pub struct CNode {
 
     /// Unused.
     _pad: u8,
-
     // What follows are (2^radix) CSlots.
 }
 
 impl CNode {
     /// Construct a CNode with a given radix.
     pub unsafe fn with_radix(address: *mut CNode, radix: u8) -> &'static mut CNode {
-        let cnode = CNode {
-            radix,
-            _pad: 0,
-        };
+        let cnode = CNode { radix, _pad: 0 };
 
         ptr::write_volatile(address, cnode);
         let cnode = &mut *address;
@@ -262,16 +248,13 @@ impl CNode {
 
     /// Returns a reference to the nth element in the CNode.
     fn get(&self, index: usize) -> Option<&CSlot> {
-        self.get_ptr(index).map(|address| {
-            unsafe { &*address }
-        })
+        self.get_ptr(index).map(|address| unsafe { &*address })
     }
 
     /// Returns a mutable reference to the nth element in the CNode.
     fn get_mut(&mut self, index: usize) -> Option<&mut CSlot> {
-        self.get_ptr(index).map(|address| {
-            unsafe { &mut *(address as *mut CSlot) }
-        })
+        self.get_ptr(index)
+            .map(|address| unsafe { &mut *(address as *mut CSlot) })
     }
 
     /// Resolve a CapPointer and returns a pointer to the CSlot.
@@ -373,7 +356,6 @@ pub struct Capability {
     /// Permissions afforded by the capability.
     permissions: PermissionSet,
     */
-
     /// The previous capability in pre-order traversal.
     prev: *const Capability,
 
@@ -413,9 +395,7 @@ impl Capability {
         }
 
         // should we check that the child's depth is exactly self.depth + 1?
-        unsafe {
-            self.next.as_ref().unwrap().depth > self.depth
-        }
+        unsafe { self.next.as_ref().unwrap().depth > self.depth }
     }
 
     /// Insert a child capability into the CDT.
@@ -504,7 +484,9 @@ impl Capability {
     /// You must make sure that you have exclusive access to this capability.
     #[allow(clippy::mut_from_ref)]
     unsafe fn as_mut(&self) -> &mut Capability {
-        (self as *const Capability as *mut Capability).as_mut().unwrap()
+        (self as *const Capability as *mut Capability)
+            .as_mut()
+            .unwrap()
     }
 
     downcast_method!(as_cnode, CapType::CNode, CNodeCap);
@@ -572,7 +554,10 @@ pub struct DowncastedCap<'cap, T: 'cap> {
 impl<'cap, T> DowncastedCap<'cap, T> {
     /// Create a downcasted view of a capability without checking the type.
     #[inline]
-    const unsafe fn new_unchecked(capability: *const Capability, data: *const T) -> DowncastedCap<'cap, T> {
+    const unsafe fn new_unchecked(
+        capability: *const Capability,
+        data: *const T,
+    ) -> DowncastedCap<'cap, T> {
         DowncastedCap {
             capability,
             data,

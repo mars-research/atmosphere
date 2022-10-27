@@ -8,7 +8,7 @@
     unused_must_use,
     unused_mut,
     unused_unsafe,
-    unused_variables,
+    unused_variables
 )]
 
 mod command;
@@ -31,4 +31,3 @@ fn init_logging() {
         .format_module_path(false)
         .init();
 }
-

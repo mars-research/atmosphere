@@ -4,8 +4,8 @@ pub type Result<T> = core::result::Result<T, Error>;
 
 use displaydoc::Display;
 
-use crate::vmx::VmxError;
 use crate::boot::command_line::Component as CommandLineComponent;
+use crate::vmx::VmxError;
 
 /// An error.
 #[non_exhaustive]

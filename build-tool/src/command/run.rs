@@ -4,10 +4,10 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
+use super::{GlobalOpts, SubCommand};
+use crate::emulator::{Bochs, CpuModel, Emulator, EmulatorExit, GdbServer, Qemu, RunConfiguration};
 use crate::error::Result;
 use crate::project::{Binary, BuildOptions, Project};
-use crate::emulator::{CpuModel, Emulator, EmulatorExit, GdbServer, RunConfiguration, Qemu, Bochs};
-use super::{SubCommand, GlobalOpts};
 
 /// Run Atmosphere.
 #[derive(Debug, Parser)]
@@ -71,7 +71,9 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
         Binary::new(prebuilt)
     } else {
         let kernel_crate = project.kernel();
-        kernel_crate.build(&opts).await?
+        kernel_crate
+            .build(&opts)
+            .await?
             .expect("No binary was produced")
     };
 

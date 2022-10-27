@@ -19,12 +19,12 @@ mod types;
 use core::cmp::min;
 use core::mem;
 
-use x86::Ring;
-pub use x86::bits64::task::TaskStateSegment;
 use x86::bits64::segmentation::load_cs;
+pub use x86::bits64::task::TaskStateSegment;
 use x86::dtables::{lgdt, DescriptorTablePointer};
 use x86::segmentation::{load_ds, load_es, load_ss, SegmentSelector};
 use x86::task::load_tr;
+use x86::Ring;
 
 use types::{AccessByte, SystemAccessByte, SystemDescriptorType};
 
@@ -61,12 +61,7 @@ pub unsafe fn init_cpu() {
         access.set_executable(true);
         access.set_read_write(true);
 
-        GdtEntry::new(
-            0,
-            0,
-            access,
-            GDT_F_LONG_MODE,
-        )
+        GdtEntry::new(0, 0, access, GDT_F_LONG_MODE)
     };
 
     gdt.kernel_data = {
@@ -74,12 +69,7 @@ pub unsafe fn init_cpu() {
         access.set_privilege(0);
         access.set_read_write(true);
 
-        GdtEntry::new(
-            0,
-            0,
-            access,
-            GDT_F_LONG_MODE,
-        )
+        GdtEntry::new(0, 0, access, GDT_F_LONG_MODE)
     };
 
     gdt.tss = {
@@ -140,8 +130,7 @@ impl GlobalDescriptorTable {
 
     /// Returns a pointer to this GDT.
     fn get_pointer(&self) -> DescriptorTablePointer<Self> {
-        let limit = mem::size_of::<Self>().try_into()
-            .expect("GDT too big");
+        let limit = mem::size_of::<Self>().try_into().expect("GDT too big");
 
         DescriptorTablePointer {
             limit,

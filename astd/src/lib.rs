@@ -1,8 +1,6 @@
 #![no_std]
 #![forbid(unsafe_code)]
-
 #![deny(missing_docs)]
-
 // Common lint configs
 #![deny(
     asm_sub_register,
@@ -14,7 +12,7 @@
     unused_must_use,
     unused_mut,
     unused_unsafe,
-    unused_variables,
+    unused_variables
 )]
 
 //! `astd` provides common data structures and utilities for use in the Atmosphere kernel.
@@ -23,5 +21,5 @@
 
 pub mod capability;
 pub mod cell;
-pub mod sync;
 pub mod collections;
+pub mod sync;

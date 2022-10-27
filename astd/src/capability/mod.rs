@@ -125,4 +125,3 @@ impl PermissionSet {
         self.0 |= mask;
     }
 }
-

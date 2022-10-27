@@ -12,7 +12,7 @@ use std::process::Stdio;
 
 use anyhow::anyhow;
 use tempfile::TempDir;
-use tokio::fs::{OpenOptions, self};
+use tokio::fs::{self, OpenOptions};
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
@@ -59,7 +59,8 @@ impl BootableImage {
 
         // actually generate the image
         let output = Command::new("grub-mkrescue")
-            .arg("-o").arg(iso_path.as_os_str())
+            .arg("-o")
+            .arg(iso_path.as_os_str())
             .arg(source_dir.as_os_str())
             .stderr(Stdio::piped())
             .output()
@@ -89,7 +90,8 @@ impl BootableImage {
 fn generate_grub_config(command_line: &str, embedded: bool) -> String {
     let root = if embedded { "/boot" } else { "(hd1,msdos1)" };
 
-    format!(r#"
+    format!(
+        r#"
 serial --unit=0 --speed=115200 --word=8 --parity=no --stop=1
 terminal_input --append serial
 terminal_output --append serial
@@ -101,5 +103,7 @@ menuentry "Atmosphere" {{
     multiboot2 {}/atmosphere {}
     boot
 }}
-"#, root, command_line)
+"#,
+        root, command_line
+    )
 }

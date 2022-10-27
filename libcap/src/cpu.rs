@@ -6,7 +6,7 @@
 use core::alloc::Layout;
 // use crate::cpu::Cpu;
 
-use super::{CapResult, CData};
+use super::{CData, CapResult};
 
 // pub const OBJECT_LAYOUT: Layout = Layout::new::<Cpu>();
 pub const OBJECT_LAYOUT: Layout = Layout::new::<()>();
@@ -16,5 +16,4 @@ pub fn new_capability(_object: *const u8) -> CapResult<CData> {
 }
 
 #[derive(Debug)]
-pub struct CpuCap {
-}
+pub struct CpuCap {}

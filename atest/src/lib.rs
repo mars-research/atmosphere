@@ -4,7 +4,7 @@ extern crate proc_macro;
 
 use proc_macro::TokenStream;
 use quote::ToTokens;
-use syn::{parse_quote, parse_macro_input, Item};
+use syn::{parse_macro_input, parse_quote, Item};
 
 #[proc_macro_attribute]
 pub fn test(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -15,9 +15,12 @@ pub fn test(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let ident = &func.sig.ident.to_string();
 
-    func.block.stmts.insert(0, parse_quote! {
-        log::info!("Running {}", #ident);
-    });
+    func.block.stmts.insert(
+        0,
+        parse_quote! {
+            log::info!("Running {}", #ident);
+        },
+    );
 
     func.block.stmts.push(parse_quote! {
         log::info!("➡️ Success");

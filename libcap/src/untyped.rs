@@ -17,8 +17,8 @@
 use core::alloc::Layout;
 use core::ptr;
 
+use super::{CSpace, CapPointer, CapType, Capability, DowncastedCap};
 use astd::capability::{CapError, CapResult};
-use super::{Capability, CapPointer, CapType, CSpace, DowncastedCap};
 
 /// A capability to an untyped memory region.
 #[derive(Debug)]
@@ -36,10 +36,7 @@ pub struct UntypedCap {
 
 impl UntypedCap {
     pub unsafe fn new(size: usize) -> Self {
-        Self {
-            size,
-            watermark: 0,
-        }
+        Self { size, watermark: 0 }
     }
 
     /// Performs an allocation, moving the watermark forward.
@@ -79,15 +76,16 @@ impl UntypedCap {
     }
 
     /// Performs a retype, creating a new capability.
-    pub fn retype(mut self: DowncastedCap<Self>,
+    pub fn retype(
+        mut self: DowncastedCap<Self>,
         capability_type: CapType,
         this_cspace: &CSpace,
-        destination_cap: CapPointer
+        destination_cap: CapPointer,
     ) -> CapResult<()> {
-        let layout = super::kernel_layout(capability_type)
-            .ok_or(CapError::NotRetypable)?;
+        let layout = super::kernel_layout(capability_type).ok_or(CapError::NotRetypable)?;
 
-        let cslot = this_cspace.resolve(destination_cap)
+        let cslot = this_cspace
+            .resolve(destination_cap)
             .ok_or(CapError::InvalidPointer)?;
 
         if cslot.is_some() {

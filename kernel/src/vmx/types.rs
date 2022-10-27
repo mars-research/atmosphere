@@ -1,5 +1,5 @@
-use core::mem;
 use core::fmt::{Display, Formatter, Result as FmtResult};
+use core::mem;
 use core::ops::{Deref, DerefMut};
 
 use displaydoc::Display;
@@ -8,7 +8,7 @@ use num_traits::cast::FromPrimitive;
 use x86::bits64::vmx;
 use x86::msr;
 
-use super::{VmxResult, VmxError};
+use super::{VmxError, VmxResult};
 
 pub const GUEST_CONTEXT_SIZE: usize = mem::size_of::<GuestContext>();
 
@@ -323,15 +323,13 @@ impl BitfieldConstraint {
 
     /// Verifies that the supplied value meets the constraint.
     fn check(&self, value: u32) -> VmxResult<()> {
-        if (!value & self.allowed_zero) != 0 || ( value & !self.allowed_one ) != 0 {
+        if (!value & self.allowed_zero) != 0 || (value & !self.allowed_one) != 0 {
             let explain = ExplainBitfieldConstraint {
                 constraint: self.clone(),
                 value,
             };
 
-            Err(VmxError::VmcsConstraintViolation {
-                explain,
-            })
+            Err(VmxError::VmcsConstraintViolation { explain })
         } else {
             Ok(())
         }
@@ -378,10 +376,10 @@ impl ExplainBitfieldConstraint {
 
         while violation != 0 {
             if violation & 1 != 0 {
-                writeln!(f, "Bit {} of {} must be {}",
-                    offset,
-                    self.constraint.field_name,
-                    must_be,
+                writeln!(
+                    f,
+                    "Bit {} of {} must be {}",
+                    offset, self.constraint.field_name, must_be,
                 )?;
             }
 
@@ -445,8 +443,8 @@ impl DerefMut for CurrentVmcsField {
 
 #[cfg(test)]
 mod tests {
-    use atest::test;
     use super::*;
+    use atest::test;
 
     fn get_full_constraint(allowed_zero: u32, allowed_one: u32) -> u64 {
         ((allowed_one as u64) << 32) | (allowed_zero as u64)
@@ -472,10 +470,7 @@ mod tests {
     }
 
     fn get_simple_constraint() -> BitfieldConstraint {
-        let constraint = get_full_constraint(
-            0b0000000000011000,
-            0b0000000000011111,
-        );
+        let constraint = get_full_constraint(0b0000000000011000, 0b0000000000011111);
 
         BitfieldConstraint::new("Test Constraint", constraint)
             .expect("The simple constraint must be valid")
@@ -485,17 +480,23 @@ mod tests {
     fn test_constraint() {
         let constraint = get_simple_constraint();
         constraint.check(0b0000011111).unwrap();
-        constraint.check(0b1111111111)
+        constraint
+            .check(0b1111111111)
             .expect_err("Value must fail 1-constraint");
-        constraint.check(0b0000000000)
+        constraint
+            .check(0b0000000000)
             .expect_err("Value must fail 0-constraint");
     }
 
     #[test]
     fn test_explain_constraint() {
         let constraint = get_simple_constraint();
-        let error = constraint.check(0b1111111111)
+        let error = constraint
+            .check(0b1111111111)
             .expect_err("Value must fail 1-constraint");
-        log::info!("Returned error (should say that bits 5-9 must be 0): {}", error);
+        log::info!(
+            "Returned error (should say that bits 5-9 must be 0): {}",
+            error
+        );
     }
 }

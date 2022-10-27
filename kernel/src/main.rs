@@ -13,35 +13,22 @@
     custom_test_frameworks,
     naked_functions,
     pattern,
-    start,
+    start
 )]
-
 #![deny(
     asm_sub_register,
     deprecated,
     missing_abi,
     unused_macros,
     unused_must_use,
-    unused_unsafe,
+    unused_unsafe
 )]
-
-#![deny(
-    clippy::from_over_into,
-    clippy::needless_question_mark,
+#![deny(clippy::from_over_into, clippy::needless_question_mark)]
+#![deny(rustdoc::bare_urls, rustdoc::broken_intra_doc_links)]
+#![cfg_attr(
+    not(debug_assertions),
+    deny(dead_code, unused_imports, unused_mut, unused_variables,)
 )]
-
-#![deny(
-    rustdoc::bare_urls,
-    rustdoc::broken_intra_doc_links,
-)]
-
-#![cfg_attr(not(debug_assertions), deny(
-    dead_code,
-    unused_imports,
-    unused_mut,
-    unused_variables,
-))]
-
 #![reexport_test_harness_main = "test_main"]
 #![test_runner(crate::test_runner)]
 #![no_main]

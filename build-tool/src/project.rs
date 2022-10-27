@@ -8,9 +8,9 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use byte_unit::Byte;
-use cargo::core::Workspace;
 use cargo::core::compiler::CompileMode;
 use cargo::core::shell::Shell as CargoShell;
+use cargo::core::Workspace;
 use cargo::ops::{CompileOptions, Packages};
 use cargo::util::config::Config as CargoConfig;
 use cargo::util::important_paths::find_root_manifest_for_wd;
@@ -39,7 +39,10 @@ impl Project {
         // Ugly exception for build-tool which lives outside the workspace
         if "build-tool" == cargo_toml.parent().unwrap().file_name().unwrap() {
             cargo_toml = cargo_toml
-                .parent().unwrap().parent().unwrap()
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
                 .join("Cargo.toml");
         }
 
@@ -49,11 +52,12 @@ impl Project {
         let root = workspace.root().to_owned();
 
         // sanity check
-        let kernel_pkg = workspace.members()
-            .find(|pkg| pkg.name() == "atmosphere");
+        let kernel_pkg = workspace.members().find(|pkg| pkg.name() == "atmosphere");
 
         if kernel_pkg.is_none() {
-            return Err(anyhow!("Invalid workspace - The kernel crate (\"atmosphere\") doesn't exist"));
+            return Err(anyhow!(
+                "Invalid workspace - The kernel crate (\"atmosphere\") doesn't exist"
+            ));
         }
 
         Ok(Arc::new(Self {
@@ -109,20 +113,23 @@ impl Crate {
         let ws = self.get_cargo_workspace(&cfg)?;
 
         let mut compile_opts = CompileOptions::new(&cfg, CompileMode::Build)?;
-        compile_opts.spec = Packages::Packages(vec![ self.name.clone() ]);
+        compile_opts.spec = Packages::Packages(vec![self.name.clone()]);
 
         if options.release {
             compile_opts.build_config.requested_profile = InternedString::new("release");
         }
 
-        let compilation = block_in_place(move || {
-            cargo::ops::compile(&ws, &compile_opts)
-        })?;
+        let compilation = block_in_place(move || cargo::ops::compile(&ws, &compile_opts))?;
 
         if let Some(binary) = &self.binary {
-            let unit = compilation.binaries.iter()
+            let unit = compilation
+                .binaries
+                .iter()
                 .find(|b| b.path.file_name().unwrap() == binary.as_str())
-                .ok_or(anyhow!("Compilation did not generate binary \"{}\"", binary))?;
+                .ok_or(anyhow!(
+                    "Compilation did not generate binary \"{}\"",
+                    binary
+                ))?;
 
             self.check_stack_sizes(&unit.path).await?;
 
@@ -138,12 +145,8 @@ impl Crate {
 
         if let Some(limit) = self.max_stack_size {
             let elf = fs::read(path).await?;
-            let functions = stack_sizes::analyze_executable(&elf)
-                .map_err(|e| anyhow!("{}", e))?;
-            let mut functions = functions
-                .defined
-                .values()
-                .collect::<Vec<&Function>>();
+            let functions = stack_sizes::analyze_executable(&elf).map_err(|e| anyhow!("{}", e))?;
+            let mut functions = functions.defined.values().collect::<Vec<&Function>>();
 
             functions.sort_by(|a, b| a.size().cmp(&b.size()).reverse());
 
@@ -175,17 +178,7 @@ impl Crate {
         let mut cfg = CargoConfig::new(shell, self.crate_dir.clone(), home);
 
         // This is required for the unstable options to be parsed and loaded
-        cfg.configure(
-            verbose,
-            false,
-            None,
-            false,
-            false,
-            false,
-            &None,
-            &[],
-            &[],
-        )?;
+        cfg.configure(verbose, false, None, false, false, false, &None, &[], &[])?;
 
         Ok(cfg)
     }

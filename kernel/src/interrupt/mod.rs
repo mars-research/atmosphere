@@ -7,8 +7,8 @@
 // See top-level LICENSE.
 
 mod exception;
-mod lapic;
 mod idt;
+mod lapic;
 
 use x86::io::{inb, outb};
 
@@ -17,12 +17,12 @@ use core::convert::{Into, TryFrom};
 use bit_field::BitField;
 use x86::bits64::paging::VAddr;
 
-pub use exception::Exception;
-pub use lapic::cpu_id;
+use crate::boot::spin_forever;
 use astd::sync::Mutex;
+pub use exception::Exception;
 use exception::EXCEPTION_MAX;
 use idt::Idt;
-use crate::boot::spin_forever;
+pub use lapic::cpu_id;
 
 /// The IRQ offset.
 pub const IRQ_OFFSET: usize = 32;
@@ -33,15 +33,13 @@ static GLOBAL_IDT: Mutex<Idt> = Mutex::new(Idt::new());
 const PIC1_DATA: u16 = 0x21;
 const PIC2_DATA: u16 = 0xa1;
 
-
 // "x86-interrupt" is gated behind #![feature(abi_x86_interrupt)].
 
 /// A handler function for an interrupt or an exception without error code.
 pub type HandlerFunc = unsafe extern "C" fn(&mut PtRegs);
 
 /// A handler function for an exception that pushes an error code.
-pub type HandlerFuncWithErrCode =
-    unsafe extern "x86-interrupt" fn(&mut InterruptStackFrame, u64);
+pub type HandlerFuncWithErrCode = unsafe extern "x86-interrupt" fn(&mut InterruptStackFrame, u64);
 
 /// A page fault handler function that pushes a page fault error code.
 pub type PageFaultHandlerFunc =
@@ -60,19 +58,36 @@ unsafe extern "C" fn double_fault(regs: &mut PtRegs) {
 }
 
 /// Stack Segment Fault handler
-unsafe extern "x86-interrupt" fn stack_segment_fault(frame: &mut InterruptStackFrame, error_code: u64) {
-    log::error!("General Protection Fault (error code {:#b}): {:#x?}", error_code, frame);
+unsafe extern "x86-interrupt" fn stack_segment_fault(
+    frame: &mut InterruptStackFrame,
+    error_code: u64,
+) {
+    log::error!(
+        "General Protection Fault (error code {:#b}): {:#x?}",
+        error_code,
+        frame
+    );
     spin_forever();
 }
 
 /// General Protection Fault handler.
-unsafe extern "x86-interrupt" fn general_protection_fault(frame: &mut InterruptStackFrame, error_code: u64) {
-    log::error!("General Protection Fault (error code {:#b}): {:#x?}", error_code, frame);
+unsafe extern "x86-interrupt" fn general_protection_fault(
+    frame: &mut InterruptStackFrame,
+    error_code: u64,
+) {
+    log::error!(
+        "General Protection Fault (error code {:#b}): {:#x?}",
+        error_code,
+        frame
+    );
     spin_forever();
 }
 
 /// Page Fault handler.
-unsafe extern "x86-interrupt" fn page_fault(frame: &mut InterruptStackFrame, error_code: PageFaultErrorCode) {
+unsafe extern "x86-interrupt" fn page_fault(
+    frame: &mut InterruptStackFrame,
+    error_code: PageFaultErrorCode,
+) {
     log::info!("Page Fault (error code {:?}): {:#x?}", error_code, frame);
 
     // FIXME
@@ -242,7 +257,8 @@ pub unsafe fn init_cpu() {
     idt.invalid_opcode.set_handler_fn(invalid_opcode);
     idt.double_fault.set_handler_fn(double_fault);
     idt.stack_segment_fault.set_handler_fn(stack_segment_fault);
-    idt.general_protection_fault.set_handler_fn(general_protection_fault);
+    idt.general_protection_fault
+        .set_handler_fn(general_protection_fault);
     idt.page_fault.set_handler_fn(page_fault);
     idt.load();
 }

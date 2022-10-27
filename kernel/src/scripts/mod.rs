@@ -24,7 +24,7 @@ macro_rules! match_script {
 
             return ret;
         }
-    }
+    };
 }
 
 /// Runs the specified debug script.

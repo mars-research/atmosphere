@@ -27,8 +27,7 @@ pub unsafe fn init() {
         COMMAND_LINE = &*ptr; // We won't touch the boot information region
     }
 
-    command_line::init(COMMAND_LINE)
-        .expect("Invalid kernel command-line");
+    command_line::init(COMMAND_LINE).expect("Invalid kernel command-line");
 }
 
 /// Returns the raw kernel command line.
@@ -58,7 +57,10 @@ pub unsafe fn shutdown(success: bool) -> ! {
     // <https://github.com/qemu/qemu/blob/bd662023e683850c085e98c8ff8297142c2dd9f2/hw/misc/debugexit.c>
     if let Some(io_base) = cmdline.qemu_debug_exit_io_base {
         if !success {
-            log::debug!("Trying QEMU isa-debug-exit shutdown (IO Port {:#x})", io_base);
+            log::debug!(
+                "Trying QEMU isa-debug-exit shutdown (IO Port {:#x})",
+                io_base
+            );
 
             // QEMU will exit with (val << 1) | 1
             outw(io_base, 0x0);
@@ -67,8 +69,16 @@ pub unsafe fn shutdown(success: bool) -> ! {
 
     // Bochs APM
     if let Some(io_base) = cmdline.bochs_apm_io_base {
-        let success_marker = if success { "BOCHS_SUCCESS" } else { "BOCHS_FAILURE" };
-        log::debug!("Trying Bochs APM shutdown (IO Port {:#x}) - {}", io_base, success_marker);
+        let success_marker = if success {
+            "BOCHS_SUCCESS"
+        } else {
+            "BOCHS_FAILURE"
+        };
+        log::debug!(
+            "Trying Bochs APM shutdown (IO Port {:#x}) - {}",
+            io_base,
+            success_marker
+        );
 
         let shutdown = "Shutdown";
 

@@ -4,11 +4,11 @@
 //! from the emulator so they don't mess up our terminal.
 
 use std::cmp::min;
-use std::task::{Context, Poll};
 use std::io::Result as IoResult;
 use std::pin::Pin;
+use std::task::{Context, Poll};
 
-use tokio::io::{AsyncRead, AsyncBufRead, AsyncBufReadExt, Lines, ReadBuf};
+use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, Lines, ReadBuf};
 
 /// A filter that suppresses initial boot outputs from the emulator.
 pub struct InitialOutputFilter<R>

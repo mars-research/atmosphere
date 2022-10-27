@@ -25,21 +25,14 @@ use x86::cpuid::CpuId;
 use x86::msr;
 use x86::vmx::vmcs::control;
 
-use astd::sync::RwLock;
-use astd::cell::AtomicRefMut;
 use crate::cpu;
 use crate::gdt::TaskStateSegment;
 use crate::memory::get_physical;
+use astd::cell::AtomicRefMut;
+use astd::sync::RwLock;
 use types::{
-    GUEST_CONTEXT_SIZE,
-    CurrentVmcsField,
-    ExitReason,
-    GuestContext,
-    GuestRegisterDump,
-    KnownExitReason,
-    VmcsRevision,
-    VmInstructionError,
-    ExplainBitfieldConstraint,
+    CurrentVmcsField, ExitReason, ExplainBitfieldConstraint, GuestContext, GuestRegisterDump,
+    KnownExitReason, VmInstructionError, VmcsRevision, GUEST_CONTEXT_SIZE,
 };
 
 pub type VmxResult<T, E = VmxError> = core::result::Result<T, E>;
@@ -54,18 +47,14 @@ pub type VCpuHandle = AtomicRefMut<'static, VCpu>;
 static GUEST_STACK: [u8; 4096] = [0u8; 4096];
 
 macro_rules! copy_host_state {
-    ($x:ident) => {
-        {
-            use x86::vmx::vmcs::{guest, host};
-            (true, host::$x, guest::$x)
-        }
-    };
-    ($cond:expr, $x:ident) => {
-        {
-            use x86::vmx::vmcs::{guest, host};
-            ($cond, host::$x, guest::$x)
-        }
-    };
+    ($x:ident) => {{
+        use x86::vmx::vmcs::{guest, host};
+        (true, host::$x, guest::$x)
+    }};
+    ($cond:expr, $x:ident) => {{
+        use x86::vmx::vmcs::{guest, host};
+        ($cond, host::$x, guest::$x)
+    }};
 }
 
 /// A virtualization error.
@@ -291,11 +280,12 @@ impl Monitor {
             return Err(VmxError::VmmAlreadyStarted);
         }
 
-        let platform_info = PlatformInfo::detect()
-            .ok_or(VmxError::VmxUnsupported)?;
+        let platform_info = PlatformInfo::detect().ok_or(VmxError::VmxUnsupported)?;
 
         if platform_info.vmcs_size != mem::size_of::<Vmcs>() {
-            return Err(VmxError::UnsupportedVmcsSize { size: platform_info.vmcs_size });
+            return Err(VmxError::UnsupportedVmcsSize {
+                size: platform_info.vmcs_size,
+            });
         }
 
         self.platform_info = platform_info;
@@ -392,7 +382,11 @@ impl Monitor {
             return Err(VmxError::VCpuNotInitialized);
         }
 
-        if vcpu.loaded.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_err() {
+        if vcpu
+            .loaded
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
             return Err(VmxError::VCpuInUse);
         }
 
@@ -441,12 +435,11 @@ impl Monitor {
     /// returned.
     #[allow(dead_code)] // used in tests
     pub fn set_vmcs_preemption_timer_value(&mut self, tsc: Option<u32>) -> VmxResult<u32> {
-        use pal::vmcs::vm_exit_controls::*;
-        use pal::vmcs::pin_based_vm_execution_controls::*;
         use pal::vmcs::guest_preemption_timer_value;
+        use pal::vmcs::pin_based_vm_execution_controls::*;
+        use pal::vmcs::vm_exit_controls::*;
 
-        let vcpu = self.current_vcpu.as_mut()
-            .ok_or(VmxError::NoCurrentVCpu)?;
+        let vcpu = self.current_vcpu.as_mut().ok_or(VmxError::NoCurrentVCpu)?;
 
         match tsc {
             None => {
@@ -461,7 +454,9 @@ impl Monitor {
             }
             Some(tsc) => {
                 // Enable Timer
-                let rate = self.platform_info.preemption_timer_rate
+                let rate = self
+                    .platform_info
+                    .preemption_timer_rate
                     .ok_or(VmxError::PreemptionTimerUnavailable)?;
 
                 let value = tsc / rate;
@@ -628,11 +623,10 @@ impl Monitor {
             vmx::vmwrite(TR_ACCESS_RIGHTS, 0b10000000000000000)?;
 
             // ## Non-register State
-            use x86::vmx::vmcs::guest::*;
             use pal::vmcs::secondary_processor_based_vm_execution_controls::{
-                vmcs_shadowing_is_enabled,
-                enable_pml_is_enabled,
+                enable_pml_is_enabled, vmcs_shadowing_is_enabled,
             };
+            use x86::vmx::vmcs::guest::*;
 
             vmx::vmwrite(ACTIVITY_STATE, 0)?;
 
@@ -650,7 +644,9 @@ impl Monitor {
 
             // TODO: Investigate this
             if enable_pml_is_enabled() {
-                return Err(VmxError::OtherError("Page-Modification Logging is not implemented"));
+                return Err(VmxError::OtherError(
+                    "Page-Modification Logging is not implemented",
+                ));
             } else {
                 // vmx::vmwrite(PML_INDEX, 0)?;
             }
@@ -667,8 +663,8 @@ impl Monitor {
         self.check_vcpu_loaded()?;
 
         use pal::vmcs::vm_exit_controls::*;
-        use x86::segmentation as seg;
         use x86::controlregs as ctl;
+        use x86::segmentation as seg;
         use x86::vmx::vmcs::host::*;
 
         // > Selector fields (16 bits each) for the segment registers
@@ -716,7 +712,10 @@ impl Monitor {
         vmx::vmwrite(IA32_SYSENTER_EIP, msr::rdmsr(msr::IA32_SYSENTER_EIP))?;
 
         if load_ia32_perf_global_ctrl_is_enabled() {
-            vmx::vmwrite(IA32_PERF_GLOBAL_CTRL_FULL, msr::rdmsr(msr::IA32_PERF_GLOBAL_CTRL))?;
+            vmx::vmwrite(
+                IA32_PERF_GLOBAL_CTRL_FULL,
+                msr::rdmsr(msr::IA32_PERF_GLOBAL_CTRL),
+            )?;
         }
 
         if load_ia32_efer_is_enabled() {
@@ -738,15 +737,8 @@ impl Monitor {
     pub unsafe fn copy_vmcs_host_state_to_guest(&self) -> VmxResult<()> {
         use pal::vmcs::vm_entry_controls::*;
         use x86::vmx::vmcs::guest::{
-            RFLAGS as GUEST_RFLAGS,
-
-            CS_ACCESS_RIGHTS,
-            SS_ACCESS_RIGHTS,
-            DS_ACCESS_RIGHTS,
-            ES_ACCESS_RIGHTS,
-            FS_ACCESS_RIGHTS,
-            GS_ACCESS_RIGHTS,
-            TR_ACCESS_RIGHTS,
+            CS_ACCESS_RIGHTS, DS_ACCESS_RIGHTS, ES_ACCESS_RIGHTS, FS_ACCESS_RIGHTS,
+            GS_ACCESS_RIGHTS, RFLAGS as GUEST_RFLAGS, SS_ACCESS_RIGHTS, TR_ACCESS_RIGHTS,
         };
 
         self.check_vcpu_loaded()?;
@@ -761,28 +753,22 @@ impl Monitor {
             copy_host_state!(SS_SELECTOR),
             copy_host_state!(DS_SELECTOR),
             copy_host_state!(ES_SELECTOR),
-
             copy_host_state!(FS_SELECTOR),
             copy_host_state!(GS_SELECTOR),
-
             copy_host_state!(TR_SELECTOR),
-
             // > Base-address fields for FS, GS, TR, GDTR, and IDTR (64 bits
             // > each; 32 bits on processors that do not support Intel 64
             // > architecture)."
             copy_host_state!(FS_BASE),
             copy_host_state!(GS_BASE),
             copy_host_state!(TR_BASE),
-
             copy_host_state!(GDTR_BASE),
             copy_host_state!(IDTR_BASE),
-
             // > CR0, CR3, and CR4 (64 bits each; 32 bits on processors that
             // > do not support Intel 64 architecture).
             copy_host_state!(CR0),
             copy_host_state!(CR3),
             copy_host_state!(CR4),
-
             // > The following MSRs:
             // > - IA32_SYSENTER_CS (32 bits)
             // > - IA32_SYSENTER_ESP and IA32_SYSENTER_EIP
@@ -794,21 +780,14 @@ impl Monitor {
             copy_host_state!(IA32_SYSENTER_CS),
             copy_host_state!(IA32_SYSENTER_ESP),
             copy_host_state!(IA32_SYSENTER_EIP),
-
             // Conditional on whether we load those registers
             // on VM entry
             copy_host_state!(
                 load_ia32_perf_global_ctrl_is_enabled(),
                 IA32_PERF_GLOBAL_CTRL_FULL
             ),
-            copy_host_state!(
-                load_ia32_efer_is_enabled(),
-                IA32_EFER_FULL
-            ),
-            copy_host_state!(
-                load_ia32_pat_is_enabled(),
-                IA32_PAT_FULL
-            ),
+            copy_host_state!(load_ia32_efer_is_enabled(), IA32_EFER_FULL),
+            copy_host_state!(load_ia32_pat_is_enabled(), IA32_PAT_FULL),
         ];
 
         for (condition, from, to) in to_copy {
@@ -1091,7 +1070,7 @@ impl Monitor {
 
     /// Returns an mutable reference to the current-loaded VCpu.
     pub fn get_current_vcpu(&mut self) -> Option<&mut VCpu> {
-    // pub fn get_current_vcpu(&mut self) -> Option<&impl DerefMut<Target = VCpu>> {
+        // pub fn get_current_vcpu(&mut self) -> Option<&impl DerefMut<Target = VCpu>> {
         self.current_vcpu.as_mut().map(|r| &mut **r)
     }
 
@@ -1107,7 +1086,8 @@ impl Monitor {
 
         if reason == KnownExitReason::PreemptionTimerExpired {
             let vcpu = self.current_vcpu.as_ref().unwrap();
-            let timer_value = vcpu.preemption_timer
+            let timer_value = vcpu
+                .preemption_timer
                 .expect("The preemption timer value must exist");
 
             unsafe {
@@ -1135,14 +1115,17 @@ impl Monitor {
 
         // Nested errors can be confusing
         if let Err(vmfail) = &error {
-            log::error!("Error occurred while trying to read VM-instruction error: {:?}", vmfail);
+            log::error!(
+                "Error occurred while trying to read VM-instruction error: {:?}",
+                vmfail
+            );
         }
 
         match error? {
             0 => Ok(None),
-            x => {
-                Ok(Some(VmxError::VmInstructionError(VmInstructionError::new(x))))
-            }
+            x => Ok(Some(VmxError::VmInstructionError(VmInstructionError::new(
+                x,
+            )))),
         }
     }
 
@@ -1355,7 +1338,6 @@ enum VCpuState {
 
     /// Ready to be launched or resumed.
     Ready,
-
     /*
     /// Cannot be launched or resumed.
     ///
@@ -1516,8 +1498,8 @@ unsafe fn write_cr4(val: u32) {
 
 /// Returns the IDT base address.
 unsafe fn read_idt_base() -> u64 {
-    use x86::segmentation::Descriptor;
     use x86::dtables::DescriptorTablePointer;
+    use x86::segmentation::Descriptor;
 
     let mut idt_pointer = DescriptorTablePointer::<Descriptor>::default();
     x86::dtables::sidt(&mut idt_pointer);
@@ -1533,10 +1515,10 @@ mod tests {
     use x86::vmx::vmcs::control;
 
     use super::*;
+    use crate::cpu::get_current_vmm;
     use astd::cell::AtomicRefCell;
     use atest::test;
     use types::{KnownExitReason, KnownVmInstructionError};
-    use crate::cpu::get_current_vmm;
 
     pub struct VmmTestSession {
         vmm: &'static mut Monitor,
@@ -1545,7 +1527,10 @@ mod tests {
 
     impl VmmTestSession {
         /// Creates a new test session.
-        unsafe fn new(vmm: &'static mut Monitor, vcpu: &'static AtomicRefCell<VCpu>) -> VmxResult<Self> {
+        unsafe fn new(
+            vmm: &'static mut Monitor,
+            vcpu: &'static AtomicRefCell<VCpu>,
+        ) -> VmxResult<Self> {
             vmm.start()?;
 
             let mut vcpu_mut = vcpu.borrow_mut();
@@ -1553,10 +1538,7 @@ mod tests {
 
             vmm.load_vcpu(vcpu_mut)?;
 
-            Ok(Self {
-                vmm,
-                vcpu,
-            })
+            Ok(Self { vmm, vcpu })
         }
     }
 
@@ -1603,9 +1585,11 @@ mod tests {
 
     macro_rules! assert_register_eq {
         ($vmm:ident, $reg:ident, $value:expr) => {
-            let registers = $vmm.dump_guest_registers().expect("Could not dump guest context");
+            let registers = $vmm
+                .dump_guest_registers()
+                .expect("Could not dump guest context");
             assert_eq!(registers.$reg, $value);
-        }
+        };
     }
 
     unsafe extern "C" fn guest_infinite_loop() {
@@ -1629,36 +1613,44 @@ mod tests {
             "mov r13, 0x8001000000000001",
             "mov r14, 0x8010000000000001",
             "mov r15, 0x8100000000000001",
-
             "vmcall", // We will set rax to &EXPECTED_VALUES
-
             // Verify that registers have been restored correctly
-            "cmp rbx, [rax +   8]", "jne 2f",
-            "cmp rcx, [rax +  16]", "jne 2f",
-            "cmp rdx, [rax +  24]", "jne 2f",
-            "cmp rbp, [rax +  32]", "jne 2f",
-            "cmp rdi, [rax +  40]", "jne 2f",
-            "cmp rsi, [rax +  48]", "jne 2f",
-            "cmp  r8, [rax +  56]", "jne 2f",
-            "cmp  r9, [rax +  64]", "jne 2f",
-            "cmp r10, [rax +  72]", "jne 2f",
-            "cmp r11, [rax +  80]", "jne 2f",
-            "cmp r12, [rax +  88]", "jne 2f",
-            "cmp r13, [rax +  96]", "jne 2f",
-            "cmp r14, [rax + 104]", "jne 2f",
-            "cmp r15, [rax + 112]", "jne 2f",
-
+            "cmp rbx, [rax +   8]",
+            "jne 2f",
+            "cmp rcx, [rax +  16]",
+            "jne 2f",
+            "cmp rdx, [rax +  24]",
+            "jne 2f",
+            "cmp rbp, [rax +  32]",
+            "jne 2f",
+            "cmp rdi, [rax +  40]",
+            "jne 2f",
+            "cmp rsi, [rax +  48]",
+            "jne 2f",
+            "cmp  r8, [rax +  56]",
+            "jne 2f",
+            "cmp  r9, [rax +  64]",
+            "jne 2f",
+            "cmp r10, [rax +  72]",
+            "jne 2f",
+            "cmp r11, [rax +  80]",
+            "jne 2f",
+            "cmp r12, [rax +  88]",
+            "jne 2f",
+            "cmp r13, [rax +  96]",
+            "jne 2f",
+            "cmp r14, [rax + 104]",
+            "jne 2f",
+            "cmp r15, [rax + 112]",
+            "jne 2f",
             "jmp 3f",
-
             // Failure
             "2:",
             "xchg bx, bx",
             "hlt",
             "jmp 2b",
-
             // Success
             "3:",
-
             "mov rax, 0xc000000000000001",
             "cpuid",
         );
@@ -1666,8 +1658,7 @@ mod tests {
 
     /// Common code to bootstrap a simple VM.
     unsafe fn bootstrap_simple_vm() -> VmmTestSession {
-        let mut vmm = VmmTestSession::new(get_current_vmm(), &VCPU)
-            .expect("Could not start VMM");
+        let mut vmm = VmmTestSession::new(get_current_vmm(), &VCPU).expect("Could not start VMM");
 
         vmm.init_vmcs_controls()
             .expect("Could not initialize VMCS Controls");
@@ -1684,8 +1675,7 @@ mod tests {
         vmm.set_vmcs_guest_entrypoint(target, stack_end)
             .expect("Could not set guest entrypoint");
 
-        vmm.mark_vcpu_ready()
-            .expect("Could not mark vCPU as ready");
+        vmm.mark_vcpu_ready().expect("Could not mark vCPU as ready");
 
         vmm
     }
@@ -1696,8 +1686,7 @@ mod tests {
             let mut vmm = bootstrap_simple_vm();
 
             // Initial launch
-            let reason = vmm.launch_current()
-                .expect("Failed to launch VM");
+            let reason = vmm.launch_current().expect("Failed to launch VM");
 
             assert_eq!(reason, KnownExitReason::Vmcall);
             assert_register_eq!(vmm, rax, 0x8000000000000001);
@@ -1707,8 +1696,8 @@ mod tests {
             assert_register_eq!(vmm, rbp, 0x8000000000010001);
             assert_register_eq!(vmm, rdi, 0x8000000000100001);
             assert_register_eq!(vmm, rsi, 0x8000000001000001);
-            assert_register_eq!(vmm,  r8, 0x8000000010000001);
-            assert_register_eq!(vmm,  r9, 0x8000000100000001);
+            assert_register_eq!(vmm, r8, 0x8000000010000001);
+            assert_register_eq!(vmm, r9, 0x8000000100000001);
             assert_register_eq!(vmm, r10, 0x8000001000000001);
             assert_register_eq!(vmm, r11, 0x8000010000000001);
             assert_register_eq!(vmm, r12, 0x8000100000000001);
@@ -1727,8 +1716,7 @@ mod tests {
 
             // Resume
             log::debug!("Trying to resume...");
-            let reason = vmm.launch_current()
-                .expect("Failed to resume VM");
+            let reason = vmm.launch_current().expect("Failed to resume VM");
 
             assert_eq!(reason, KnownExitReason::Cpuid);
             assert_register_eq!(vmm, rax, 0xc000000000000001);
@@ -1744,13 +1732,18 @@ mod tests {
             vmx::vmwrite(control::PINBASED_EXEC_CONTROLS, u64::MAX)
                 .expect("Could not inject control value");
 
-            let launch_err = vmm.launch_current()
-                .expect_err("VM launch must fail");
+            let launch_err = vmm.launch_current().expect_err("VM launch must fail");
 
             if let VmxError::VmInstructionError(err) = launch_err {
-                assert_eq!(err, KnownVmInstructionError::VmEntryWithInvalidControlFields);
+                assert_eq!(
+                    err,
+                    KnownVmInstructionError::VmEntryWithInvalidControlFields
+                );
             } else {
-                panic!("Launch must fail with an VM-instruction error - It failed with {}", launch_err);
+                panic!(
+                    "Launch must fail with an VM-instruction error - It failed with {}",
+                    launch_err
+                );
             }
         }
     }
@@ -1769,8 +1762,7 @@ mod tests {
             vmm.set_vmcs_preemption_timer_value(Some(100))
                 .expect("Could not set preemption timer");
 
-            let reason = vmm.launch_current()
-                .expect("Failed to launch VM");
+            let reason = vmm.launch_current().expect("Failed to launch VM");
 
             assert_eq!(reason, KnownExitReason::PreemptionTimerExpired);
         }
