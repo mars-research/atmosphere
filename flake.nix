@@ -3,10 +3,9 @@
 
   inputs = {
     mars-std.url = "github:mars-research/mars-std";
-    kexec-tools.url = "github:mars-research/kexec-tools/mb2-x86-64";
   };
 
-  outputs = { self, mars-std, kexec-tools, ... }: let
+  outputs = { self, mars-std, ... }: let
     supportedSystems = [ "x86_64-linux" ];
   in mars-std.lib.eachSystem supportedSystems (system: let
     nightlyVersion = "2022-05-01";
@@ -46,8 +45,6 @@
         editorconfig-checker
 
         cachix pkgs.mars-research.mars-tools
-
-        kexec-tools.defaultPackage.${system}
 
         # Bareflank pal.py code generator
         cmake
