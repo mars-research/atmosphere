@@ -8,12 +8,6 @@ macro_rules! source {
     };
 }
 
-macro_rules! static_link {
-    ($lib: expr) => {
-        println!("cargo:rustc-link-lib=static={}", $lib);
-    };
-}
-
 fn main() {
     println!("Baking garlic bread...");
     source!("build.rs");
@@ -29,7 +23,9 @@ fn x86_64_asm(source: &str) {
     mb.file(&format!("{}/{}", arch_dir, source));
     mb.target("");
     mb.flag("-felf64");
-    mb.compile(source).unwrap();
 
-    static_link!(source);
+    let objects = mb.compile_objects().unwrap();
+    for object in objects {
+        println!("cargo:rustc-link-arg={}", object.to_str().unwrap());
+    }
 }
