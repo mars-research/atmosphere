@@ -5,8 +5,14 @@
 //! from the first hard drive. We don't put the actual
 //! kernel in the image since generating the image may
 //! be slow with large files.
+//!
+//! To build the X86 GRUB ISO on other platforms, we pass
+//! to `grub-mkrescue` the modules path containing X86 GRUB
+//! modules. This path is obtained from the `GRUB_X86_MODULES`
+//! environment variable.
 
 use std::convert::AsRef;
+use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
@@ -58,14 +64,19 @@ impl BootableImage {
             fs::copy(kernel.path(), kernel_path).await?;
         }
 
-        // actually generate the image
-        let output = Command::new("grub-mkrescue")
+        let mut command = Command::new("grub-mkrescue");
+        command
             .arg("-o")
             .arg(iso_path.as_os_str())
             .arg(source_dir.as_os_str())
-            .stderr(Stdio::piped())
-            .output()
-            .await?;
+            .stderr(Stdio::piped());
+
+        if let Ok(modules_path) = env::var("GRUB_X86_MODULES") {
+            command.args(&["-d", &modules_path]);
+        }
+
+        // actually generate the image
+        let output = command.output().await?;
 
         if output.status.success() {
             Ok(Self {

@@ -12,11 +12,13 @@
   };
 
   outputs = { self, mars-std, crane, ... }: let
-    supportedSystems = [ "x86_64-linux" ];
+    supportedSystems = [ "x86_64-linux" "aarch64-linux" ];
   in mars-std.lib.eachSystem supportedSystems (system: let
     nightlyVersion = "2022-10-20";
 
     pkgs = mars-std.legacyPackages.${system};
+    x86Pkgs = mars-std.legacyPackages.x86_64-linux;
+
     pinnedRust = pkgs.rust-bin.nightly.${nightlyVersion}.default.override {
       extensions = [ "rust-src" "rust-analyzer-preview" "clippy" ];
       targets = [ "x86_64-unknown-linux-gnu" ];
@@ -66,6 +68,9 @@
       inputsFrom = [
         self.packages.${system}.build-tool
       ];
+
+      # Used by build-tool
+      GRUB_X86_MODULES = "${x86Pkgs.grub2}/lib/grub/i386-pc";
     };
   });
 }
