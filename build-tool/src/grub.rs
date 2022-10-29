@@ -10,7 +10,7 @@ use std::convert::AsRef;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use tempfile::TempDir;
 use tokio::fs::{self, OpenOptions};
 use tokio::io::AsyncWriteExt;
@@ -53,6 +53,7 @@ impl BootableImage {
         grub_cfg.write_all(config.as_bytes()).await?;
 
         if let Some(kernel) = kernel {
+            verify_multiboot2(kernel.path()).await?;
             let kernel_path = source_dir.join("boot/atmosphere");
             fs::copy(kernel.path(), kernel_path).await?;
         }
@@ -106,4 +107,19 @@ menuentry "Atmosphere" {{
 "#,
         root, command_line
     )
+}
+
+async fn verify_multiboot2(image: &Path) -> Result<()> {
+    let status = Command::new("grub-file")
+        .arg("--is-x86-multiboot2")
+        .arg(image)
+        .status()
+        .await
+        .with_context(|| "Failed to run grub-file to verify the kernel image")?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(anyhow!("Not a valid multiboot2 image: {:?}", image))
+    }
 }
