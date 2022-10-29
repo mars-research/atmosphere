@@ -286,7 +286,7 @@ impl CNode {
     unsafe fn insert(&mut self, capability: Capability) -> Option<(usize, *const Capability)> {
         let slot = self.first_empty()?;
         let slot_opt = self.get_mut(slot).unwrap();
-        slot_opt.replace(capability);
+        *slot_opt = Some(capability); // FIXME: Align
 
         let addr = slot_opt.as_ref().unwrap() as *const Capability;
         Some((slot, addr))
