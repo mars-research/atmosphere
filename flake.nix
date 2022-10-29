@@ -45,7 +45,7 @@
       ] ++ (with pkgs; [
         gnumake utillinux cargo-expand cargo-outdated cargo-edit
 
-        gcc10 clang_10 nasm
+        nasm
         grub2 xorriso gdb
 
         qemu bochs
