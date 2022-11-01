@@ -2,9 +2,11 @@
 
 members = [
   "astd",
+  "atcp",
   "atest",
   "build-tool",
   "kernel",
   "libcap",
   "ns16550a",
+  "portman",
 ]
