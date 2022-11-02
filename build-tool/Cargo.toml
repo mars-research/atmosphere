@@ -18,6 +18,7 @@ clap_complete = "3.2.5"
 env_logger = "0.9.0"
 home = "0.5.3"
 log = { version = "0.4.14", features = [] }
+quit = "1.1.4"
 serde = { version = "1.0.147", features = ["derive"] }
 serde_json = "1.0"
 stack-sizes = "0.4.0"

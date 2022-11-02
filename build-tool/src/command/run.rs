@@ -160,11 +160,11 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
 
     match ret {
         EmulatorExit::Code(code) => {
-            std::process::exit(code);
+            quit::with_code(code);
         }
         EmulatorExit::Killed => {
             log::error!("The emulator was killed by a signal");
-            std::process::exit(1);
+            quit::with_code(1);
         }
         _ => {}
     }

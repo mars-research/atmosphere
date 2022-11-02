@@ -27,7 +27,7 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
     if !json_path.exists() {
         log::error!("The GDB connection info file doesn't exist");
         log::error!("Hint: Try `atmo run --gdb` or `cargo run -- --gdb`");
-        std::process::exit(1);
+        quit::with_code(1);
     }
 
     let json = fs::read(&json_path).await?;
@@ -37,11 +37,11 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
 
     if let Some(code) = status.code() {
         if code != 0 {
-            std::process::exit(code);
+            quit::with_code(code);
         }
     } else if let Some(signal) = status.signal() {
         log::error!("GDB was killed by signal {}", signal);
-        std::process::exit(1);
+        quit::with_code(1);
     }
 
     Ok(())

@@ -18,6 +18,7 @@ mod grub;
 mod project;
 
 #[tokio::main]
+#[quit::main]
 async fn main() -> Result<(), anyhow::Error> {
     init_logging();
     command::run().await
