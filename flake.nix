@@ -44,6 +44,7 @@
         pinnedRust
 
         self.packages.${system}.build-tool
+        pkgs.mars-research.mars-tools
       ] ++ (with pkgs; [
         gnumake utillinux cargo-expand cargo-outdated cargo-edit
 
@@ -56,13 +57,7 @@
 
         editorconfig-checker
 
-        cachix pkgs.mars-research.mars-tools
-
-        # Bareflank pal.py code generator
-        cmake
-      ]) ++ (with pkgs.python3Packages; [
-        # Bareflank pal.py code generator
-        lxml pyyaml colorama
+        cachix
       ]);
 
       inputsFrom = [

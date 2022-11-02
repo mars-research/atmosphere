@@ -171,6 +171,7 @@ impl GdtEntry {
     }
 
     /// Returns the "Access Bytes" that VMX wants.
+    #[allow(dead_code)] // TODO: Now dead because the VMX subsystem was removed
     pub fn access_bytes(&self) -> u32 {
         let flags = self.flags_limith & 0b11110000;
         (self.access as u32) | ((flags as u32) << 8)
@@ -215,6 +216,7 @@ impl BigGdtEntry {
     }
 
     /// Returns the "Access Bytes" that VMX wants.
+    #[allow(dead_code)] // TODO: Now dead because the VMX subsystem was removed
     pub fn access_bytes(&self) -> u32 {
         let flags = self.flags_limith & 0b11110000;
         (self.access_type as u32) | ((flags as u32) << 8)

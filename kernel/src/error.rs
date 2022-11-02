@@ -5,15 +5,11 @@ pub type Result<T> = core::result::Result<T, Error>;
 use displaydoc::Display;
 
 use crate::boot::command_line::Component as CommandLineComponent;
-use crate::vmx::VmxError;
 
 /// An error.
 #[non_exhaustive]
 #[derive(Clone, Debug, Display)]
 pub enum Error {
-    /// VT-x subsystem error: {0}
-    Vmx(VmxError),
-
     /// No such script is defined.
     NoSuchScript,
 
@@ -25,10 +21,4 @@ pub enum Error {
 
     /// Other error.
     Other(&'static str),
-}
-
-impl From<VmxError> for Error {
-    fn from(error: VmxError) -> Self {
-        Self::Vmx(error)
-    }
 }

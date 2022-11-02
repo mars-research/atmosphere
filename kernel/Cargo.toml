@@ -23,11 +23,5 @@ num-traits = { version = "0.2.14", default-features = false }
 realjump = "0.2.0"
 x86 = "0.47.0"
 
-[dependencies.pal]
-git = "https://github.com/mars-research/pal"
-rev = "36802117b2eb78088719a4178e0caa1b91cc856a"
-default-features = false
-features = [ "intel_64bit_systemv_nasm" ]
-
 [build-dependencies]
 nasm-rs = "0.2.4"
