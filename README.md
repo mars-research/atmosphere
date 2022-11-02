@@ -2,7 +2,7 @@
 
 [![Kernel](https://github.com/mars-research/atmosphere/actions/workflows/kernel.yml/badge.svg)](https://github.com/mars-research/atmosphere/actions/workflows/kernel.yml)
 
-Atmosphere is a Type-1 hypervisor for Intel x86-64, written in Rust.
+Atmosphere is a proving ground for novel isolation techniques and formal verification, written in Rust.
 It's inspired by the design of [seL4](https://sel4.systems/Info/Docs/seL4-manual-latest.pdf), where memory for kernel objects is not dynamically allocated by the microkernel.
 
 ## Development Setup
@@ -12,7 +12,6 @@ With Nix installed, enter the prepared nix-shell environment with `nix-shell` or
 
 You can now build and run Atmosphere with `cd kernel && cargo run`.
 The kernel test cases can be run with `cargo test`.
-To run the kernel on QEMU with KVM and nested virtualization, use `atmo run --qemu` or `cargo run -- --qemu` (see [Atmo](#atmo) for more information).
 
 The kernel has a set of "debug scripts" which can be run with `atmo run --script=NAME`.
 
