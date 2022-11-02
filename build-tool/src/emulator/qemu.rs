@@ -60,7 +60,6 @@ impl Emulator for Qemu {
 
         let mut command = Command::new(self.qemu_binary.as_os_str());
         command
-            .arg("-enable-kvm")
             .arg("-nographic")
             .args(&["-serial", "mon:stdio"])
             // .args(&["-serial", "file:serial.log"])
@@ -76,6 +75,10 @@ impl Emulator for Qemu {
                 ),
             ])
             .args(config.cpu_model.to_qemu()?);
+
+        if config.use_virtualization {
+            command.arg("-enable-kvm");
+        }
 
         if config.suppress_initial_outputs {
             command.stdout(Stdio::piped());

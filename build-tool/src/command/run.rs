@@ -29,6 +29,12 @@ pub struct Opts {
     #[clap(long = "cmdline")]
     command_line: Option<String>,
 
+    /// Whether to use KVM.
+    ///
+    /// This only has an effect for QEMU.
+    #[clap(long)]
+    kvm: bool,
+
     /// Whether to enable the Bochs debugger.
     ///
     /// This only has an effect for Bochs.
@@ -83,6 +89,7 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
     };
 
     let mut run_config = RunConfiguration::default();
+    run_config.use_virtualization(local.kvm);
     run_config.auto_shutdown(!local.no_shutdown);
 
     if let Some(cpu_model) = local.cpu_model {
