@@ -29,19 +29,19 @@ pub struct Opts {
     #[clap(long = "cmdline")]
     command_line: Option<String>,
 
-    /// Whether to enable the debugger.
-    #[clap(long)]
+    /// Whether to enable the Bochs debugger.
+    ///
+    /// This only has an effect for Bochs.
+    #[clap(long, hidden = true)]
     debugger: bool,
 
     /// Whether to enable the GDB server.
     #[clap(long)]
     gdb: bool,
 
-    /// Whether to use QEMU.
-    ///
-    /// KVM on an Intel machine with nested virtualization is required.
+    /// Whether to use Bochs.
     #[clap(long)]
-    qemu: bool,
+    bochs: bool,
 
     /// Whether to emit full output from the emulator.
     #[clap(long)]
@@ -102,7 +102,7 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
     }
 
     if local.debugger {
-        if local.qemu {
+        if !local.bochs {
             unimplemented!();
         }
 
@@ -114,19 +114,19 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
 
     // FIXME: Make this configurable
     if local.gdb {
-        let gdb_server = if local.qemu {
+        let gdb_server = if local.bochs {
+            GdbServer::Tcp(1234)
+        } else {
             // Use Unix Domain Socket
             let socket_path = run_dir.path().join("gdb.sock").to_owned();
             GdbServer::Unix(socket_path)
-        } else {
-            GdbServer::Tcp(1234)
         };
 
         run_config.gdb_server(gdb_server.clone());
         run_config.freeze_on_startup(true);
 
-        if !local.qemu {
-            unimplemented!("GDB support for Bochs not implemented yet - use QEMU with --qemu")
+        if local.bochs {
+            unimplemented!("GDB support for Bochs not implemented yet")
         }
 
         // Save connection info to `.gdb`
@@ -143,10 +143,10 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
         log::warn!("Run `atmo gdb` in another terminal. Execution will be frozen until you continue in the debugger.");
     }
 
-    let mut emulator: Box<dyn Emulator> = if local.qemu {
-        Box::new(Qemu::new(project.clone()))
-    } else {
+    let mut emulator: Box<dyn Emulator> = if local.bochs {
         Box::new(Bochs::new(project.clone()))
+    } else {
+        Box::new(Qemu::new(project.clone()))
     };
     // let mut qemu = Qemu::new(project.clone());
     let ret = emulator.run(&run_config, &kernel).await?;
