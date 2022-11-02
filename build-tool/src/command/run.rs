@@ -2,10 +2,15 @@
 
 use std::path::PathBuf;
 
+use anyhow::Context;
 use clap::Parser;
+use tempfile::Builder as TempfileBuilder;
+use tokio::fs;
 
 use super::{GlobalOpts, SubCommand};
-use crate::emulator::{Bochs, CpuModel, Emulator, EmulatorExit, GdbServer, Qemu, RunConfiguration};
+use crate::emulator::{
+    Bochs, CpuModel, Emulator, EmulatorExit, GdbConnectionInfo, GdbServer, Qemu, RunConfiguration,
+};
 use crate::error::Result;
 use crate::project::{Binary, BuildOptions, Project};
 
@@ -29,7 +34,7 @@ pub struct Opts {
     debugger: bool,
 
     /// Whether to enable the GDB server.
-    #[clap(long, hidden = true)]
+    #[clap(long)]
     gdb: bool,
 
     /// Whether to use QEMU.
@@ -105,18 +110,37 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
         run_config.freeze_on_startup(true);
     }
 
+    let run_dir = TempfileBuilder::new().prefix("atmo-run-").tempdir()?;
+
     // FIXME: Make this configurable
     if local.gdb {
-        if local.qemu {
+        let gdb_server = if local.qemu {
             // Use Unix Domain Socket
-            unimplemented!()
+            let socket_path = run_dir.path().join("gdb.sock").to_owned();
+            GdbServer::Unix(socket_path)
         } else {
-            run_config.gdb_server(GdbServer::Tcp(1234));
-        }
+            GdbServer::Tcp(1234)
+        };
 
+        run_config.gdb_server(gdb_server.clone());
         run_config.freeze_on_startup(true);
 
-        panic!("Not implemented yet")
+        if !local.qemu {
+            unimplemented!("GDB support for Bochs not implemented yet - use QEMU with --qemu")
+        }
+
+        // Save connection info to `.gdb`
+        let gdb_info = GdbConnectionInfo::new(kernel.path().to_owned(), gdb_server);
+        let json_path = project.gdb_info_path();
+        let json = serde_json::to_vec(&gdb_info)?;
+
+        if json_path.exists() {
+            log::warn!("GDB connection info file already exists - Overwriting");
+        }
+
+        fs::write(&json_path, json).await?;
+
+        log::warn!("Run `atmo gdb` in another terminal. Execution will be frozen until you continue in the debugger.");
     }
 
     let mut emulator: Box<dyn Emulator> = if local.qemu {
@@ -126,6 +150,13 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
     };
     // let mut qemu = Qemu::new(project.clone());
     let ret = emulator.run(&run_config, &kernel).await?;
+
+    if local.gdb {
+        let json_path = project.gdb_info_path();
+        fs::remove_file(&json_path)
+            .await
+            .with_context(|| "Failed to remove GDB connection info JSON")?;
+    }
 
     match ret {
         EmulatorExit::Code(code) => {
@@ -137,6 +168,8 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
         }
         _ => {}
     }
+
+    drop(run_dir);
 
     Ok(())
 }

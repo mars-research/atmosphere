@@ -227,6 +227,8 @@ dependencies = [
  "env_logger",
  "home",
  "log",
+ "serde",
+ "serde_json",
  "stack-sizes",
  "tempfile",
  "tokio",

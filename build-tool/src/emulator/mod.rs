@@ -1,10 +1,10 @@
 //! Emulators/Virtualizers.
 
 pub mod bochs;
+pub mod gdb;
 mod output_filter;
 pub mod qemu;
 
-use std::path::PathBuf;
 use std::str::FromStr;
 
 use anyhow::anyhow;
@@ -14,6 +14,7 @@ use byte_unit::{Byte, ByteUnit};
 use crate::error::{Error, Result};
 use crate::project::Binary;
 pub use bochs::Bochs;
+pub use gdb::{GdbConnectionInfo, GdbServer};
 pub use qemu::Qemu;
 
 #[async_trait]
@@ -175,15 +176,4 @@ pub enum EmulatorExit {
 
     /// The emulator exited with a code.
     Code(i32),
-}
-
-/// GDB server configurations.
-#[allow(dead_code)]
-#[derive(Debug)]
-pub enum GdbServer {
-    /// Listen on a Unix socket.
-    Unix(PathBuf),
-
-    /// Listen on a TCP port.
-    Tcp(u16),
 }
