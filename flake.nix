@@ -29,6 +29,10 @@
     };
 
     craneLib = (crane.mkLib pkgs).overrideToolchain pinnedRust;
+
+    verus = pkgs.callPackage ./verus {
+      inherit crane;
+    };
   in {
     packages = {
       build-tool = craneLib.buildPackage {
@@ -37,6 +41,9 @@
         buildInputs = [ pkgs.openssl ];
         nativeBuildInputs = [ pkgs.pkg-config ];
       };
+      rustc-verus = verus.rustc;
+      cargo-verus = verus.cargo;
+      verus = verus.verus;
     };
 
     devShell = pkgs.mkShell {
@@ -58,6 +65,9 @@
         editorconfig-checker
 
         cachix
+
+        verus.z3
+        verus.verus
       ]);
 
       inputsFrom = [
