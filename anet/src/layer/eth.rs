@@ -1,4 +1,4 @@
-use thingbuf::mpsc::{Sender, Receiver};
+use thingbuf::mpsc::{Receiver, Sender};
 
 use crate::util::{MacAddress, RawPacket};
 
@@ -14,8 +14,16 @@ pub struct EthernetLayer {
 }
 
 impl EthernetLayer {
-    pub fn new(endpoint: MacAddress, tx_queue: Sender<RawPacket>, rx_dequeue: Receiver<RawPacket>) -> Self {
-        Self { endpoint, tx_queue, rx_dequeue }
+    pub fn new(
+        endpoint: MacAddress,
+        tx_queue: Sender<RawPacket>,
+        rx_dequeue: Receiver<RawPacket>,
+    ) -> Self {
+        Self {
+            endpoint,
+            tx_queue,
+            rx_dequeue,
+        }
     }
 
     pub fn enqueue_packet<F>(&self, f: F) -> Result<usize, ()>

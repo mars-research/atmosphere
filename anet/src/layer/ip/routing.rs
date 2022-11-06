@@ -8,9 +8,7 @@ pub struct RoutingTable {
 
 impl RoutingTable {
     pub fn new() -> Self {
-        Self {
-            trie: Trie::new(),
-        }
+        Self { trie: Trie::new() }
     }
 
     pub fn resolve(&self, dest: Ipv4Address) -> Ipv4Address {
@@ -24,11 +22,8 @@ struct Trie {
 
 impl Trie {
     fn new() -> Self {
-        Self {
-            root: TrieNode {},
-        }
+        Self { root: TrieNode {} }
     }
 }
 
-struct TrieNode {
-}
+struct TrieNode {}

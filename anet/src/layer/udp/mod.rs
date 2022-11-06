@@ -11,10 +11,10 @@ pub struct UdpLayer {
 
 impl UdpLayer {
     pub fn new(endpoint: Port, lower: Arc<Ipv4Layer>) -> Self {
-        Self { endpoint,lower }
+        Self { endpoint, lower }
     }
 
-    pub fn send_packet<F>(&self, addr: SocketAddress, f: F) -> Result<usize, ()> 
+    pub fn send_packet<F>(&self, addr: SocketAddress, f: F) -> Result<usize, ()>
     where
         F: FnOnce(&mut [u8]) -> usize,
     {
@@ -22,7 +22,9 @@ impl UdpLayer {
             buf[0..2].copy_from_slice(&self.endpoint.to_be_bytes());
             buf[2..4].copy_from_slice(&addr.port.to_be_bytes());
 
-            let udp_payload_len: u16 = f(&mut buf[8..]).try_into().expect("udp payload len overflowed");
+            let udp_payload_len: u16 = f(&mut buf[8..])
+                .try_into()
+                .expect("udp payload len overflowed");
 
             buf[4..6].copy_from_slice(&udp_payload_len.to_be_bytes());
 

@@ -22,13 +22,14 @@ pub struct SocketAddress {
 }
 
 impl SocketAddress {
-    pub fn new(ip: Ipv4Address, port: Port) -> Self { Self { ip, port } }
+    pub fn new(ip: Ipv4Address, port: Port) -> Self {
+        Self { ip, port }
+    }
 }
 
 #[cfg(not(test))]
 #[derive(Clone)]
 pub struct RawPacket(pub [u8; 1518]);
-
 
 impl Default for RawPacket {
     fn default() -> Self {

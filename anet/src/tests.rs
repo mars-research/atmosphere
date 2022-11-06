@@ -2,16 +2,24 @@
 
 use alloc::sync::Arc;
 
-use crate::{stack::udp::UdpStack, util::{Ipv4Address, MacAddress, SocketAddress}, arp::ArpTable};
+use crate::{
+    arp::ArpTable,
+    stack::udp::UdpStack,
+    util::{Ipv4Address, MacAddress, SocketAddress},
+};
 
-use pnet::packet::{ethernet::EthernetPacket, ipv4::Ipv4Packet, Packet, udp::UdpPacket};
+use pnet::packet::{ethernet::EthernetPacket, ipv4::Ipv4Packet, udp::UdpPacket, Packet};
 
 #[test]
 pub fn test_udp_stack() -> Result<(), ()> {
-
     let arp_table = Arc::new(ArpTable::new());
 
-    let stack = UdpStack::new(8000, Ipv4Address::new([192, 168, 64, 9]), MacAddress::new([0x4a, 0xe4, 0x6e, 0x5f, 0xd4, 0xf0]), arp_table);
+    let stack = UdpStack::new(
+        8000,
+        Ipv4Address::new([192, 168, 64, 9]),
+        MacAddress::new([0x4a, 0xe4, 0x6e, 0x5f, 0xd4, 0xf0]),
+        arp_table,
+    );
 
     let dst = SocketAddress::new(Ipv4Address::new([8, 8, 8, 8]), 8000);
 
@@ -27,13 +35,12 @@ pub fn test_udp_stack() -> Result<(), ()> {
 
     println!("{:?}", packet);
 
-    
     let eth = dbg!(EthernetPacket::new(&packet.0).expect("invalid ethernet header"));
 
     let ipv4 = dbg!(Ipv4Packet::new(eth.payload()).expect("invalid ipv4 header"));
 
     println!("{:?}", ipv4.payload());
-    
+
     let udp = dbg!(UdpPacket::new(ipv4.payload()).expect("invalid udp header"));
 
     assert_eq!(udp.payload(), data);
