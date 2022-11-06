@@ -1,22 +1,39 @@
-use alloc::{collections::VecDeque, sync::Arc, vec::Vec};
+use alloc::sync::Arc;
+use thingbuf::mpsc::{Sender, Receiver};
 
-use crate::address::{MacAddress, Ipv4Address, Port};
 use crate::arp::ArpTable;
-use crate::layer::{eth::EthernetLayer, eth::Nic, ip::Ipv4Layer, udp::UdpLayer};
+use crate::layer::{eth::EthernetLayer, ip::Ipv4Layer, udp::UdpLayer};
+use crate::util::{Port, Ipv4Address, MacAddress, RawPacket, SocketAddress};
 
 pub struct UdpStack {
     udp: Arc<UdpLayer>,
+    pub(crate) tx_dequeue: Receiver<RawPacket>,
+    pub(crate) rx_queue: Sender<RawPacket>,
 }
 
 impl UdpStack {
-    pub fn new(udp_port: Port, ipv4_addr: Ipv4Address, mac_addr: MacAddress, nic: Arc<Nic>, arp_table: Arc<ArpTable>) -> Self {
-        let eth_layer = Arc::new(EthernetLayer::new(mac_addr));
+    pub fn new(udp_port: Port, ipv4_addr: Ipv4Address, mac_addr: MacAddress, arp_table: Arc<ArpTable>) -> Self {
+        let (tx_queue, tx_dequeue) = thingbuf::mpsc::channel(32);
+        let (rx_queue, rx_dequeue) = thingbuf::mpsc::channel(32);
+
+        let eth_layer = Arc::new(EthernetLayer::new(mac_addr, tx_queue, rx_dequeue));
         let ipv4_layer = Arc::new(Ipv4Layer::new(ipv4_addr, arp_table, eth_layer.clone()));
         let udp_layer = Arc::new(UdpLayer::new(udp_port, ipv4_layer.clone()));
 
+
         Self {
             udp: udp_layer,
+            tx_dequeue,
+            rx_queue,
         }
+    }
+
+    pub fn send<F>(&self, dst: SocketAddress, payload: F) -> Result<usize, ()>
+    where
+        F: FnOnce(&mut [u8]) -> usize,
+    {
+        // TODO: ideally, do fragmentation here
+        self.udp.send_packet(dst, payload)
     }
 
     pub fn run() {

@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use crate::address::{Port, SocketAddress};
+use crate::util::{Port, SocketAddress};
 
 use super::ip::Ipv4Layer;
 

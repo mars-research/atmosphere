@@ -1,26 +1,6 @@
-use core::cell::RefCell;
+use thingbuf::mpsc::{Sender, Receiver};
 
-use alloc::{
-    sync::Arc,
-    vec::Vec, collections::VecDeque,
-};
-
-// use pnet::packet::ethernet::EthernetPacket;
-
-use crate::address::MacAddress;
-
-// Replace with actual NIC
-pub struct Nic;
-
-impl Nic {
-    pub fn recv(&self) -> (&[u8], Vec<u8>) {
-        todo!()
-    }
-
-    pub fn send(&self, buffer: Vec<u8>, payload: &[u8]) {
-        todo!()
-    }
-}
+use crate::util::{MacAddress, RawPacket};
 
 pub enum EtherType {
     Ipv4 = 0x800,
@@ -29,27 +9,24 @@ pub enum EtherType {
 
 pub struct EthernetLayer {
     endpoint: MacAddress,
-    rx_queue: RefCell<VecDeque<[u8; 1514]>>,
-    tx_queue: RefCell<VecDeque<[u8; 1514]>>,
+    tx_queue: Sender<RawPacket>,
+    rx_dequeue: Receiver<RawPacket>,
 }
 
 impl EthernetLayer {
-    pub fn new(endpoint: MacAddress) -> Self {
-        let tx_queue = RefCell::new(VecDeque::new());
-        let rx_queue = RefCell::new(VecDeque::new());
-
-        Self { endpoint, tx_queue, rx_queue }
+    pub fn new(endpoint: MacAddress, tx_queue: Sender<RawPacket>, rx_dequeue: Receiver<RawPacket>) -> Self {
+        Self { endpoint, tx_queue, rx_dequeue }
     }
 
     pub fn enqueue_packet<F>(&self, f: F) -> Result<usize, ()>
     where
         F: FnOnce(&mut [u8]) -> usize,
     {
-        let mut packet_buf: [u8; 1514] = [0; 1514];
+        let mut raw_packet = RawPacket::default();
 
-        let packet_size = f(&mut packet_buf);
+        let packet_size = f(&mut raw_packet.0);
 
-        self.tx_queue.borrow_mut().push_back(packet_buf);
+        self.tx_queue.try_send(raw_packet).map_err(|_| ())?;
 
         Ok(packet_size)
     }

@@ -2,8 +2,14 @@
 
 extern crate alloc;
 
-pub mod address;
 pub mod arp;
 pub mod layer;
 pub mod stack;
-pub(crate) mod tests;
+pub mod util;
+
+#[cfg(test)]
+#[macro_use]
+extern crate std;
+
+#[cfg(test)]
+mod tests;
