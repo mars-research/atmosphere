@@ -1,14 +1,14 @@
 #![deny(
     asm_sub_register,
-    dead_code,
     deprecated,
     missing_abi,
     rustdoc::bare_urls,
-    unused_imports,
     unused_must_use,
-    unused_mut,
-    unused_unsafe,
-    unused_variables
+    unused_unsafe
+)]
+#![cfg_attr(
+    not(debug_assertions),
+    deny(dead_code, unused_imports, unused_mut, unused_variables)
 )]
 
 mod command;
@@ -17,9 +17,8 @@ mod error;
 mod grub;
 mod project;
 
-// use std::env;
-
 #[tokio::main]
+#[quit::main]
 async fn main() -> Result<(), anyhow::Error> {
     init_logging();
     command::run().await

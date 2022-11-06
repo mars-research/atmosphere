@@ -43,7 +43,6 @@ mod logging;
 mod memory;
 mod scripts;
 mod utils;
-mod vmx;
 
 use core::panic::PanicInfo;
 

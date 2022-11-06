@@ -1,6 +1,6 @@
 //! Memory management.
 
-use x86::bits64::paging::{PAddr, VAddr};
+// use x86::bits64::paging::{PAddr, VAddr};
 
 use astd::collections::vec::Vec;
 use astd::sync::Mutex;
@@ -14,11 +14,6 @@ pub fn get_virtual(physical: PAddr) -> VAddr {
     physical.as_usize().into()
 }
 */
-
-/// Returns the physical address for a virtual address in the kernel.
-pub fn get_physical(r#virtual: VAddr) -> PAddr {
-    r#virtual.as_usize().into()
-}
 
 /// Returns the end of the kernel.
 pub fn get_kernel_end() -> u64 {

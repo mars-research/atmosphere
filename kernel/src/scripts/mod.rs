@@ -5,7 +5,6 @@
 
 mod cap_test;
 mod fail_test;
-mod vmx_test;
 
 use crate::boot;
 use crate::error::{Error, Result};
@@ -31,7 +30,6 @@ macro_rules! match_script {
 pub unsafe fn run_script(script: &str) -> Result<()> {
     match_script!("cap_test", cap_test::run, script);
     match_script!("fail_test", fail_test::run, script);
-    match_script!("vmx_test", vmx_test::run, script);
 
     log::error!("Script {} does not exist", script);
     Err(Error::NoSuchScript)

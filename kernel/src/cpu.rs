@@ -3,7 +3,6 @@
 //! The [`Cpu`] data structure is set as the `GS` base on the CPU.
 //! It currently consists of the following:
 //!
-//! - VMXON region
 //! - GDT
 //! - TSS
 //! - IST stack spaces
@@ -12,20 +11,19 @@
 //! CPUs are provided by Cpu capabilities.
 
 use core::arch::asm;
-use core::mem::{self, MaybeUninit};
+use core::mem::MaybeUninit;
 use core::ptr;
 
 use x86::apic::xapic::XAPIC;
 use x86::msr;
 
 use crate::gdt::{GlobalDescriptorTable, IstStack, TaskStateSegment};
-use crate::vmx::{Monitor, Vmxon};
 
 /// Per-processor data for CPU 0.
 static mut CPU0: Cpu = Cpu::new();
 
 /// Offset of GS where the pointer to `Cpu` is stored.
-const GS_SELF_PTR_OFFSET: usize = mem::size_of::<Vmxon>() as usize;
+const GS_SELF_PTR_OFFSET: usize = 0;
 
 /// Returns a handle to the current CPU's data structure.
 pub fn get_current() -> &'static mut Cpu {
@@ -44,20 +42,14 @@ pub fn get_current() -> &'static mut Cpu {
     unsafe { &mut *address }
 }
 
-/// Returns a handle to the current CPU's VMM.
-pub fn get_current_vmm() -> &'static mut Monitor {
-    let cpu = get_current();
-
-    unsafe { cpu.vmm.assume_init_mut() }
-}
-
 /// Per-processor data for a CPU.
 #[repr(align(4096))]
 pub struct Cpu {
     // WARNING: If you change the position of `self_ptr`, you must also
     // change `GS_SELF_PTR_OFFSET` above!
-    /// The VMXON region.
-    pub vmxon: Vmxon,
+
+    // Previously, the VMXON region was stored here. Now there is nothing.
+    // Put things that require page-alignment here.
 
     // WARNING: If you change the position of `self_ptr`, you must also
     // change `GS_SELF_PTR_OFFSET` above!
@@ -69,9 +61,6 @@ pub struct Cpu {
 
     /// State for the xAPIC driver.
     pub xapic: MaybeUninit<XAPIC>,
-
-    /// State for the VMM.
-    pub vmm: MaybeUninit<Monitor>,
 
     /// The Global Descriptor Table.
     ///
@@ -91,10 +80,8 @@ unsafe impl Sync for Cpu {}
 impl Cpu {
     pub const fn new() -> Self {
         Self {
-            vmxon: Vmxon::new(),
             self_ptr: ptr::null(),
             xapic: MaybeUninit::uninit(),
-            vmm: MaybeUninit::uninit(),
             gdt: GlobalDescriptorTable::empty(),
             tss: TaskStateSegment::new(),
             ist: [
@@ -117,7 +104,6 @@ pub unsafe fn init_cpu0() {
     let address = &CPU0 as *const Cpu;
 
     CPU0.self_ptr = address;
-    CPU0.vmm.write(Monitor::new(&mut CPU0.vmxon));
 
     msr::wrmsr(msr::IA32_GS_BASE, address as u64);
 }

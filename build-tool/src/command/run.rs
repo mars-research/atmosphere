@@ -2,10 +2,15 @@
 
 use std::path::PathBuf;
 
+use anyhow::Context;
 use clap::Parser;
+use tempfile::Builder as TempfileBuilder;
+use tokio::fs;
 
 use super::{GlobalOpts, SubCommand};
-use crate::emulator::{Bochs, CpuModel, Emulator, EmulatorExit, GdbServer, Qemu, RunConfiguration};
+use crate::emulator::{
+    Bochs, CpuModel, Emulator, EmulatorExit, GdbConnectionInfo, GdbServer, Qemu, RunConfiguration,
+};
 use crate::error::Result;
 use crate::project::{Binary, BuildOptions, Project};
 
@@ -24,19 +29,25 @@ pub struct Opts {
     #[clap(long = "cmdline")]
     command_line: Option<String>,
 
-    /// Whether to enable the debugger.
+    /// Whether to use KVM.
+    ///
+    /// This only has an effect for QEMU.
     #[clap(long)]
+    kvm: bool,
+
+    /// Whether to enable the Bochs debugger.
+    ///
+    /// This only has an effect for Bochs.
+    #[clap(long, hidden = true)]
     debugger: bool,
 
     /// Whether to enable the GDB server.
-    #[clap(long, hidden = true)]
+    #[clap(long)]
     gdb: bool,
 
-    /// Whether to use QEMU.
-    ///
-    /// KVM on an Intel machine with nested virtualization is required.
+    /// Whether to use Bochs.
     #[clap(long)]
-    qemu: bool,
+    bochs: bool,
 
     /// Whether to emit full output from the emulator.
     #[clap(long)]
@@ -78,6 +89,7 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
     };
 
     let mut run_config = RunConfiguration::default();
+    run_config.use_virtualization(local.kvm);
     run_config.auto_shutdown(!local.no_shutdown);
 
     if let Some(cpu_model) = local.cpu_model {
@@ -97,7 +109,7 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
     }
 
     if local.debugger {
-        if local.qemu {
+        if !local.bochs {
             unimplemented!();
         }
 
@@ -105,38 +117,66 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
         run_config.freeze_on_startup(true);
     }
 
+    let run_dir = TempfileBuilder::new().prefix("atmo-run-").tempdir()?;
+
     // FIXME: Make this configurable
     if local.gdb {
-        if local.qemu {
-            // Use Unix Domain Socket
-            unimplemented!()
+        let gdb_server = if local.bochs {
+            GdbServer::Tcp(1234)
         } else {
-            run_config.gdb_server(GdbServer::Tcp(1234));
-        }
+            // Use Unix Domain Socket
+            let socket_path = run_dir.path().join("gdb.sock").to_owned();
+            GdbServer::Unix(socket_path)
+        };
 
+        run_config.gdb_server(gdb_server.clone());
         run_config.freeze_on_startup(true);
 
-        panic!("Not implemented yet")
+        if local.bochs {
+            unimplemented!("GDB support for Bochs not implemented yet")
+        }
+
+        // Save connection info to `.gdb`
+        let gdb_info = GdbConnectionInfo::new(kernel.path().to_owned(), gdb_server);
+        let json_path = project.gdb_info_path();
+        let json = serde_json::to_vec(&gdb_info)?;
+
+        if json_path.exists() {
+            log::warn!("GDB connection info file already exists - Overwriting");
+        }
+
+        fs::write(&json_path, json).await?;
+
+        log::warn!("Run `atmo gdb` in another terminal. Execution will be frozen until you continue in the debugger.");
     }
 
-    let mut emulator: Box<dyn Emulator> = if local.qemu {
-        Box::new(Qemu::new(project.clone()))
-    } else {
+    let mut emulator: Box<dyn Emulator> = if local.bochs {
         Box::new(Bochs::new(project.clone()))
+    } else {
+        Box::new(Qemu::new(project.clone()))
     };
     // let mut qemu = Qemu::new(project.clone());
     let ret = emulator.run(&run_config, &kernel).await?;
 
+    if local.gdb {
+        let json_path = project.gdb_info_path();
+        fs::remove_file(&json_path)
+            .await
+            .with_context(|| "Failed to remove GDB connection info JSON")?;
+    }
+
     match ret {
         EmulatorExit::Code(code) => {
-            std::process::exit(code);
+            quit::with_code(code);
         }
         EmulatorExit::Killed => {
             log::error!("The emulator was killed by a signal");
-            std::process::exit(1);
+            quit::with_code(1);
         }
         _ => {}
     }
+
+    drop(run_dir);
 
     Ok(())
 }

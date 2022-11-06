@@ -1,10 +1,10 @@
 //! Emulators/Virtualizers.
 
 pub mod bochs;
+pub mod gdb;
 mod output_filter;
 pub mod qemu;
 
-use std::path::PathBuf;
 use std::str::FromStr;
 
 use anyhow::anyhow;
@@ -14,6 +14,7 @@ use byte_unit::{Byte, ByteUnit};
 use crate::error::{Error, Result};
 use crate::project::Binary;
 pub use bochs::Bochs;
+pub use gdb::{GdbConnectionInfo, GdbServer};
 pub use qemu::Qemu;
 
 #[async_trait]
@@ -26,6 +27,12 @@ pub trait Emulator {
 pub struct RunConfiguration {
     /// Memory for the virtual machine.
     memory: Byte,
+
+    /// Use hardware-accelerated virtualization.
+    ///
+    /// The behavior depends on the emulator in use. Currently we only
+    /// support QEMU-KVM.
+    use_virtualization: bool,
 
     /// The emulated CPU model.
     cpu_model: CpuModel,
@@ -67,6 +74,12 @@ impl RunConfiguration {
     /// Set the kernel command-line.
     pub fn command_line(&mut self, cmdline: String) -> &mut Self {
         self.command_line = cmdline;
+        self
+    }
+
+    /// Set whether to use hardware virtualization.
+    pub fn use_virtualization(&mut self, use_virtualization: bool) -> &mut Self {
+        self.use_virtualization = use_virtualization;
         self
     }
 
@@ -124,6 +137,7 @@ impl Default for RunConfiguration {
     fn default() -> Self {
         Self {
             memory: Byte::from_unit(2.0f64, ByteUnit::GiB).unwrap(),
+            use_virtualization: false,
             cpu_model: CpuModel::Haswell,
             script: None,
             command_line: String::new(),
@@ -175,15 +189,4 @@ pub enum EmulatorExit {
 
     /// The emulator exited with a code.
     Code(i32),
-}
-
-/// GDB server configurations.
-#[allow(dead_code)]
-#[derive(Debug)]
-pub enum GdbServer {
-    /// Listen on a Unix socket.
-    Unix(PathBuf),
-
-    /// Listen on a TCP port.
-    Tcp(u16),
 }

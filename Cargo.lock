@@ -115,7 +115,6 @@ dependencies = [
  "num",
  "num-derive",
  "num-traits",
- "pal",
  "realjump",
  "x86",
 ]
@@ -239,6 +238,9 @@ dependencies = [
  "env_logger",
  "home",
  "log",
+ "quit",
+ "serde",
+ "serde_json",
  "stack-sizes",
  "tempfile",
  "tokio",
@@ -567,12 +569,6 @@ dependencies = [
  "openssl",
  "winapi",
 ]
-
-[[package]]
-name = "cty"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b365fabc795046672053e29c954733ec3b05e4be654ab130fe8f1f94d7051f35"
 
 [[package]]
 name = "curl"
@@ -1343,15 +1339,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3baf96e39c5359d2eb0dd6ccb42c62b91d9678aa68160d261b9e0ccbf9e9dea9"
 
 [[package]]
-name = "pal"
-version = "0.1.0"
-source = "git+https://github.com/mars-research/pal?rev=36802117b2eb78088719a4178e0caa1b91cc856a#36802117b2eb78088719a4178e0caa1b91cc856a"
-dependencies = [
- "cty",
- "pkg-config",
-]
-
-[[package]]
 name = "parking_lot"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1547,6 +1534,21 @@ checksum = "5ea3d908b0e36316caf9e9e2c4625cdde190a7e6f440d794667ed17a1855e725"
 dependencies = [
  "unicode-ident",
 ]
+
+[[package]]
+name = "quit"
+version = "1.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bad314fc86f60b58587ffaf97e3150ed6f0aece74012db9cf0e36ee88768e49d"
+dependencies = [
+ "quit_macros",
+]
+
+[[package]]
+name = "quit_macros"
+version = "1.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a411616b47dce3139c0169c89899ba5ea3534e545ab4d0c1d3956460fe781bae"
 
 [[package]]
 name = "quote"
