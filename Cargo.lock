@@ -38,6 +38,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "anet"
+version = "0.1.0"
+dependencies = [
+ "hashbrown",
+ "managed",
+ "pnet",
+]
+
+[[package]]
 name = "ansi_term"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -79,10 +88,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "atcp"
-version = "0.1.0"
-
-[[package]]
 name = "atest"
 version = "0.1.0"
 dependencies = [
@@ -95,7 +100,6 @@ name = "atmosphere"
 version = "0.1.0"
 dependencies = [
  "astd",
- "atcp",
  "atest",
  "bit_field",
  "bitfield",
@@ -1078,6 +1082,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "managed"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ca88d725a0a943b096803bd34e73a4437208b6077654cc4ecb2947a5f91618d"
+
+[[package]]
 name = "memchr"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1473,10 +1483,8 @@ dependencies = [
 name = "portman"
 version = "0.1.0"
 dependencies = [
- "atcp",
  "hashbrown",
  "pnet",
- "ringbuf",
 ]
 
 [[package]]
@@ -1590,15 +1598,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3acd125665422973a33ac9d3dd2df85edad0f4ae9b00dafb1a05e43a9f5ef8e7"
 dependencies = [
  "winapi",
-]
-
-[[package]]
-name = "ringbuf"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89e68dd9c1d8f7bb0c664e1556b1521809bc6fa62d92bb3b813adf8611caa0eb"
-dependencies = [
- "crossbeam-utils",
 ]
 
 [[package]]

@@ -2,7 +2,7 @@
 
 members = [
   "astd",
-  "atcp",
+  "anet",
   "atest",
   "build-tool",
   "kernel",
