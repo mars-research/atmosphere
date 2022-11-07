@@ -15,7 +15,7 @@ pub fn test_udp_stack() -> Result<(), ()> {
     let arp_table = Arc::new(ArpTable::new());
 
     let mut routing_table = RoutingTable::new();
-    routing_table.insert_rule(Ipv4Address::new([0, 0, 0, 0]), 0, Ipv4Address::new([192, 168, 64, 1]));
+    routing_table.set_default_gateway(Ipv4Address::new([192, 168, 64, 1]));
 
     let stack = UdpStack::new(
         8000,

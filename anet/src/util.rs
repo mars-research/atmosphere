@@ -18,6 +18,12 @@ impl Ipv4Address {
     }
 }
 
+impl From<Ipv4Address> for u32 {
+    fn from(value: Ipv4Address) -> Self {
+        u32::from_be_bytes(value.0)
+    }
+}
+
 pub struct SocketAddress {
     pub ip: Ipv4Address,
     pub port: Port,

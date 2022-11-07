@@ -6,9 +6,15 @@ pub struct RoutingTable {
     trie: Trie,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum RoutingEntry {
+    DirectlyConnected,
+    Gateway(Ipv4Address),
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum RoutingResult {
-    Reachable(Ipv4Address),
+    Reachable(RoutingEntry),
     Unreachable,
 }
 
@@ -18,21 +24,27 @@ impl RoutingTable {
     }
 
     pub fn resolve(&self, dest: Ipv4Address) -> RoutingResult {
-        if let Some(next_ip) = self.trie.get(u32::from_be_bytes(dest.0)) {
-            RoutingResult::Reachable(next_ip)
+        if let Some(entry) = self.trie.get(dest.into()) {
+            RoutingResult::Reachable(entry)
         } else {
             RoutingResult::Unreachable
         }
     }
 
-    pub fn insert_rule(&mut self, cidr: Ipv4Address, mask: u8, next: Ipv4Address) {
+    pub fn insert_rule(&mut self, cidr: Ipv4Address, mask: u8, value: RoutingEntry) {
         if mask > 32 {
             panic!("invalid subnet mask");
         }
         
-        let key = u32::from_be_bytes(cidr.0);
+        let key = cidr.into();
 
-        self.trie.insert(key, next, mask);
+        self.trie.insert(key, value, mask);
+    }
+
+    pub fn set_default_gateway(&mut self, gateway: Ipv4Address) {
+        let key = 0; // match 0.0.0.0/0
+
+        self.trie.insert(key, RoutingEntry::Gateway(gateway), 0);
     }
 }
 
@@ -47,17 +59,17 @@ impl Trie {
         }
     }
 
-    pub fn insert(&mut self, key: u32, value: Ipv4Address, bits: u8) {
+    pub fn insert(&mut self, key: u32, value: RoutingEntry, bits: u8) {
         self.root.insert(key, value, bits, 0)
     }
 
-    pub fn get(&self, key: u32) -> Option<Ipv4Address> {
+    pub fn get(&self, key: u32) -> Option<RoutingEntry> {
         self.root.get(key, 0)
     }
 }
 
 struct TrieNode {
-    value: Option<Ipv4Address>,
+    value: Option<RoutingEntry>,
     left: Option<Box<TrieNode>>,
     right: Option<Box<TrieNode>>,
 }
@@ -70,7 +82,7 @@ impl TrieNode {
             value: None,
         })
     }
-    pub fn insert(&mut self, key: u32, value: Ipv4Address, bits: u8, pos: u8) {
+    pub fn insert(&mut self, key: u32, value: RoutingEntry, bits: u8, pos: u8) {
         if pos + 1 >= bits {
             self.value = Some(value);
             return;
@@ -90,7 +102,7 @@ impl TrieNode {
         }
     }
 
-    pub fn get(&self, key: u32, pos: u8) -> Option<Ipv4Address> {
+    pub fn get(&self, key: u32, pos: u8) -> Option<RoutingEntry> {
         if pos > 31 {
             panic!("pos can't be greater than 32");
         }
@@ -119,38 +131,37 @@ impl TrieNode {
 
 #[cfg(test)]
 mod tests {
-    use crate::util::Ipv4Address; 
+    use crate::{util::Ipv4Address, layer::ip::routing::RoutingEntry}; 
 
     use super::{RoutingTable, RoutingResult};
 
     #[test]
     pub fn test_routing_table() {
-    let mut table = RoutingTable::new();
+        let mut table = RoutingTable::new();
+        
+        // default gateway
+        table.set_default_gateway(Ipv4Address([192, 168, 64, 1]));
+        // directly connected hosts in a LAN
+        table.insert_rule(Ipv4Address::new([192, 168, 64, 1]), 24, RoutingEntry::DirectlyConnected); 
+        // a VM running on the host
+        table.insert_rule(Ipv4Address::new([10, 0, 0, 1]), 24, RoutingEntry::Gateway(Ipv4Address::new([192, 168, 64, 10])));
 
-    let a = u32::from_be_bytes([192, 168, 64, 1]);
-    
-    table.insert_rule(Ipv4Address::new([192, 168, 65, 1]), 24, Ipv4Address::new([192, 168, 65, 1])); // some other router 
-    table.insert_rule(Ipv4Address::new([0, 0, 0, 0]), 0, Ipv4Address::new([192, 168, 64, 1])); // gateway from router
-    table.insert_rule(Ipv4Address::new([172, 17, 24, 1]), 24, Ipv4Address::new([172, 17, 24, 1])); // another interface probably
+        // via default gateway
+        assert_eq!(
+            table.resolve(Ipv4Address::new([8, 8, 8, 8])),
+            RoutingResult::Reachable(RoutingEntry::Gateway(Ipv4Address::new([192, 168, 64, 1])))
+        );
 
-    assert_eq!(
-        table.resolve(Ipv4Address::new([8, 8, 8, 8])),
-        RoutingResult::Reachable(Ipv4Address::new([192, 168, 64, 1]))
-    );
+        // directly connected to host
+        assert_eq!(
+            table.resolve(Ipv4Address::new([192, 168, 64, 9])),
+            RoutingResult::Reachable(RoutingEntry::DirectlyConnected)
+        );
 
-    assert_eq!(
-        table.resolve(Ipv4Address::new([192, 168, 65, 1])),
-        RoutingResult::Reachable(Ipv4Address::new([192, 168, 65, 1]))
-    );
-
-    assert_eq!(
-        table.resolve(Ipv4Address::new([172, 17, 24, 31])),
-        RoutingResult::Reachable(Ipv4Address::new([172, 17, 24, 1]))
-    );
-
-    assert_eq!(
-        table.resolve(Ipv4Address::new([172, 17, 45, 31])), // 25 instead of 24
-        RoutingResult::Reachable(Ipv4Address::new([192, 168, 64, 1])) // should use the gateway
-    );
+        // via another gateway
+        assert_eq!(
+            table.resolve(Ipv4Address::new([10, 0, 0, 8])),
+            RoutingResult::Reachable(RoutingEntry::Gateway(Ipv4Address::new([192, 168, 64, 10])))
+        );
     }
 }

@@ -2,6 +2,14 @@ use hashbrown::{HashMap, HashSet};
 
 use crate::util::{Ipv4Address, MacAddress};
 
+pub enum HardwareType {
+
+}
+
+struct ArpRequest {
+    hardware_type: HardwareType,
+}
+
 pub struct ArpTable {
     cache: HashMap<Ipv4Address, MacAddress>,
     inflight: HashSet<Ipv4Address>,
