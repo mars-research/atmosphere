@@ -83,7 +83,7 @@ impl TrieNode {
         })
     }
     pub fn insert(&mut self, key: u32, value: RoutingEntry, bits: u8, pos: u8) {
-        if pos + 1 >= bits {
+        if pos == bits {
             self.value = Some(value);
             return;
         }
@@ -143,6 +143,9 @@ mod tests {
         table.set_default_gateway(Ipv4Address([192, 168, 64, 1]));
         // directly connected hosts in a LAN
         table.insert_rule(Ipv4Address::new([192, 168, 64, 1]), 24, RoutingEntry::DirectlyConnected); 
+
+        // another router for another LAN (test overlapping prefixes)
+        table.insert_rule(Ipv4Address::new([192, 168, 65, 1]), 24, RoutingEntry::Gateway(Ipv4Address::new([192, 168, 65, 1])));
         // a VM running on the host
         table.insert_rule(Ipv4Address::new([10, 0, 0, 1]), 24, RoutingEntry::Gateway(Ipv4Address::new([192, 168, 64, 10])));
 
@@ -162,6 +165,11 @@ mod tests {
         assert_eq!(
             table.resolve(Ipv4Address::new([10, 0, 0, 8])),
             RoutingResult::Reachable(RoutingEntry::Gateway(Ipv4Address::new([192, 168, 64, 10])))
+        );
+
+        assert_eq!(
+            table.resolve(Ipv4Address::new([192, 168, 65, 30])),
+            RoutingResult::Reachable(RoutingEntry::Gateway(Ipv4Address::new([192, 168, 65, 1])))
         );
     }
 }
