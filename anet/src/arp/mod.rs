@@ -16,6 +16,7 @@ impl ArpTable {
     }
 
     pub fn resolve(&self, ip_addr: &Ipv4Address) -> MacAddress {
+        // TODO: Actual resolving
         MacAddress([0xf6, 0xd4, 0x88, 0xc7, 0xe5, 0x64])
     }
 }

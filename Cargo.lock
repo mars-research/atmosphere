@@ -90,6 +90,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "atcp"
+version = "0.1.0"
+
+[[package]]
 name = "atest"
 version = "0.1.0"
 dependencies = [
@@ -1498,8 +1502,10 @@ dependencies = [
 name = "portman"
 version = "0.1.0"
 dependencies = [
+ "atcp",
  "hashbrown",
  "pnet",
+ "ringbuf",
 ]
 
 [[package]]
@@ -1628,6 +1634,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3acd125665422973a33ac9d3dd2df85edad0f4ae9b00dafb1a05e43a9f5ef8e7"
 dependencies = [
  "winapi",
+]
+
+[[package]]
+name = "ringbuf"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "89e68dd9c1d8f7bb0c664e1556b1521809bc6fa62d92bb3b813adf8611caa0eb"
+dependencies = [
+ "crossbeam-utils",
 ]
 
 [[package]]

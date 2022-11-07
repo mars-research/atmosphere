@@ -1,5 +1,6 @@
 pub type Port = u16;
 
+#[derive(Clone, Copy)]
 pub struct MacAddress(pub [u8; 6]);
 
 impl MacAddress {
@@ -8,6 +9,7 @@ impl MacAddress {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Ipv4Address(pub [u8; 4]);
 
 impl Ipv4Address {

@@ -2,6 +2,7 @@ use alloc::sync::Arc;
 use thingbuf::mpsc::{Receiver, Sender};
 
 use crate::arp::ArpTable;
+use crate::layer::ip::routing::RoutingTable;
 use crate::layer::{eth::EthernetLayer, ip::Ipv4Layer, udp::UdpLayer};
 use crate::util::{Ipv4Address, MacAddress, Port, RawPacket, SocketAddress};
 
@@ -16,13 +17,14 @@ impl UdpStack {
         udp_port: Port,
         ipv4_addr: Ipv4Address,
         mac_addr: MacAddress,
+        routing_table: RoutingTable,
         arp_table: Arc<ArpTable>,
     ) -> Self {
         let (tx_queue, tx_dequeue) = thingbuf::mpsc::channel(32);
         let (rx_queue, rx_dequeue) = thingbuf::mpsc::channel(32);
 
         let eth_layer = Arc::new(EthernetLayer::new(mac_addr, tx_queue, rx_dequeue));
-        let ipv4_layer = Arc::new(Ipv4Layer::new(ipv4_addr, arp_table, eth_layer.clone()));
+        let ipv4_layer = Arc::new(Ipv4Layer::new(ipv4_addr, routing_table, arp_table, eth_layer.clone()));
         let udp_layer = Arc::new(UdpLayer::new(udp_port, ipv4_layer.clone()));
 
         Self {

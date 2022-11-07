@@ -2,11 +2,11 @@ use alloc::{borrow::ToOwned, sync::Arc};
 
 use crate::{arp::ArpTable, util::Ipv4Address};
 
-use self::routing::RoutingTable;
+use self::routing::{RoutingTable, RoutingResult};
 
 use super::eth::EthernetLayer;
 
-mod routing;
+pub mod routing;
 
 const IPV4_VERSION: u8 = 4;
 const IPV4_HDR_LEN: u8 = 5;
@@ -19,8 +19,7 @@ pub struct Ipv4Layer {
 }
 
 impl Ipv4Layer {
-    pub fn new(endpoint: Ipv4Address, arp_table: Arc<ArpTable>, lower: Arc<EthernetLayer>) -> Self {
-        let routing_table = RoutingTable::new();
+    pub fn new(endpoint: Ipv4Address, routing_table: RoutingTable, arp_table: Arc<ArpTable>, lower: Arc<EthernetLayer>) -> Self {
         Self {
             endpoint,
             arp_table,
@@ -33,34 +32,36 @@ impl Ipv4Layer {
     where
         F: FnOnce(&mut [u8]) -> usize,
     {
-        let next_hop_ip = self.routing_table.resolve(dst_addr);
-        let dmac = self.arp_table.resolve(&next_hop_ip);
+        if let RoutingResult::Reachable(next_hop_ip) = self.routing_table.resolve(dst_addr) {
+            let dmac = self.arp_table.resolve(&next_hop_ip);
+            self.lower
+                .send_packet(dmac, super::eth::EtherType::Ipv4, |buf: &mut [u8]| {
+                    // write ipv4 header here
+                    // buf[0..20].copy_from_slice(&[0; 20]);
+                    buf[0] = (IPV4_VERSION << 4) | IPV4_HDR_LEN;
+                    buf[1] = 0;
 
-        self.lower
-            .send_packet(dmac, super::eth::EtherType::Ipv4, |buf: &mut [u8]| {
-                // write ipv4 header here
-                // buf[0..20].copy_from_slice(&[0; 20]);
-                buf[0] = (IPV4_VERSION << 4) | IPV4_HDR_LEN;
-                buf[1] = 0;
+                    let ipv4_payload_len: u16 = f(&mut buf[20..])
+                        .try_into()
+                        .expect("ipv4_payload_len overflowed");
 
-                let ipv4_payload_len: u16 = f(&mut buf[20..])
-                    .try_into()
-                    .expect("ipv4_payload_len overflowed");
+                    let total_len = ipv4_payload_len + 20;
 
-                let total_len = ipv4_payload_len + 20;
+                    buf[2..4].copy_from_slice(&total_len.to_be_bytes());
 
-                buf[2..4].copy_from_slice(&total_len.to_be_bytes());
+                    buf[4..8].copy_from_slice(&[0; 4]);
 
-                buf[4..8].copy_from_slice(&[0; 4]);
+                    buf[8] = 64;
 
-                buf[8] = 64;
+                    buf[9] = 17;
 
-                buf[9] = 17;
+                    buf[12..16].copy_from_slice(&self.endpoint.0);
+                    buf[16..20].copy_from_slice(&next_hop_ip.0);
 
-                buf[12..16].copy_from_slice(&self.endpoint.0);
-                buf[16..20].copy_from_slice(&next_hop_ip.0);
-
-                total_len.into()
+                    total_len.into()
             })
+        } else {
+            panic!("unreachable address received!");
+        }
     }
 }
