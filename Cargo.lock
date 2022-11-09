@@ -1470,6 +1470,7 @@ dependencies = [
  "atcp",
  "hashbrown",
  "pnet",
+ "prusti-contracts",
  "ringbuf",
 ]
 
@@ -1505,6 +1506,19 @@ checksum = "5ea3d908b0e36316caf9e9e2c4625cdde190a7e6f440d794667ed17a1855e725"
 dependencies = [
  "unicode-ident",
 ]
+
+[[package]]
+name = "prusti-contracts"
+version = "0.1.2"
+source = "git+https://github.com/viperproject/prusti-dev#34981398a0bd12b412ce800a008aa527172013be"
+dependencies = [
+ "prusti-contracts-proc-macros",
+]
+
+[[package]]
+name = "prusti-contracts-proc-macros"
+version = "0.1.2"
+source = "git+https://github.com/viperproject/prusti-dev#34981398a0bd12b412ce800a008aa527172013be"
 
 [[package]]
 name = "quit"

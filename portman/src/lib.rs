@@ -14,6 +14,7 @@
 use atcp::TCPStack;
 use hashbrown::HashMap;
 use pnet::packet::{ethernet::EthernetPacket, ipv4::Ipv4Packet, tcp::TcpPacket, Packet};
+use prusti_contracts::*;
 use ringbuf::Consumer;
 
 type Port = u16;
@@ -46,6 +47,7 @@ impl<'a> PortManager<'a> {
 }
 
 // Given an ethernet frame containing a TCP packet, extracts the TCP port of that packet.
+#[trusted] // TODO
 fn get_port(packet: &[u8]) -> PortManResult<Port> {
     let ether_pkt = EthernetPacket::new(packet).ok_or(())?;
 
@@ -54,6 +56,30 @@ fn get_port(packet: &[u8]) -> PortManResult<Port> {
     let tcp_pkt = TcpPacket::new(ipv4_pkt.payload()).ok_or(())?;
 
     Ok(tcp_pkt.get_destination())
+}
+
+#[requires(n < 32)]
+#[ensures(result == 4 * n)]
+fn cursed_quadruple_1(n: u8) -> u8 {
+    n + n + n + n
+}
+
+#[requires(n > 0)]
+#[requires(n < 32)]
+#[ensures(result == 4 * n)]
+fn cursed_quadruple_2(n: u8) -> u8 {
+    let mut result = n;
+    result += n + n;
+
+    if result > n {
+        result += n;
+    }
+
+    if result < 4 * n {
+        result = 0;
+    }
+
+    result
 }
 
 #[cfg(test)]
