@@ -2,7 +2,7 @@
 
 // use x86::bits64::paging::{PAddr, VAddr};
 
-use astd::collections::vec::Vec;
+use astd::heapless::Vec;
 use astd::sync::Mutex;
 
 /// A list of usable RAM regions as (base, size) tuples.

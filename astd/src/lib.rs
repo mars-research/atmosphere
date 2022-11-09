@@ -21,5 +21,6 @@
 
 pub mod capability;
 pub mod cell;
-pub mod collections;
 pub mod sync;
+
+pub use heapless;
