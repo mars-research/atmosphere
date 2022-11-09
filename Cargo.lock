@@ -95,12 +95,12 @@ name = "atmosphere"
 version = "0.1.0"
 dependencies = [
  "astd",
- "atcp",
  "atest",
  "bit_field",
  "bitfield",
  "displaydoc",
  "enum-primitive-derive",
+ "kernel-logger",
  "libcap",
  "log",
  "multiboot2",
@@ -962,6 +962,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "068b1ee6743e4d11fb9c6a1e6064b3693a1b600e7f5f5988047d98b3dc9fb90b"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "kernel-logger"
+version = "0.1.0"
+dependencies = [
+ "log",
 ]
 
 [[package]]

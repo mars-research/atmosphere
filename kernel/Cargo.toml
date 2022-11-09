@@ -10,6 +10,7 @@ astd = { path = "../astd" }
 atest = { path = "../atest" }
 libcap = { path = "../libcap" }
 ns16550a = { path = "../ns16550a" }
+kernel-logger = { path = "../kernel-logger" }
 
 bitfield = "0.13.2"  # Totally non-confusing crate name
 bit_field = "0.10.1"

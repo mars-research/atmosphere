@@ -17,8 +17,10 @@ use ns16550a::PioSerial;
 /// The serial device.
 static SERIAL: Mutex<PioSerial> = Mutex::new(unsafe { PioSerial::new(0x3f8) });
 
+pub type WriterType = MutexGuard<'static, PioSerial>;
+
 /// Returns a writer that implements `core::fmt::Write`.
-pub fn get_writer() -> MutexGuard<'static, PioSerial> {
+pub fn get_writer() -> WriterType {
     SERIAL.lock()
 }
 

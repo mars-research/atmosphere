@@ -6,6 +6,7 @@ members = [
   "atest",
   "build-tool",
   "kernel",
+  "kernel-logger",
   "libcap",
   "ns16550a",
   "portman",
