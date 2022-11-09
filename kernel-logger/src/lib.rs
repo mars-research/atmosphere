@@ -24,8 +24,9 @@ pub struct Logger<WR> {
 }
 
 impl<WR, W> Logger<WR>
-    where WR: core::ops::DerefMut<Target = W>,
-          W: Write,
+where
+    WR: core::ops::DerefMut<Target = W>,
+    W: Write,
 {
     /// Creates an uninitialized logger instance.
     pub const fn uninit() -> Self {
@@ -59,8 +60,9 @@ impl<WR, W> Logger<WR>
 }
 
 impl<WR, W> log::Log for Logger<WR>
-    where WR: core::ops::DerefMut<Target = W>,
-          W: Write,
+where
+    WR: core::ops::DerefMut<Target = W>,
+    W: Write,
 {
     fn enabled(&self, metadata: &Metadata) -> bool {
         metadata.level() <= self.log_level
@@ -68,7 +70,9 @@ impl<WR, W> log::Log for Logger<WR>
 
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
-            let acquire_writer = self.acquire_writer.as_ref()
+            let acquire_writer = self
+                .acquire_writer
+                .as_ref()
                 .expect("Writer acquisition function wasn't set");
             let mut writer = acquire_writer();
             if self.use_colors {

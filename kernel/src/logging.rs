@@ -5,9 +5,9 @@
 //! to configure the logger to log to multiple targets, such as a
 //! file in the Filesystem.
 
-use kernel_logger::Logger;
 use crate::boot;
-use crate::console::{WriterType, get_writer};
+use crate::console::{get_writer, WriterType};
+use kernel_logger::Logger;
 
 /// The global logger.
 static mut LOGGER: Logger<WriterType> = Logger::uninit();
