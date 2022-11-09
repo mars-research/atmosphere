@@ -83,16 +83,37 @@
         "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1666526718,
-        "narHash": "sha256-EESbHuDiHcw95GAIKBV968qC7IQ7Ya2yOYCwTlvAA94=",
+        "lastModified": 1667736274,
+        "narHash": "sha256-byS+oGVLQGv6VWQY1swtl9SAuzyvl7AmaqGmJxilxHs=",
         "owner": "mars-research",
         "repo": "mars-std",
-        "rev": "49250734f99c75fcba7a320a7c1cacfd53d832d2",
+        "rev": "56b5de974e899cbc77b9f91e03f8deaa04e3f791",
         "type": "github"
       },
       "original": {
         "owner": "mars-research",
         "repo": "mars-std",
+        "type": "github"
+      }
+    },
+    "naersk": {
+      "inputs": {
+        "nixpkgs": [
+          "prusti",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1662220400,
+        "narHash": "sha256-9o2OGQqu4xyLZP9K6kNe1pTHnyPz0Wr3raGYnr9AIgY=",
+        "owner": "nmattia",
+        "repo": "naersk",
+        "rev": "6944160c19cb591eb85bbf9b2f2768a935623ed3",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nmattia",
+        "repo": "naersk",
         "type": "github"
       }
     },
@@ -128,10 +149,42 @@
         "type": "github"
       }
     },
+    "prusti": {
+      "inputs": {
+        "naersk": "naersk",
+        "nixpkgs": [
+          "mars-std",
+          "nixpkgs"
+        ],
+        "rust-overlay": [
+          "mars-std",
+          "rust-overlay"
+        ],
+        "utils": [
+          "mars-std",
+          "flake-utils"
+        ]
+      },
+      "locked": {
+        "lastModified": 1667972572,
+        "narHash": "sha256-atBiRRQ7EZhf18xxvpZfCNcoNHW3nqvXwAmDyMVlUrs=",
+        "owner": "mars-research",
+        "repo": "prusti-dev",
+        "rev": "24831959eaf32772a9f2705bb2257beb166d1338",
+        "type": "github"
+      },
+      "original": {
+        "owner": "mars-research",
+        "repo": "prusti-dev",
+        "rev": "24831959eaf32772a9f2705bb2257beb166d1338",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "crane": "crane",
-        "mars-std": "mars-std"
+        "mars-std": "mars-std",
+        "prusti": "prusti"
       }
     },
     "rust-overlay": {
@@ -140,11 +193,11 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1666494036,
-        "narHash": "sha256-4mmm+1MBPMD56LMLN9QcEwnfnu41NkA6lDeZGjSrxIw=",
+        "lastModified": 1667702825,
+        "narHash": "sha256-b0uPqiTUCQHE8A+UAwi1QAyYozchR/dbVq/5B+5Pfg4=",
         "owner": "oxalica",
         "repo": "rust-overlay",
-        "rev": "af2e939ba2c7cbb188d06d6650c6353b10b3f2be",
+        "rev": "ab9be7d78e9607b0b764b0e4a3b0804655e3c58d",
         "type": "github"
       },
       "original": {

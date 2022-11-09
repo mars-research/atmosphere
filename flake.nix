@@ -9,9 +9,16 @@
       inputs.flake-utils.follows = "mars-std/flake-utils";
       inputs.flake-compat.follows = "mars-std/flake-compat";
     };
+    prusti = {
+      # Changes yet to be upstreamed
+      url = "github:mars-research/prusti-dev/24831959eaf32772a9f2705bb2257beb166d1338";
+      inputs.nixpkgs.follows = "mars-std/nixpkgs";
+      inputs.rust-overlay.follows = "mars-std/rust-overlay";
+      inputs.utils.follows = "mars-std/flake-utils";
+    };
   };
 
-  outputs = { self, mars-std, crane, ... }: let
+  outputs = { self, mars-std, crane, prusti, ... }: let
     supportedSystems = [ "x86_64-linux" "aarch64-linux" ];
   in mars-std.lib.eachSystem supportedSystems (system: let
     nightlyVersion = "2022-10-20";
@@ -58,6 +65,8 @@
         editorconfig-checker
 
         cachix
+
+        prusti.packages.${system}.prusti
       ]);
 
       inputsFrom = [
