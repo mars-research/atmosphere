@@ -2,12 +2,20 @@ use hashbrown::{HashMap, HashSet};
 
 use crate::util::{Ipv4Address, MacAddress};
 
-pub enum HardwareType {
+const ETHERNET_HRD_LEN: u8 = 6;
+const IPV4_PROTO_LEN: u8 = 4;
 
+pub enum HardwareType {
+    Ethernet = 1,
+}
+
+pub enum ProtocolType {
+    Ipv4 = 0x800,
 }
 
 struct ArpRequest {
     hardware_type: HardwareType,
+    protocol_type: ProtocolType,
 }
 
 pub struct ArpTable {

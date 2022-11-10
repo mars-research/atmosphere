@@ -35,7 +35,7 @@ impl RoutingTable {
         if mask > 32 {
             panic!("invalid subnet mask");
         }
-        
+
         let key = cidr.into();
 
         self.trie.insert(key, value, mask);
@@ -93,12 +93,18 @@ impl TrieNode {
             if self.right.is_none() {
                 self.right = Some(TrieNode::new());
             }
-            self.right.as_mut().unwrap().insert(key, value, bits, pos + 1);
+            self.right
+                .as_mut()
+                .unwrap()
+                .insert(key, value, bits, pos + 1);
         } else {
             if self.left.is_none() {
                 self.left = Some(TrieNode::new());
             }
-            self.left.as_mut().unwrap().insert(key, value, bits, pos + 1);
+            self.left
+                .as_mut()
+                .unwrap()
+                .insert(key, value, bits, pos + 1);
         }
     }
 
@@ -131,23 +137,35 @@ impl TrieNode {
 
 #[cfg(test)]
 mod tests {
-    use crate::{util::Ipv4Address, layer::ip::routing::RoutingEntry}; 
+    use crate::{layer::ip::routing::RoutingEntry, util::Ipv4Address};
 
-    use super::{RoutingTable, RoutingResult};
+    use super::{RoutingResult, RoutingTable};
 
     #[test]
     pub fn test_routing_table() {
         let mut table = RoutingTable::new();
-        
+
         // default gateway
         table.set_default_gateway(Ipv4Address([192, 168, 64, 1]));
         // directly connected hosts in a LAN
-        table.insert_rule(Ipv4Address::new([192, 168, 64, 1]), 24, RoutingEntry::DirectlyConnected); 
+        table.insert_rule(
+            Ipv4Address::new([192, 168, 64, 1]),
+            24,
+            RoutingEntry::DirectlyConnected,
+        );
 
         // another router for another LAN (test overlapping prefixes)
-        table.insert_rule(Ipv4Address::new([192, 168, 65, 1]), 24, RoutingEntry::Gateway(Ipv4Address::new([192, 168, 65, 1])));
+        table.insert_rule(
+            Ipv4Address::new([192, 168, 65, 1]),
+            24,
+            RoutingEntry::Gateway(Ipv4Address::new([192, 168, 65, 1])),
+        );
         // a VM running on the host
-        table.insert_rule(Ipv4Address::new([10, 0, 0, 1]), 24, RoutingEntry::Gateway(Ipv4Address::new([192, 168, 64, 10])));
+        table.insert_rule(
+            Ipv4Address::new([10, 0, 0, 1]),
+            24,
+            RoutingEntry::Gateway(Ipv4Address::new([192, 168, 64, 10])),
+        );
 
         // via default gateway
         assert_eq!(

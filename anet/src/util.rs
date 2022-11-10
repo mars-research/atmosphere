@@ -1,19 +1,37 @@
 pub type Port = u16;
 
-#[derive(Clone, Copy)]
+#[derive(Default, Clone, Copy)]
 pub struct MacAddress(pub [u8; 6]);
 
 impl MacAddress {
     pub fn new(octets: [u8; 6]) -> Self {
         Self(octets)
     }
+    
+    pub fn broadcast() -> Self {
+        Self([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
+    }
+
+    pub fn from_slice(slice: &[u8]) -> Self {
+        let mut octets = [0; 6];
+
+        octets.copy_from_slice(slice);
+
+        Self(octets)
+    }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Ipv4Address(pub [u8; 4]);
 
 impl Ipv4Address {
     pub fn new(octets: [u8; 4]) -> Self {
+        Self(octets)
+    }
+
+    pub fn from_slice(slice: &[u8]) -> Self {
+        let mut octets = [0; 4];
+        octets.copy_from_slice(slice);
         Self(octets)
     }
 }
@@ -24,13 +42,14 @@ impl From<Ipv4Address> for u32 {
     }
 }
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SocketAddress {
     pub ip: Ipv4Address,
     pub port: Port,
 }
 
 impl SocketAddress {
-    pub fn new(ip: Ipv4Address, port: Port) -> Self {
+    pub fn new(ip: Ipv4Address, port: u16) -> Self {
         Self { ip, port }
     }
 }

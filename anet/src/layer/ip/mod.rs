@@ -1,8 +1,8 @@
 use alloc::sync::Arc;
 
-use crate::{arp::ArpTable, util::Ipv4Address};
+use crate::{arp::ArpTable, util::{Ipv4Address, MacAddress}};
 
-use self::routing::{RoutingTable, RoutingResult};
+use self::routing::{RoutingResult, RoutingTable};
 
 use super::eth::EthernetLayer;
 
@@ -19,7 +19,12 @@ pub struct Ipv4Layer {
 }
 
 impl Ipv4Layer {
-    pub fn new(endpoint: Ipv4Address, routing_table: RoutingTable, arp_table: Arc<ArpTable>, lower: Arc<EthernetLayer>) -> Self {
+    pub fn new(
+        endpoint: Ipv4Address,
+        routing_table: RoutingTable,
+        arp_table: Arc<ArpTable>,
+        lower: Arc<EthernetLayer>,
+    ) -> Self {
         Self {
             endpoint,
             arp_table,
@@ -64,11 +69,30 @@ impl Ipv4Layer {
                         buf[16..20].copy_from_slice(&next_ip.0);
 
                         total_len.into()
-                })
+                    })
             }
             RoutingResult::Unreachable => {
                 panic!("unreachable ipv4 address");
             }
         }
+    }
+
+    pub fn recv_packet<F>(&self, f: F) -> Result<Ipv4Address, ()> 
+    where
+        F: FnOnce(Ipv4Address, &[u8]) -> ()
+    {
+        let mut remote_addr = Ipv4Address::default();
+
+        self.lower.recv_packet(|_mac_addr: MacAddress, payload: &[u8]| {
+            remote_addr = Ipv4Address::from_slice(&payload[12..16]);
+
+            let total_len = u16::from_be_bytes([payload[2], payload[3]]) as usize;
+
+            f(remote_addr, &payload[20..total_len]);
+
+            
+        })?;
+
+        Ok(remote_addr)
     }
 }
