@@ -52,6 +52,10 @@ impl Emulator for Bochs {
             return Err(anyhow!("Memory > 2 GiB is not supported by Bochs"));
         }
 
+        if config.early_loader.is_some() {
+            return Err(anyhow!("The early loader is not yet supported by Bochs"));
+        }
+
         let command_line =
             config.full_command_line() + &format!(" bochs_apm_io_base={}", self.apm_io_base);
 

@@ -41,6 +41,10 @@ pub struct Opts {
     #[clap(long, hidden = true)]
     debugger: bool,
 
+    /// Whether to enable the early loader.
+    #[clap(long, hidden = true)]
+    loader: bool,
+
     /// Whether to enable the GDB server.
     #[clap(long)]
     gdb: bool,
@@ -115,6 +119,15 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
 
         run_config.suppress_initial_outputs(false);
         run_config.freeze_on_startup(true);
+    }
+
+    if local.loader {
+        let loader = project
+            .early_loader()
+            .build(&opts)
+            .await?
+            .expect("No binary was reproduced for the early loader");
+        run_config.early_loader(Some(loader));
     }
 
     let run_dir = TempfileBuilder::new().prefix("atmo-run-").tempdir()?;

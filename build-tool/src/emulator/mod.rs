@@ -54,6 +54,11 @@ pub struct RunConfiguration {
     /// Whether to freeze on start-up to wait for the debugger.
     freeze_on_startup: bool,
 
+    /// The early loader to use.
+    ///
+    /// This will become required.
+    early_loader: Option<Binary>,
+
     /// Whether to suppress inital outputs from the emulator.
     ///
     /// By default, we suppress initial outputs from the emulator (BIOS, GRUB,
@@ -107,6 +112,12 @@ impl RunConfiguration {
         self
     }
 
+    /// Set whether to use the early loader.
+    pub fn early_loader(&mut self, early_loader: Option<Binary>) -> &mut Self {
+        self.early_loader = early_loader;
+        self
+    }
+
     /// Set the initial output suppression config.
     pub fn suppress_initial_outputs(&mut self, suppress_initial_outputs: bool) -> &mut Self {
         self.suppress_initial_outputs = suppress_initial_outputs;
@@ -144,6 +155,7 @@ impl Default for RunConfiguration {
             auto_shutdown: true,
             gdb_server: None,
             freeze_on_startup: false,
+            early_loader: None,
             suppress_initial_outputs: true,
         }
     }
