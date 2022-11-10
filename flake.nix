@@ -75,6 +75,7 @@
 
       # Used by build-tool
       GRUB_X86_MODULES = "${x86Pkgs.grub2}/lib/grub/i386-pc";
+      QBOOT_BIOS = "${x86Pkgs.qboot}/bios.bin";
     };
   });
 }
