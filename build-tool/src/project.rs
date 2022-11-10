@@ -155,13 +155,13 @@ impl Crate {
 
             functions.sort_by(|a, b| a.size().cmp(&b.size()).reverse());
 
-            eprintln!("Top stack sizes:");
-            for func in &functions[..10] {
-                eprintln!("{}: {:?}", func.size(), func.names());
-            }
-
             if let Some(top) = functions.first() {
                 if top.size() as u128 > limit.get_bytes() {
+                    eprintln!("Top stack sizes:");
+                    for func in &functions[..10] {
+                        eprintln!("{}: {:?}", func.size(), func.names());
+                    }
+
                     return Err(anyhow!(
                         "The stack size of function {:?} is {} bytes, which is over the limit of {:?}",
                         top.names(),
