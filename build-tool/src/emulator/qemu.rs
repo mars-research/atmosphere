@@ -1,5 +1,6 @@
 //! QEMU integration.
 
+use std::env;
 use std::ffi::OsString;
 use std::path::PathBuf;
 use std::process::Stdio;
@@ -44,29 +45,57 @@ impl Emulator for Qemu {
 
         let command_line = config.full_command_line()
             + &format!(" qemu_debug_exit_io_base={}", self.debug_exit_io_base);
-
-        // FIXME: Make this cachable
-        let grub = BootableImage::generate(command_line, Some(kernel)).await?;
-        let hda = format!(
-            "file={},format=raw,index=0,media=disk",
-            grub.iso_path().to_str().expect("Path contains non-UTF-8")
-        );
-        /*
-        let hdb = format!(
-            "file=fat:rw:{},format=raw,index=1,media=disk",
-            kernel.path().parent().unwrap().to_str().expect("Path contains non-UTF-8"),
-        );
-        */
+        let suppress_initial_outputs =
+            config.suppress_initial_outputs && config.early_loader.is_none();
 
         let mut command = Command::new(self.qemu_binary.as_os_str());
+        let mut grub_image = None;
+
+        if let Some(early_loader) = &config.early_loader {
+            command.args(&[
+                "-kernel",
+                early_loader
+                    .path()
+                    .to_str()
+                    .expect("Early loader path contains non-UTF-8"),
+            ]);
+            command.args(&[
+                "-initrd",
+                kernel
+                    .path()
+                    .to_str()
+                    .expect("Kernel path contains non-UTF-8"),
+            ]);
+
+            if let Ok(qboot) = env::var("QBOOT_BIOS") {
+                command.args(&["-bios", &qboot]);
+            }
+        } else {
+            // FIXME: Make this cachable
+            let grub_image =
+                grub_image.insert(BootableImage::generate(command_line, Some(kernel)).await?);
+            let hda = format!(
+                "file={},format=raw,index=0,media=disk",
+                grub_image
+                    .iso_path()
+                    .to_str()
+                    .expect("Path contains non-UTF-8")
+            );
+            command.args(&["-drive", &hda]);
+            /*
+            let hdb = format!(
+                "file=fat:rw:{},format=raw,index=1,media=disk",
+                kernel.path().parent().unwrap().to_str().expect("Path contains non-UTF-8"),
+            );
+            command.arg(&["-drive", &hdb]);
+            */
+        }
+
         command
             .arg("-nographic")
             .args(&["-serial", "mon:stdio"])
             // .args(&["-serial", "file:serial.log"])
             .args(&["-m", &format!("{}", memory)])
-            .arg("-drive")
-            .arg(&hda)
-            // .arg("-drive").arg(&hdb)
             .args(&[
                 "-device",
                 &format!(
@@ -74,13 +103,14 @@ impl Emulator for Qemu {
                     self.debug_exit_io_base
                 ),
             ])
+            .arg("-no-reboot")
             .args(config.cpu_model.to_qemu()?);
 
         if config.use_virtualization {
             command.arg("-enable-kvm");
         }
 
-        if config.suppress_initial_outputs {
+        if suppress_initial_outputs {
             command.stdout(Stdio::piped());
         }
 
@@ -100,7 +130,7 @@ impl Emulator for Qemu {
 
         let mut child = command.spawn()?;
 
-        if config.suppress_initial_outputs {
+        if suppress_initial_outputs {
             let stdout = {
                 let reader = child
                     .stdout
@@ -114,6 +144,8 @@ impl Emulator for Qemu {
         }
 
         let status = child.wait_with_output().await?.status;
+
+        drop(grub_image);
 
         if !status.success() {
             if let Some(code) = status.code() {
