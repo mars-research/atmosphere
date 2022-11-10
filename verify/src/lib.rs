@@ -1,7 +1,7 @@
 #![no_std]
 
-use prusti_contracts::*;
 use core::option::Option;
+use prusti_contracts::*;
 
 #[extern_spec]
 impl<T> Option<T> {
