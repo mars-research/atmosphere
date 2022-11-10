@@ -1,0 +1,11 @@
+[package]
+name = "verify"
+version = "0.1.0"
+edition = "2021"
+
+# This is a crate to house verification common code throughout
+# the repo. For instance, external verification for types in std,
+# alloc, and third-party crates, common pure functions, proofs etc.
+
+[dependencies]
+prusti-contracts = { git = "https://github.com/viperproject/prusti-dev" }
