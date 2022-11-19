@@ -37,7 +37,13 @@ impl Net for DummyNic {
         while let Some(send_buf) = send_bufs.pop_front() {
             let mut copy = [0; 1514];
             copy.copy_from_slice(&send_buf.0);
+
+            flip_eth_hdr(&mut copy[0..14]);
+            flip_ip_hdr(&mut copy[14..34]);
+            flip_udp_hdr(&mut copy[34..42]);
+
             g.push_back(copy);
+            return_bufs.push_back(send_buf);
         }
         Ok(num_sent)
     }
@@ -67,36 +73,9 @@ mod test {
 
     use super::DummyNic;
 
-    
-    #[test]
-    pub fn test_dummy_nic_send() {
-        let nic = DummyNic::new();
-
-        let mut packet_buf = RawPacket::default();
-        let data = [74, 228, 110, 95, 212, 240, 246, 212, 136, 199, 229, 100, 8, 0, 69, 0, 0, 41, 0, 0, 0, 0, 64, 17, 0, 0, 192, 168, 64, 9, 192, 168, 64, 1, 31, 64, 31, 64, 0, 21, 0, 0, 104, 101, 108, 108, 111, 44, 32, 119, 111, 114, 108, 100, 33];
-
-        packet_buf.0[..data.len()].copy_from_slice(&data);
-
-        let (sent, _packet_buf) = nic.submit(packet_buf).unwrap();
-
-        assert!(sent);
-
-        let mut free_bufs: VecDeque<RawPacket> = repeat(RawPacket::default()).take(8).collect(); 
-
-        let mut recvd_bufs = VecDeque::new();
-
-        let num_recvd = nic.poll(&mut free_bufs, &mut recvd_bufs).unwrap();
-
-        assert_eq!(num_recvd, 1);
-
-        let recvd_packet = recvd_bufs.pop_front().unwrap();
-
-        println!("{:?}", &data);
-        println!("{:?}", &recvd_packet.0);
-
-
-        let sent_frame = EthernetPacket::new(&data).unwrap();
-        let recvd_frame = EthernetPacket::new(&recvd_packet.0).unwrap();
+    fn assert_echo(sent: &[u8], recvd: &[u8]) {
+        let sent_frame = EthernetPacket::new(sent).unwrap();
+        let recvd_frame = EthernetPacket::new(recvd).unwrap();
 
 
         assert_eq!(sent_frame.get_source(), recvd_frame.get_destination());
@@ -117,5 +96,61 @@ mod test {
         assert_eq!(sent_udp.get_source(), recvd_udp.get_destination());
         assert_eq!(sent_udp.get_destination(), recvd_udp.get_source());
         assert_eq!(sent_udp.payload(), recvd_udp.payload());
+    }
+    
+    #[test]
+    pub fn test_dummy_nic_send() {
+        let nic = DummyNic::new();
+
+        let mut packet_buf = RawPacket::default();
+        let data = [74, 228, 110, 95, 212, 240, 246, 212, 136, 199, 229, 100, 8, 0, 69, 0, 0, 41, 0, 0, 0, 0, 64, 17, 0, 0, 192, 168, 64, 9, 192, 168, 64, 1, 31, 64, 31, 64, 0, 21, 0, 0, 104, 101, 108, 108, 111, 44, 32, 119, 111, 114, 108, 100, 33];
+
+        packet_buf.0[..data.len()].copy_from_slice(&data);
+
+        let (sent, packet_buf) = nic.submit(packet_buf).unwrap();
+
+        assert!(sent);
+
+        let mut free_bufs: VecDeque<RawPacket> = repeat(RawPacket::default()).take(8).collect(); 
+
+        let mut recvd_bufs = VecDeque::new();
+
+        let num_recvd = nic.poll(&mut free_bufs, &mut recvd_bufs).unwrap();
+
+        assert_eq!(num_recvd, 1);
+
+        let recvd_packet = recvd_bufs.pop_front().unwrap();
+
+        assert_echo(&packet_buf.0, &recvd_packet.0);
+    }
+
+    #[test]
+    pub fn test_dummy_nic_send_batch() {
+        let nic = DummyNic::new();
+
+        let mut packet_buf = RawPacket::default();
+        let data = [74, 228, 110, 95, 212, 240, 246, 212, 136, 199, 229, 100, 8, 0, 69, 0, 0, 41, 0, 0, 0, 0, 64, 17, 0, 0, 192, 168, 64, 9, 192, 168, 64, 1, 31, 64, 31, 64, 0, 21, 0, 0, 104, 101, 108, 108, 111, 44, 32, 119, 111, 114, 108, 100, 33];
+
+        packet_buf.0[..data.len()].copy_from_slice(&data);
+
+        let mut batch = repeat(packet_buf).take(32).collect();
+        let mut returned_bufs = VecDeque::new();
+
+        let num_sent = nic.submit_batch(&mut batch, &mut returned_bufs).unwrap();
+
+        assert_eq!(num_sent, 32);
+        assert_eq!(returned_bufs.len(), 32);
+
+        let mut recv_bufs = repeat(RawPacket::default()).take(16).collect();
+        let mut recvd_batch = VecDeque::new();
+
+        let num_recvd = nic.poll(&mut recv_bufs, &mut recvd_batch).unwrap();
+
+        assert_eq!(num_recvd, 16);
+        assert_eq!(recvd_batch.len(), 16);
+
+        recvd_batch.iter().for_each(|pkt|{
+            assert_echo(&data, &pkt.0)
+        });
     }
 }
