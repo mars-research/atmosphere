@@ -3,12 +3,11 @@ use crate::{
     arp::ArpTable,
     layer::ip::routing::RoutingTable,
     stack::udp::UdpStack,
-    util::{Ipv4Address, MacAddress, SocketAddress, RawPacket}, netmanager::NetManager, DummyNic,
-};
+    util::{Ipv4Address, MacAddress, SocketAddress, RawPacket}, netmanager::NetManager, nic::DummyNic};
 
 use alloc::sync::Arc;
 
-use pnet::packet::{ethernet::EthernetPacket, ipv4::Ipv4Packet, udp::UdpPacket, Packet, FromPacket};
+use pnet::packet::{ethernet::EthernetPacket, ipv4::Ipv4Packet, udp::UdpPacket, Packet};
 
 fn create_udp_stack() -> UdpStack {
     let arp_table = Arc::new(ArpTable::new());
@@ -18,7 +17,7 @@ fn create_udp_stack() -> UdpStack {
 
     let netman = Arc::new(NetManager {});
 
-    let nic_handle = Arc::new(DummyNic {});
+    let nic_handle = Arc::new(DummyNic::new());
 
     UdpStack::new(
         8000,

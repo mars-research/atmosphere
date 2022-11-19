@@ -1,5 +1,3 @@
-use core::borrow::{BorrowMut, Borrow};
-
 use alloc::sync::Arc;
 use thingbuf::mpsc::{Receiver, Sender};
 

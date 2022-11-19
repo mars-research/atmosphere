@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use alloc::vec;
 use thingbuf::mpsc::{Receiver, Sender};
 
-use crate::DummyNic;
+use crate::nic::DummyNic;
 use crate::arp::ArpTable;
 use crate::layer::ip::routing::RoutingTable;
 use crate::layer::{eth::EthernetLayer, ip::Ipv4Layer, udp::UdpLayer};
