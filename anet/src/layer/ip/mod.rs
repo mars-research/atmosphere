@@ -1,6 +1,9 @@
 use alloc::sync::Arc;
 
-use crate::{arp::ArpTable, util::{Ipv4Address, MacAddress}};
+use crate::{
+    arp::ArpTable,
+    util::{Ipv4Address, MacAddress},
+};
 
 use self::routing::{RoutingResult, RoutingTable};
 
@@ -8,8 +11,18 @@ use super::eth::EthernetLayer;
 
 pub mod routing;
 
+// NOT TO BE CONFUSED WITH THE IPV4_HDR_LEN field which is for the packet itself
+pub const IPV4_HEADER_LEN: usize = 20;
+
 const IPV4_VERSION: u8 = 4;
 const IPV4_HDR_LEN: u8 = 5;
+
+#[repr(u8)]
+pub enum Ipv4NextHeader {
+    Udp = 17,
+    Tcp = 06,
+    Icmp = 01,
+}
 
 pub struct Ipv4Layer {
     endpoint: Ipv4Address,
@@ -33,7 +46,13 @@ impl Ipv4Layer {
         }
     }
 
-    pub fn send_packet<F>(&self, dst_addr: Ipv4Address, f: F) -> Result<usize, ()>
+    pub fn send_packet<F>(
+        &self,
+        buf: &mut [u8],
+        dst_addr: Ipv4Address,
+        next_hdr: Ipv4NextHeader,
+        f: F,
+    ) -> Result<usize, ()>
     where
         F: FnOnce(&mut [u8]) -> usize,
     {
@@ -45,7 +64,7 @@ impl Ipv4Layer {
                 };
                 let dmac = self.arp_table.resolve(&next_ip);
                 self.lower
-                    .send_packet(dmac, super::eth::EtherType::Ipv4, |buf: &mut [u8]| {
+                    .send_packet(buf, dmac, super::eth::EtherType::Ipv4, |buf: &mut [u8]| {
                         // write ipv4 header here
                         // buf[0..20].copy_from_slice(&[0; 20]);
                         buf[0] = (IPV4_VERSION << 4) | IPV4_HDR_LEN;
@@ -63,10 +82,10 @@ impl Ipv4Layer {
 
                         buf[8] = 64;
 
-                        buf[9] = 17;
+                        buf[9] = next_hdr as u8;
 
                         buf[12..16].copy_from_slice(&self.endpoint.0);
-                        buf[16..20].copy_from_slice(&next_ip.0);
+                        buf[16..20].copy_from_slice(&dst_addr.0);
 
                         total_len.into()
                     })
@@ -77,21 +96,20 @@ impl Ipv4Layer {
         }
     }
 
-    pub fn recv_packet<F>(&self, f: F) -> Result<Ipv4Address, ()> 
+    pub fn recv_packet<F>(&self, buf: &[u8], f: F) -> Result<Ipv4Address, ()>
     where
-        F: FnOnce(Ipv4Address, &[u8]) -> ()
+        F: FnOnce(Ipv4Address, &[u8]) -> (),
     {
         let mut remote_addr = Ipv4Address::default();
 
-        self.lower.recv_packet(|_mac_addr: MacAddress, payload: &[u8]| {
-            remote_addr = Ipv4Address::from_slice(&payload[12..16]);
+        self.lower
+            .recv_packet(buf, |_mac_addr: MacAddress, payload: &[u8]| {
+                remote_addr = Ipv4Address::from_slice(&payload[12..16]);
 
-            let total_len = u16::from_be_bytes([payload[2], payload[3]]) as usize;
+                let total_len = u16::from_be_bytes([payload[2], payload[3]]) as usize;
 
-            f(remote_addr, &payload[20..total_len]);
-
-            
-        })?;
+                f(remote_addr, &payload[20..total_len]);
+            })?;
 
         Ok(remote_addr)
     }

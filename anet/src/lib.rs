@@ -4,10 +4,10 @@ extern crate alloc;
 
 pub mod arp;
 pub mod layer;
-pub mod stack;
-pub mod util;
 pub mod netmanager;
 pub mod nic;
+pub mod stack;
+pub mod util;
 
 #[cfg(test)]
 #[macro_use]
@@ -34,9 +34,7 @@ pub struct RpcError {
     error: ErrorEnum,
 }
 
-
 impl RpcError {
-
     pub unsafe fn panic() -> Self {
         Self {
             error: ErrorEnum::PanicUnwind,

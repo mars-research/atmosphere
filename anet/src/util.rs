@@ -1,3 +1,10 @@
+use crossbeam::queue::ArrayQueue;
+
+use crate::layer::{
+    eth::ETHER_HDR_LEN,
+    ip::{Ipv4NextHeader, IPV4_HEADER_LEN},
+};
+
 pub type Port = u16;
 
 #[derive(Default, Clone, Copy)]
@@ -7,7 +14,7 @@ impl MacAddress {
     pub fn new(octets: [u8; 6]) -> Self {
         Self(octets)
     }
-    
+
     pub fn broadcast() -> Self {
         Self([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
     }
@@ -54,8 +61,7 @@ impl SocketAddress {
     }
 }
 
-#[cfg(not(test))]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RawPacket(pub [u8; 1514]);
 
 impl Default for RawPacket {
@@ -64,15 +70,13 @@ impl Default for RawPacket {
     }
 }
 
-#[cfg(test)]
-#[derive(Clone, Debug)]
-pub struct RawPacket(pub [u8; 1514]);
+pub type VacantBufs = ArrayQueue<RawPacket>;
 
 pub fn flip_ip_hdr(ip_hdr: &mut [u8]) {
-    let mut src_ip: [u8; 4] = [0;4];
+    let mut src_ip: [u8; 4] = [0; 4];
     src_ip.copy_from_slice(&ip_hdr[12..16]);
 
-    let mut dst_ip: [u8; 4] = [0;4];
+    let mut dst_ip: [u8; 4] = [0; 4];
     dst_ip.copy_from_slice(&ip_hdr[16..20]);
 
     let ttl = ip_hdr[8] - 1;
@@ -83,10 +87,10 @@ pub fn flip_ip_hdr(ip_hdr: &mut [u8]) {
 }
 
 pub fn flip_udp_hdr(udp_hdr: &mut [u8]) {
-    let mut src_port = [0;2];
+    let mut src_port = [0; 2];
     src_port.copy_from_slice(&udp_hdr[0..2]);
 
-    let mut dst_port = [0;2];
+    let mut dst_port = [0; 2];
     dst_port.copy_from_slice(&udp_hdr[2..4]);
 
     udp_hdr[0..2].copy_from_slice(&dst_port);
@@ -107,4 +111,32 @@ pub fn echo_pkt(buf: &mut [u8]) {
     flip_eth_hdr(&mut buf[0..14]);
     flip_ip_hdr(&mut buf[14..34]);
     flip_udp_hdr(&mut buf[34..42]);
+}
+
+#[inline(always)]
+pub fn read_proto_and_port(buf: &[u8]) -> (Ipv4NextHeader, Port) {
+    let ipv4_packet = &buf[ETHER_HDR_LEN..];
+    let next_header = *&ipv4_packet[9];
+
+    if next_header == (Ipv4NextHeader::Udp as u8) {
+        (Ipv4NextHeader::Udp, read_udp_port(ipv4_packet))
+    } else if next_header == (Ipv4NextHeader::Tcp as u8) {
+        (Ipv4NextHeader::Tcp, read_tcp_port(ipv4_packet))
+    } else {
+        panic!("unsupported ipv4 next header");
+    }
+}
+
+fn read_tcp_port(ipv4_packet: &[u8]) -> Port {
+    let tcp_packet = &ipv4_packet[IPV4_HEADER_LEN..];
+    let tcp_port = u16::from_be_bytes([tcp_packet[2], tcp_packet[3]]);
+
+    tcp_port
+}
+
+fn read_udp_port(ipv4_packet: &[u8]) -> Port {
+    let udp_packet = &ipv4_packet[IPV4_HEADER_LEN..];
+    let udp_port = u16::from_be_bytes([udp_packet[2], udp_packet[3]]);
+
+    udp_port
 }

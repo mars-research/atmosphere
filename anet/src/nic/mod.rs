@@ -1,6 +1,6 @@
 use alloc::collections::VecDeque;
 
-use crate::{RpcResult, util::RawPacket};
+use crate::{util::RawPacket, RpcResult};
 
 mod dummy;
 
@@ -10,7 +10,17 @@ pub use dummy::DummyNic;
 pub trait Net {
     fn submit(&self, buf: RawPacket) -> RpcResult<(bool, RawPacket)>;
 
-    fn submit_batch(&self, bufs: &mut VecDeque<RawPacket>, return_bufs: &mut VecDeque<RawPacket>) -> RpcResult<usize>;
+    fn submit_batch(
+        &self,
+        bufs: &mut VecDeque<RawPacket>,
+        return_bufs: &mut VecDeque<RawPacket>,
+    ) -> RpcResult<usize>;
 
-    fn poll(&self, bufs: &mut VecDeque<RawPacket>, recvd_bufs: &mut VecDeque<RawPacket>) -> RpcResult<usize>;
+    fn poll(&self, buf: RawPacket) -> RpcResult<(bool, RawPacket)>;
+
+    fn poll_batch(
+        &self,
+        bufs: &mut VecDeque<RawPacket>,
+        recvd_bufs: &mut VecDeque<RawPacket>,
+    ) -> RpcResult<usize>;
 }

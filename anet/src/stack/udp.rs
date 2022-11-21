@@ -1,39 +1,43 @@
-use core::cell::RefCell;
+use core::iter;
 
 use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::vec;
-use thingbuf::mpsc::{Receiver, Sender};
+use thingbuf::mpsc::Sender;
 
-use crate::nic::DummyNic;
 use crate::arp::ArpTable;
 use crate::layer::ip::routing::RoutingTable;
 use crate::layer::{eth::EthernetLayer, ip::Ipv4Layer, udp::UdpLayer};
 use crate::netmanager::NetManager;
-use crate::util::{Ipv4Address, MacAddress, Port, RawPacket, SocketAddress};
+use crate::nic::{DummyNic, Net};
+use crate::util::{Ipv4Address, MacAddress, Port, RawPacket, SocketAddress, VacantBufs, read_proto_and_port};
 
 pub struct UdpStack {
+    port: Port,
     udp: Arc<UdpLayer>,
-    pub tx_dequeue: Receiver<RawPacket>,
-    pub rx_queue: Sender<RawPacket>,
-    pub manager: Arc<NetManager>,
-    pub vacant_bufs: RefCell<Vec<RawPacket>>,
+    rx_queue: Sender<RawPacket>,
+    manager: Arc<NetManager>,
+    vacant_bufs: Arc<VacantBufs>,
+    pub(crate) nic: Arc<DummyNic>,
 }
 
 impl UdpStack {
     pub fn new(
-        udp_port: Port,
+        port: Port,
         manager: Arc<NetManager>,
-        nic_handle: Arc<DummyNic>,
+        nic: Arc<DummyNic>,
         ipv4_addr: Ipv4Address,
         mac_addr: MacAddress,
         routing_table: RoutingTable,
         arp_table: Arc<ArpTable>,
     ) -> Self {
-        let (tx_queue, tx_dequeue) = thingbuf::mpsc::channel(32);
         let (rx_queue, rx_dequeue) = thingbuf::mpsc::channel(32);
+        let mut vacant_bufs = Arc::new(VacantBufs::new(32));
+        iter::repeat(RawPacket::default()).take(32).for_each(|buf| vacant_bufs.push(buf).expect("32 != 32"));
+        //
+        let nic = Arc::new(DummyNic::new());
 
-        let eth = Arc::new(EthernetLayer::new(mac_addr, tx_queue, rx_dequeue, manager.clone()));
+        let eth = Arc::new(EthernetLayer::new(
+            mac_addr,
+        ));
         let ipv4 = Arc::new(Ipv4Layer::new(
             ipv4_addr,
             routing_table,
@@ -41,16 +45,15 @@ impl UdpStack {
             eth.clone(),
         ));
 
-        let udp = Arc::new(UdpLayer::new(udp_port, ipv4.clone()));
-
-        let vacant_bufs = RefCell::new(vec![RawPacket::default(); 32]);
+        let udp = Arc::new(UdpLayer::new(port, ipv4.clone()));
 
         Self {
+            port,
             manager,
             udp,
-            tx_dequeue,
             rx_queue,
             vacant_bufs,
+            nic,
         }
     }
 
@@ -58,25 +61,43 @@ impl UdpStack {
     where
         F: FnOnce(&mut [u8]) -> usize,
     {
-        // TODO: ideally, do fragmentation here
-        self.udp.send_packet(dst, payload)
+        // get packet buffer
+        let mut packet_buf = self.vacant_bufs.pop().expect("no vacant_buf available");
+
+        let len = self.udp.send_packet(&mut packet_buf.0, dst, payload)?;
+
+        let (sent, free_buf) = self.nic.submit(packet_buf).expect("nic submit call failed");
+        // return packet buffer
+        self.vacant_bufs.push(free_buf).expect("more buffers returned than taken");
+
+        if sent {
+            Ok(len)
+        } else {
+            Err(())
+        }
     }
 
-    pub fn recv<F>(&self, f: F) -> Result<SocketAddress, ()> 
+    pub fn recv<F>(&self, f: F) -> Result<SocketAddress, ()>
     where
-        F: FnOnce(SocketAddress, &[u8]) -> ()
+        F: FnOnce(SocketAddress, &[u8]) -> (),
     {
-        self.udp.recv_packet(f)
-    }
+        // take buffer
+        let buf = self.vacant_bufs.pop().expect("no vacant buffer available");
 
-    pub fn run() {
-        // TODO:
-        // Run the UDP Stack
-        // 2 threads: one for rx one for tx.
-        // on receiving a packet from the dispatcher, rx thread will queue it in the rx_queue.
-        // packet gets dequeued when application calls socket.recv()
-        // for sending a packet, a packet_buffer is allocated application calls socket.send()
-        // socket.send() will call the subsequent layers and construct a packet in the buffer.
-        // the packet then gets queued in the tx_queue.
+        let (recvd, buf) = self.nic.poll(buf).expect("failed to poll nic");
+
+        if recvd {
+            let (proto, port) = read_proto_and_port(&buf.0);
+
+            if port == self.port {
+                self.udp.recv_packet(&buf.0, f)
+            } else {
+                // flip packet with demuxer
+                Err(())
+            }
+        } else {
+            self.vacant_bufs.push(buf).expect("more bufs returned than taken");
+            Err(())
+        }
     }
 }

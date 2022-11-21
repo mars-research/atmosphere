@@ -3,7 +3,7 @@ use thingbuf::mpsc::{Receiver, Sender};
 
 use crate::{
     layer::{arp::ArpLayer, eth::EthernetLayer},
-    util::{MacAddress, RawPacket, Ipv4Address},
+    util::{Ipv4Address, MacAddress, RawPacket},
 };
 
 pub struct ArpStack {
