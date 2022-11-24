@@ -15,7 +15,6 @@ use atcp::TCPStack;
 use hashbrown::HashMap;
 use pnet::packet::{ethernet::EthernetPacket, ipv4::Ipv4Packet, tcp::TcpPacket, Packet};
 use ringbuf::Consumer;
-use prusti_contracts::*;
 
 type Port = u16;
 type PortManResult<T> = core::result::Result<T, ()>;
@@ -47,7 +46,6 @@ impl<'a> PortManager<'a> {
 }
 
 // Given an ethernet frame containing a TCP packet, extracts the TCP port of that packet.
-#[trusted]
 fn get_port(packet: &[u8]) -> PortManResult<Port> {
     let ether_pkt = EthernetPacket::new(packet).ok_or(())?;
 
@@ -81,16 +79,4 @@ mod test {
 
         Ok(())
     }
-}
-
-// Import is needed to import extern specification for Option.
-use verify as _;
-
-#[ensures(n.is_some() ==> (result == true))]
-pub fn cursed_test<T>(n: Option<T>) -> bool {
-    if n.is_some() {
-        assert!(!n.is_none());
-        return true;
-    }
-    false
 }

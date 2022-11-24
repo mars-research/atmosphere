@@ -1,5 +1,5 @@
 [package]
-name = "verify"
+name = "verified"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,3 +9,4 @@ edition = "2021"
 
 [dependencies]
 prusti-contracts = { git = "https://github.com/viperproject/prusti-dev" }
+hashbrown = "0.12.3"

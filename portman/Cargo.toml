@@ -10,6 +10,3 @@ atcp = { path = "../atcp"}
 hashbrown = "0.12.3"
 pnet = "0.31.0"
 ringbuf = { version = "0.3.1", features = [ "alloc" ]}
-
-verify = { path = "../verify" }
-prusti-contracts = { git = "https://github.com/viperproject/prusti-dev" }

@@ -10,5 +10,5 @@ members = [
   "libcap",
   "ns16550a",
   "portman",
-  "verify",
+  "verified",
 ]
