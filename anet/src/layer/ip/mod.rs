@@ -1,23 +1,20 @@
-use alloc::sync::Arc;
+use alloc::collections::VecDeque;
+use pnet::packet::ip::IpNextHeaderProtocols;
+use pnet::packet::{ipv4::checksum, Packet};
+use pnet::util::core_net::Ipv4Addr;
 
-use crate::{
-    arp::ArpTable,
-    util::{Ipv4Address, MacAddress},
-};
-
-use self::routing::{RoutingResult, RoutingTable};
-
-use super::eth::EthernetLayer;
+use crate::packet::UdpPacketRepr;
 
 pub mod routing;
 
-// NOT TO BE CONFUSED WITH THE IPV4_HDR_LEN field which is for the packet itself
 pub const IPV4_HEADER_LEN: usize = 20;
 
+const IP_DEFAULT_TTL: u8 = 64;
 const IPV4_VERSION: u8 = 4;
 const IPV4_HDR_LEN: u8 = 5;
 
 #[repr(u8)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Ipv4NextHeader {
     Udp = 17,
     Tcp = 06,
@@ -25,92 +22,30 @@ pub enum Ipv4NextHeader {
 }
 
 pub struct Ipv4Layer {
-    endpoint: Ipv4Address,
-    arp_table: Arc<ArpTable>,
-    routing_table: RoutingTable,
-    lower: Arc<EthernetLayer>,
+    endpoint: Ipv4Addr,
 }
 
 impl Ipv4Layer {
-    pub fn new(
-        endpoint: Ipv4Address,
-        routing_table: RoutingTable,
-        arp_table: Arc<ArpTable>,
-        lower: Arc<EthernetLayer>,
-    ) -> Self {
-        Self {
-            endpoint,
-            arp_table,
-            routing_table,
-            lower,
-        }
+    pub fn new(endpoint: Ipv4Addr) -> Self {
+        Self { endpoint }
     }
 
-    pub fn send_packet<F>(
-        &self,
-        buf: &mut [u8],
-        dst_addr: Ipv4Address,
-        next_hdr: Ipv4NextHeader,
-        f: F,
-    ) -> Result<usize, ()>
-    where
-        F: FnOnce(&mut [u8]) -> usize,
-    {
-        match self.routing_table.resolve(dst_addr) {
-            RoutingResult::Reachable(routing_entry) => {
-                let next_ip = match routing_entry {
-                    routing::RoutingEntry::Gateway(ip) => ip,
-                    routing::RoutingEntry::DirectlyConnected => dst_addr,
-                };
-                let dmac = self.arp_table.resolve(&next_ip);
-                self.lower
-                    .send_packet(buf, dmac, super::eth::EtherType::Ipv4, |buf: &mut [u8]| {
-                        // write ipv4 header here
-                        // buf[0..20].copy_from_slice(&[0; 20]);
-                        buf[0] = (IPV4_VERSION << 4) | IPV4_HDR_LEN;
-                        buf[1] = 0;
+    pub fn prepare_udp_batch(&self, dest: Ipv4Addr, packets: &mut VecDeque<UdpPacketRepr>) {
+        for packet in packets.iter_mut() {
+            let total_len = packet.udp_packet().get_length() + IPV4_HEADER_LEN as u16;
+            packet.set_ip_packet(|mut ip| {
+                ip.set_destination(dest);
+                ip.set_source(self.endpoint);
+                ip.set_ttl(64);
+                ip.set_ttl(IP_DEFAULT_TTL);
+                ip.set_version(IPV4_VERSION);
+                ip.set_header_length(IPV4_HDR_LEN);
+                ip.set_total_length(total_len);
+                ip.set_next_level_protocol(IpNextHeaderProtocols::Udp);
 
-                        let ipv4_payload_len: u16 = f(&mut buf[20..])
-                            .try_into()
-                            .expect("ipv4_payload_len overflowed");
-
-                        let total_len = ipv4_payload_len + 20;
-
-                        buf[2..4].copy_from_slice(&total_len.to_be_bytes());
-
-                        buf[4..8].copy_from_slice(&[0; 4]);
-
-                        buf[8] = 64;
-
-                        buf[9] = next_hdr as u8;
-
-                        buf[12..16].copy_from_slice(&self.endpoint.0);
-                        buf[16..20].copy_from_slice(&dst_addr.0);
-
-                        total_len.into()
-                    })
-            }
-            RoutingResult::Unreachable => {
-                panic!("unreachable ipv4 address");
-            }
+                let ck = checksum(&ip.to_immutable());
+                ip.set_checksum(ck);
+            });
         }
-    }
-
-    pub fn recv_packet<F>(&self, buf: &[u8], f: F) -> Result<Ipv4Address, ()>
-    where
-        F: FnOnce(Ipv4Address, &[u8]) -> (),
-    {
-        let mut remote_addr = Ipv4Address::default();
-
-        self.lower
-            .recv_packet(buf, |_mac_addr: MacAddress, payload: &[u8]| {
-                remote_addr = Ipv4Address::from_slice(&payload[12..16]);
-
-                let total_len = u16::from_be_bytes([payload[2], payload[3]]) as usize;
-
-                f(remote_addr, &payload[20..total_len]);
-            })?;
-
-        Ok(remote_addr)
     }
 }

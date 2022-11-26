@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 
-use crate::util::Ipv4Address;
+use pnet::util::core_net::Ipv4Addr;
 
 pub struct RoutingTable {
     trie: Trie,
@@ -9,7 +9,7 @@ pub struct RoutingTable {
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum RoutingEntry {
     DirectlyConnected,
-    Gateway(Ipv4Address),
+    Gateway(Ipv4Addr),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -23,7 +23,7 @@ impl RoutingTable {
         Self { trie: Trie::new() }
     }
 
-    pub fn resolve(&self, dest: Ipv4Address) -> RoutingResult {
+    pub fn resolve(&self, dest: Ipv4Addr) -> RoutingResult {
         if let Some(entry) = self.trie.get(dest.into()) {
             RoutingResult::Reachable(entry)
         } else {
@@ -31,7 +31,7 @@ impl RoutingTable {
         }
     }
 
-    pub fn insert_rule(&mut self, cidr: Ipv4Address, mask: u8, value: RoutingEntry) {
+    pub fn insert_rule(&mut self, cidr: Ipv4Addr, mask: u8, value: RoutingEntry) {
         if mask > 32 {
             panic!("invalid subnet mask");
         }
@@ -41,7 +41,7 @@ impl RoutingTable {
         self.trie.insert(key, value, mask);
     }
 
-    pub fn set_default_gateway(&mut self, gateway: Ipv4Address) {
+    pub fn set_default_gateway(&mut self, gateway: Ipv4Addr) {
         let key = 0; // match 0.0.0.0/0
 
         self.trie.insert(key, RoutingEntry::Gateway(gateway), 0);
@@ -137,7 +137,8 @@ impl TrieNode {
 
 #[cfg(test)]
 mod tests {
-    use crate::{layer::ip::routing::RoutingEntry, util::Ipv4Address};
+    use crate::layer::ip::routing::RoutingEntry;
+    use pnet::util::core_net::Ipv4Addr;
 
     use super::{RoutingResult, RoutingTable};
 
@@ -146,48 +147,48 @@ mod tests {
         let mut table = RoutingTable::new();
 
         // default gateway
-        table.set_default_gateway(Ipv4Address([192, 168, 64, 1]));
+        table.set_default_gateway(Ipv4Addr::new(192, 168, 64, 1));
         // directly connected hosts in a LAN
         table.insert_rule(
-            Ipv4Address::new([192, 168, 64, 1]),
+            Ipv4Addr::new(192, 168, 64, 1),
             24,
             RoutingEntry::DirectlyConnected,
         );
 
         // another router for another LAN (test overlapping prefixes)
         table.insert_rule(
-            Ipv4Address::new([192, 168, 65, 1]),
+            Ipv4Addr::new(192, 168, 65, 1),
             24,
-            RoutingEntry::Gateway(Ipv4Address::new([192, 168, 65, 1])),
+            RoutingEntry::Gateway(Ipv4Addr::new(192, 168, 65, 1)),
         );
         // a VM running on the host
         table.insert_rule(
-            Ipv4Address::new([10, 0, 0, 1]),
+            Ipv4Addr::new(10, 0, 0, 1),
             24,
-            RoutingEntry::Gateway(Ipv4Address::new([192, 168, 64, 10])),
+            RoutingEntry::Gateway(Ipv4Addr::new(192, 168, 64, 10)),
         );
 
         // via default gateway
         assert_eq!(
-            table.resolve(Ipv4Address::new([8, 8, 8, 8])),
-            RoutingResult::Reachable(RoutingEntry::Gateway(Ipv4Address::new([192, 168, 64, 1])))
+            table.resolve(Ipv4Addr::new(8, 8, 8, 8)),
+            RoutingResult::Reachable(RoutingEntry::Gateway(Ipv4Addr::new(192, 168, 64, 1)))
         );
 
         // directly connected to host
         assert_eq!(
-            table.resolve(Ipv4Address::new([192, 168, 64, 9])),
+            table.resolve(Ipv4Addr::new(192, 168, 64, 9)),
             RoutingResult::Reachable(RoutingEntry::DirectlyConnected)
         );
 
         // via another gateway
         assert_eq!(
-            table.resolve(Ipv4Address::new([10, 0, 0, 8])),
-            RoutingResult::Reachable(RoutingEntry::Gateway(Ipv4Address::new([192, 168, 64, 10])))
+            table.resolve(Ipv4Addr::new(10, 0, 0, 8)),
+            RoutingResult::Reachable(RoutingEntry::Gateway(Ipv4Addr::new(192, 168, 64, 10)))
         );
 
         assert_eq!(
-            table.resolve(Ipv4Address::new([192, 168, 65, 30])),
-            RoutingResult::Reachable(RoutingEntry::Gateway(Ipv4Address::new([192, 168, 65, 1])))
+            table.resolve(Ipv4Addr::new(192, 168, 65, 30)),
+            RoutingResult::Reachable(RoutingEntry::Gateway(Ipv4Addr::new(192, 168, 65, 1)))
         );
     }
 }

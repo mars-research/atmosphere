@@ -1,76 +1,14 @@
-use crossbeam::queue::ArrayQueue;
-
-use crate::layer::{
-    eth::ETHER_HDR_LEN,
-    ip::{Ipv4NextHeader, IPV4_HEADER_LEN},
+use pnet::packet::ip::{
+    IpNextHeaderProtocol,
+    IpNextHeaderProtocols::{self, Udp},
 };
 
+use crate::layer::{eth::ETHER_HDR_LEN, ip::IPV4_HEADER_LEN};
+
 pub type Port = u16;
-
-#[derive(Default, Clone, Copy)]
-pub struct MacAddress(pub [u8; 6]);
-
-impl MacAddress {
-    pub fn new(octets: [u8; 6]) -> Self {
-        Self(octets)
-    }
-
-    pub fn broadcast() -> Self {
-        Self([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
-    }
-
-    pub fn from_slice(slice: &[u8]) -> Self {
-        let mut octets = [0; 6];
-
-        octets.copy_from_slice(slice);
-
-        Self(octets)
-    }
-}
-
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Ipv4Address(pub [u8; 4]);
-
-impl Ipv4Address {
-    pub fn new(octets: [u8; 4]) -> Self {
-        Self(octets)
-    }
-
-    pub fn from_slice(slice: &[u8]) -> Self {
-        let mut octets = [0; 4];
-        octets.copy_from_slice(slice);
-        Self(octets)
-    }
-}
-
-impl From<Ipv4Address> for u32 {
-    fn from(value: Ipv4Address) -> Self {
-        u32::from_be_bytes(value.0)
-    }
-}
-
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SocketAddress {
-    pub ip: Ipv4Address,
-    pub port: Port,
-}
-
-impl SocketAddress {
-    pub fn new(ip: Ipv4Address, port: u16) -> Self {
-        Self { ip, port }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct RawPacket(pub [u8; 1514]);
-
-impl Default for RawPacket {
-    fn default() -> Self {
-        RawPacket([0; 1514])
-    }
-}
-
-pub type VacantBufs = ArrayQueue<RawPacket>;
+pub type MacAddress = pnet::util::MacAddr;
+pub type Ipv4Address = pnet::util::core_net::Ipv4Addr;
+pub type SocketAddress = pnet::util::core_net::SocketAddrV4;
 
 pub fn flip_ip_hdr(ip_hdr: &mut [u8]) {
     let mut src_ip: [u8; 4] = [0; 4];
@@ -114,14 +52,14 @@ pub fn echo_pkt(buf: &mut [u8]) {
 }
 
 #[inline(always)]
-pub fn read_proto_and_port(buf: &[u8]) -> (Ipv4NextHeader, Port) {
+pub fn read_proto_and_port(buf: &[u8]) -> (IpNextHeaderProtocol, Port) {
     let ipv4_packet = &buf[ETHER_HDR_LEN..];
     let next_header = *&ipv4_packet[9];
 
-    if next_header == (Ipv4NextHeader::Udp as u8) {
-        (Ipv4NextHeader::Udp, read_udp_port(ipv4_packet))
-    } else if next_header == (Ipv4NextHeader::Tcp as u8) {
-        (Ipv4NextHeader::Tcp, read_tcp_port(ipv4_packet))
+    if next_header == (IpNextHeaderProtocols::Udp.0) {
+        (Udp, read_udp_port(ipv4_packet))
+    } else if next_header == (IpNextHeaderProtocols::Tcp.0) {
+        (IpNextHeaderProtocols::Tcp, read_tcp_port(ipv4_packet))
     } else {
         panic!("unsupported ipv4 next header");
     }

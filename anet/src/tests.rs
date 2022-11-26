@@ -1,14 +1,16 @@
 #![cfg(test)]
+
 use crate::{
     arp::ArpTable,
     layer::ip::routing::RoutingTable,
     netmanager::NetManager,
     nic::{DummyNic, Net},
+    packet::RawPacket,
     stack::udp::UdpStack,
-    util::{Ipv4Address, MacAddress, RawPacket, SocketAddress},
+    util::{Ipv4Address, MacAddress, SocketAddress},
 };
 
-use alloc::sync::Arc;
+use alloc::{collections::VecDeque, sync::Arc};
 
 use pnet::packet::{ethernet::EthernetPacket, ipv4::Ipv4Packet, udp::UdpPacket, Packet};
 
@@ -16,7 +18,7 @@ fn create_udp_stack() -> UdpStack {
     let arp_table = Arc::new(ArpTable::new());
 
     let mut routing_table = RoutingTable::new();
-    routing_table.set_default_gateway(Ipv4Address::new([192, 168, 64, 1]));
+    routing_table.set_default_gateway(Ipv4Address::new(192, 168, 64, 1));
 
     let netman = Arc::new(NetManager {});
 
@@ -26,8 +28,8 @@ fn create_udp_stack() -> UdpStack {
         8000,
         netman,
         nic,
-        Ipv4Address::new([192, 168, 64, 9]),
-        MacAddress::new([0x4a, 0xe4, 0x6e, 0x5f, 0xd4, 0xf0]),
+        Ipv4Address::new(192, 168, 64, 9),
+        MacAddress::new(0x4a, 0xe4, 0x6e, 0x5f, 0xd4, 0xf0),
         routing_table,
         arp_table,
     )
@@ -37,15 +39,16 @@ fn create_udp_stack() -> UdpStack {
 pub fn test_udp_send() -> Result<(), ()> {
     let stack = create_udp_stack();
 
-    let dst = SocketAddress::new(Ipv4Address::new([8, 8, 8, 8]), 8000);
+    let mut free_bufs = VecDeque::from(vec![RawPacket::default(); 32]);
+    let mut send_batch = VecDeque::new();
+
+    let dst = SocketAddress::new(Ipv4Address::new(8, 8, 8, 8), 8000);
 
     let data = b"hello, world!";
 
-    stack.send(dst, |buf: &mut [u8]| {
-        buf[0..data.len()].copy_from_slice(data);
+    stack.prepare_batch(&mut free_bufs, &mut send_batch, dst, data)?;
 
-        data.len()
-    })?;
+    stack.send_batch(&mut send_batch, &mut free_bufs)?;
 
     let packet = RawPacket::default();
     let (did_recv, packet) = stack.nic.poll(packet).unwrap();
@@ -74,6 +77,8 @@ pub fn test_udp_send() -> Result<(), ()> {
 #[test]
 pub fn test_udp_recv() -> Result<(), ()> {
     let stack = create_udp_stack();
+    let mut free_bufs = VecDeque::from(vec![RawPacket::default(); 32]);
+    let mut recv_batch = VecDeque::new();
 
     let mut raw_packet = RawPacket::default();
     let data = [
@@ -89,16 +94,11 @@ pub fn test_udp_recv() -> Result<(), ()> {
 
     assert!(sent);
 
-    stack.recv(|remote: SocketAddress, payload: &[u8]| {
-        assert_eq!(
-            remote,
-            SocketAddress {
-                ip: Ipv4Address([192, 168, 64, 9]),
-                port: 8000
-            }
-        );
-        assert_eq!(payload, b"hello, world!");
-    })?;
+    stack.recv_batch(&mut free_bufs, &mut recv_batch)?;
+
+    let repr = recv_batch.pop_back().unwrap();
+
+    let recvd_packet = repr.udp_packet();
 
     Ok(())
 }
@@ -106,20 +106,25 @@ pub fn test_udp_recv() -> Result<(), ()> {
 #[test]
 pub fn test_udp_echo() -> Result<(), ()> {
     let stack = create_udp_stack();
+    let mut free_bufs = VecDeque::from(vec![RawPacket::default(); 32]);
+    let mut recv_batch = VecDeque::new();
+    let mut send_batch = VecDeque::new();
 
-    let dst = SocketAddress::new(Ipv4Address::new([8, 8, 8, 8]), 5454);
+    let dst = SocketAddress::new(Ipv4Address::new(8, 8, 8, 8), 5454);
+
     let data = b"hello, world!";
 
-    stack.send(dst, |buf: &mut [u8]| {
-        buf[0..data.len()].copy_from_slice(data);
+    stack.prepare_batch(&mut free_bufs, &mut send_batch, dst, data)?;
 
-        data.len()
-    })?;
+    stack.send_batch(&mut send_batch, &mut free_bufs)?;
 
-    stack.recv(|src, payload| {
-        assert_eq!(src, dst);
-        assert_eq!(payload, data);
-    })?;
+    stack.recv_batch(&mut free_bufs, &mut recv_batch)?;
+
+    let repr = recv_batch.pop_back().unwrap();
+
+    let payload = repr.udp_payload();
+
+    assert_eq!(data, payload);
 
     Ok(())
 }

@@ -1,4 +1,4 @@
-#![no_std]
+// #![no_std]
 
 extern crate alloc;
 
@@ -6,6 +6,7 @@ pub mod arp;
 pub mod layer;
 pub mod netmanager;
 pub mod nic;
+pub mod packet;
 pub mod stack;
 pub mod util;
 

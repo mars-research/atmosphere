@@ -1,6 +1,6 @@
 use alloc::collections::VecDeque;
 
-use crate::{util::RawPacket, RpcResult};
+use crate::{packet::RawPacket, RpcResult};
 
 mod dummy;
 

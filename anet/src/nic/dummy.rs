@@ -2,7 +2,8 @@ use alloc::collections::VecDeque;
 use spin::Mutex;
 
 use crate::{
-    util::{flip_eth_hdr, flip_ip_hdr, flip_udp_hdr, RawPacket},
+    packet::RawPacket,
+    util::{flip_eth_hdr, flip_ip_hdr, flip_udp_hdr},
     RpcResult,
 };
 
@@ -101,7 +102,7 @@ mod test {
         ethernet::EthernetPacket, ipv4::Ipv4Packet, udp::UdpPacket, FromPacket, Packet,
     };
 
-    use crate::{nic::Net, util::RawPacket};
+    use crate::{nic::Net, packet::RawPacket};
 
     use super::DummyNic;
 

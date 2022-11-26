@@ -1,6 +1,7 @@
 use hashbrown::{HashMap, HashSet};
 
-use crate::util::{Ipv4Address, MacAddress};
+use pnet::util::core_net::Ipv4Addr;
+use pnet::util::MacAddr;
 
 const ETHERNET_HRD_LEN: u8 = 6;
 const IPV4_PROTO_LEN: u8 = 4;
@@ -19,8 +20,8 @@ struct ArpRequest {
 }
 
 pub struct ArpTable {
-    cache: HashMap<Ipv4Address, MacAddress>,
-    inflight: HashSet<Ipv4Address>,
+    cache: HashMap<Ipv4Addr, MacAddr>,
+    inflight: HashSet<Ipv4Addr>,
 }
 
 impl ArpTable {
@@ -31,8 +32,8 @@ impl ArpTable {
         }
     }
 
-    pub fn resolve(&self, ip_addr: &Ipv4Address) -> MacAddress {
+    pub fn resolve(&self, ip_addr: &Ipv4Addr) -> MacAddr {
         // TODO: Actual resolving
-        MacAddress([0xf6, 0xd4, 0x88, 0xc7, 0xe5, 0x64])
+        MacAddr(0xf6, 0xd4, 0x88, 0xc7, 0xe5, 0x64)
     }
 }

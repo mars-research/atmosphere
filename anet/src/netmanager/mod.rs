@@ -1,4 +1,4 @@
-use crate::util::RawPacket;
+use crate::packet::RawPacket;
 
 pub struct NetManager {}
 // TCP hashmap and udp dispatch
