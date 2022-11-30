@@ -7,9 +7,17 @@
 ///  - get:key
 ///  - del:key
 ///
-use std::{sync::Arc, str::FromStr, collections::VecDeque};
+use std::{collections::VecDeque, str::FromStr, sync::Arc};
 
-use anet::{nic::TapDevice, stack::udp::UdpStack, arp::ArpTable, util::{Ipv4Address, MacAddress, SocketAddress}, layer::ip::routing::{RoutingTable, RoutingEntry}, netmanager::NetManager, packet::{UdpPacketRepr, RawPacket}};
+use anet::{
+    arp::ArpTable,
+    layer::ip::routing::{RoutingEntry, RoutingTable},
+    netmanager::NetManager,
+    nic::TapDevice,
+    packet::{RawPacket, UdpPacketRepr},
+    stack::udp::UdpStack,
+    util::{Ipv4Address, MacAddress, SocketAddress},
+};
 use hashbrown::HashMap;
 use pnet::packet::ipv4::checksum;
 
@@ -26,11 +34,18 @@ lazy_static::lazy_static! {
 fn create_udp_stack() -> UdpStack<TapDevice> {
     let nic = TAP.clone();
     let arp_table = Arc::new(ArpTable::new());
-    arp_table.add_static_entry(Ipv4Address::from_str("10.0.0.1").unwrap(), MacAddress::from_str(TAP_MAC).unwrap());
+    arp_table.add_static_entry(
+        Ipv4Address::from_str("10.0.0.1").unwrap(),
+        MacAddress::from_str(TAP_MAC).unwrap(),
+    );
 
     let mut routing_table = RoutingTable::new();
     routing_table.set_default_gateway(Ipv4Address::new(10, 0, 0, 1));
-    routing_table.insert_rule(Ipv4Address::new(10, 0, 0, 1), 24, RoutingEntry::DirectlyConnected);
+    routing_table.insert_rule(
+        Ipv4Address::new(10, 0, 0, 1),
+        24,
+        RoutingEntry::DirectlyConnected,
+    );
 
     let netman = Arc::new(NetManager {});
 
@@ -54,7 +69,9 @@ pub fn main() {
     let mut send_batch = VecDeque::new();
 
     loop {
-        let n_packets = stack.recv_batch(&mut free_bufs, &mut recvd_packets).expect("failed to receive packets");
+        let n_packets = stack
+            .recv_batch(&mut free_bufs, &mut recvd_packets)
+            .expect("failed to receive packets");
 
         println!("received {n_packets} packets");
         if n_packets > 0 {
@@ -63,7 +80,9 @@ pub fn main() {
                 process_pkt(&mut pkt, &mut store);
                 send_batch.push_back(pkt);
             });
-            stack.send_batch(&mut send_batch, &mut free_bufs).expect("failed to send packets");
+            stack
+                .send_batch(&mut send_batch, &mut free_bufs)
+                .expect("failed to send packets");
         }
     }
 }
@@ -130,18 +149,14 @@ impl Request {
 
                 Response::Inserted
             }
-            Request::Get(k) => {
-                match store.get(k) {
-                    Some(v) => Response::Found(v.to_string()),
-                    None => Response::NotFound,
-                }
-            }
-            Request::Del(k) => {
-                match store.remove(k) {
-                    Some(_) => Response::Deleted,
-                    None => Response::NotFound,
-                }
-            }
+            Request::Get(k) => match store.get(k) {
+                Some(v) => Response::Found(v.to_string()),
+                None => Response::NotFound,
+            },
+            Request::Del(k) => match store.remove(k) {
+                Some(_) => Response::Deleted,
+                None => Response::NotFound,
+            },
         }
     }
 }
@@ -174,7 +189,7 @@ impl FromStr for Request {
                         Err("invalid command")
                     }
                 }
-                _ => Err("invalid command")
+                _ => Err("invalid command"),
             }
         } else {
             Err("invalid command")

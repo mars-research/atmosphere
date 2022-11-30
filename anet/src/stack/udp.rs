@@ -103,7 +103,14 @@ impl<Dev: Net> UdpStack<Dev> {
         returned: &mut VecDeque<RawPacket>,
     ) -> Result<usize, ()> {
         self.nic
-            .submit_batch(&mut packets.drain(..packets.len()).map(|p| p.consume()).rev().collect(), returned)
+            .submit_batch(
+                &mut packets
+                    .drain(..packets.len())
+                    .map(|p| p.consume())
+                    .rev()
+                    .collect(),
+                returned,
+            )
             .map_err(|_| ())
     }
 
@@ -126,7 +133,7 @@ impl<Dev: Net> UdpStack<Dev> {
                 } else {
                     // TODO: flip with demuxer
                     bufs.push_back(buf);
-                } 
+                }
             } else {
                 // drop
                 bufs.push_back(buf);

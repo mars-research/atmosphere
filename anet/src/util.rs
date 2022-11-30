@@ -1,7 +1,13 @@
-use pnet::packet::{ip::{
-    IpNextHeaderProtocol,
-    IpNextHeaderProtocols::{self, Udp},
-}, ipv4::Ipv4Packet, udp::UdpPacket, Packet, tcp::TcpPacket};
+use pnet::packet::{
+    ip::{
+        IpNextHeaderProtocol,
+        IpNextHeaderProtocols::{self, Udp},
+    },
+    ipv4::Ipv4Packet,
+    tcp::TcpPacket,
+    udp::UdpPacket,
+    Packet,
+};
 
 use crate::layer::{eth::ETHER_HDR_LEN, ip::IPV4_HEADER_LEN};
 
@@ -54,7 +60,7 @@ pub fn echo_pkt(buf: &mut [u8]) {
 #[inline(always)]
 pub fn read_proto_and_port(buf: &[u8]) -> Result<(IpNextHeaderProtocol, Port), ()> {
     if let Some(ipv4_packet) = Ipv4Packet::new(&buf[ETHER_HDR_LEN..]) {
-    let next_header = ipv4_packet.get_next_level_protocol();
+        let next_header = ipv4_packet.get_next_level_protocol();
 
         if next_header == IpNextHeaderProtocols::Udp {
             if let Some(udp_packet) = UdpPacket::new(ipv4_packet.payload()) {

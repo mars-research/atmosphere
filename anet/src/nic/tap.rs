@@ -4,23 +4,23 @@ use crate::packet::RawPacket;
 
 use super::Net;
 
-
 pub struct TapDevice {
     tap: tun_tap::Iface,
 }
 
 impl TapDevice {
     pub fn new(name: &str) -> Self {
-        let tap = tun_tap::Iface::without_packet_info(name, tun_tap::Mode::Tap).expect("failed to open tap interface");
-        Self {
-            tap
-        }
+        let tap = tun_tap::Iface::without_packet_info(name, tun_tap::Mode::Tap)
+            .expect("failed to open tap interface");
+        Self { tap }
     }
 }
 
-
 impl Net for TapDevice {
-    fn submit(&self, buf: crate::packet::RawPacket) -> crate::RpcResult<(bool, crate::packet::RawPacket)> {
+    fn submit(
+        &self,
+        buf: crate::packet::RawPacket,
+    ) -> crate::RpcResult<(bool, crate::packet::RawPacket)> {
         let bytes = self.tap.send(&buf.0).expect("failed to send on tap device");
         if bytes < buf.0.len() {
             panic!("failed to send");
@@ -43,12 +43,18 @@ impl Net for TapDevice {
             } else {
                 break;
             }
-        };
+        }
         Ok(n_submitted)
     }
 
-    fn poll(&self, mut buf: crate::packet::RawPacket) -> crate::RpcResult<(bool, crate::packet::RawPacket)> {
-        Ok(self.tap.recv(&mut buf.0).map_or((true, buf), |_|(false, buf)))
+    fn poll(
+        &self,
+        mut buf: crate::packet::RawPacket,
+    ) -> crate::RpcResult<(bool, crate::packet::RawPacket)> {
+        Ok(self
+            .tap
+            .recv(&mut buf.0)
+            .map_or((true, buf), |_| (false, buf)))
     }
 
     fn poll_batch(
@@ -65,7 +71,7 @@ impl Net for TapDevice {
             } else {
                 break;
             }
-        };
+        }
         Ok(n_recvd)
     }
 }
