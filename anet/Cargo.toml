@@ -9,9 +9,10 @@ edition = "2021"
 bitfield = "0.14.0"
 crossbeam = { version = "0.8.2", features = ["crossbeam-queue", "alloc"], default-features = false }
 hashbrown = "0.12.3"
+lazy_static = "1.4.0"
 managed = "0.8"
 pnet = "0.31.0"
-quiche = { version = "0.16.0", default-features = false, features = ["boringssl-boring-crate"] }
+ring = "0.16.20"
 spin = "0.9.4"
 thingbuf = "0.1.3"
 tun-tap = "0.1.3"

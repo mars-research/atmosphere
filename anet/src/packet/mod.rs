@@ -76,6 +76,7 @@ impl UdpPacketRepr {
         let mut payload_len = 0;
         self.set_udp_packet(|mut udp| {
             payload_len = f(udp.payload_mut());
+            udp.set_length((payload_len + UDP_HEADER_LEN) as u16);
         });
 
         self.udp_payload_len = payload_len;
@@ -83,6 +84,10 @@ impl UdpPacketRepr {
 
     pub fn udp_payload(&self) -> &[u8] {
         &self.packet.0[UDP_PAYLOAD_OFFSET..UDP_PAYLOAD_OFFSET + self.udp_payload_len]
+    }
+
+    pub fn udp_payload_mut(&mut self) -> &mut [u8] {
+        &mut self.packet.0[UDP_PAYLOAD_OFFSET..]
     }
 
     pub fn consume(self) -> RawPacket {

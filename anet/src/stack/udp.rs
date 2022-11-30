@@ -4,19 +4,16 @@ use pnet::packet::ip::IpNextHeaderProtocols;
 use pnet::util::MacAddr;
 use thingbuf::mpsc::Sender;
 
-use pnet::util::core_net::{Ipv4Addr, SocketAddrV4};
-
 use crate::arp::ArpTable;
 use crate::layer::ip::routing::{RoutingEntry, RoutingResult, RoutingTable};
-use crate::layer::ip::Ipv4NextHeader;
 use crate::layer::{eth::EthernetLayer, ip::Ipv4Layer, udp::UdpLayer};
 use crate::netmanager::NetManager;
-use crate::nic::{DummyNic, Net};
+use crate::nic::Net;
 use crate::packet::{RawPacket, UdpPacketRepr};
-use crate::util::{read_proto_and_port, Port};
+use crate::util::{read_proto_and_port, SocketAddress};
 
-pub struct UdpStack {
-    port: Port,
+pub struct UdpStack<Dev: Net> {
+    endpoint: SocketAddress,
     udp_layer: UdpLayer,
     ipv4_layer: Ipv4Layer,
     routing_table: RoutingTable,
@@ -24,30 +21,27 @@ pub struct UdpStack {
     rx_queue: Sender<RawPacket>,
     arp_table: Arc<ArpTable>,
     manager: Arc<NetManager>,
-    pub(crate) nic: Arc<DummyNic>,
+    pub(crate) nic: Arc<Dev>,
 }
 
-impl UdpStack {
+impl<Dev: Net> UdpStack<Dev> {
     pub fn new(
-        port: Port,
+        endpoint: SocketAddress,
         manager: Arc<NetManager>,
-        nic: Arc<DummyNic>,
-        ipv4_addr: Ipv4Addr,
+        nic: Arc<Dev>,
         mac_addr: MacAddr,
         routing_table: RoutingTable,
         arp_table: Arc<ArpTable>,
     ) -> Self {
         let (rx_queue, rx_dequeue) = thingbuf::mpsc::channel(32);
-        //
-        let nic = Arc::new(DummyNic::new());
 
         let eth_layer = EthernetLayer::new(mac_addr);
-        let ipv4_layer = Ipv4Layer::new(ipv4_addr);
+        let ipv4_layer = Ipv4Layer::new(*endpoint.ip());
 
-        let udp_layer = UdpLayer::new(port);
+        let udp_layer = UdpLayer::new(endpoint.port());
 
         Self {
-            port,
+            endpoint,
             manager,
             udp_layer,
             ipv4_layer,
@@ -63,7 +57,7 @@ impl UdpStack {
         &self,
         buffers: &mut VecDeque<RawPacket>,
         packets: &mut VecDeque<UdpPacketRepr>,
-        dest: SocketAddrV4,
+        dest: SocketAddress,
         payload: &[u8],
     ) -> Result<usize, ()> {
         let mut bytes = 0;
@@ -76,7 +70,6 @@ impl UdpStack {
             let mut packet = UdpPacketRepr::from(buf);
             packet.set_udp_payload(|buf: &mut [u8]| {
                 let len = core::cmp::min(buf.len(), payload[bytes..].len());
-                println!("len: {}", len);
                 buf[..len].copy_from_slice(&payload[bytes..len]);
 
                 bytes += len;
@@ -110,7 +103,7 @@ impl UdpStack {
         returned: &mut VecDeque<RawPacket>,
     ) -> Result<usize, ()> {
         self.nic
-            .submit_batch(&mut packets.iter().map(|p| p.consume()).collect(), returned)
+            .submit_batch(&mut packets.drain(..packets.len()).map(|p| p.consume()).rev().collect(), returned)
             .map_err(|_| ())
     }
 
@@ -123,21 +116,29 @@ impl UdpStack {
         self.nic
             .poll_batch(bufs, &mut returned_bufs)
             .map_err(|_| ())?;
-        let num_pkts = returned_bufs.len();
+        let mut num_pkts = 0;
 
         for buf in returned_bufs {
-            let (proto, port) = read_proto_and_port(&buf.0);
-            if proto == IpNextHeaderProtocols::Udp && port == self.port {
-                returned.push_back(UdpPacketRepr::from(buf));
+            if let Ok((proto, port)) = read_proto_and_port(&buf.0) {
+                if proto == IpNextHeaderProtocols::Udp && port == self.endpoint.port() {
+                    returned.push_back(UdpPacketRepr::from(buf));
+                    num_pkts += 1;
+                } else {
+                    // TODO: flip with demuxer
+                    bufs.push_back(buf);
+                } 
             } else {
-                // TODO: flip with demuxer
+                // drop
                 bufs.push_back(buf);
             }
         }
 
         Ok(num_pkts)
     }
-}
 
+    pub fn endpoint(&self) -> SocketAddress {
+        self.endpoint
+    }
+}
 // first you request from demuxer
 // then request from nic?

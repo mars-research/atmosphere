@@ -1,7 +1,7 @@
-use pnet::packet::ip::{
+use pnet::packet::{ip::{
     IpNextHeaderProtocol,
     IpNextHeaderProtocols::{self, Udp},
-};
+}, ipv4::Ipv4Packet, udp::UdpPacket, Packet, tcp::TcpPacket};
 
 use crate::layer::{eth::ETHER_HDR_LEN, ip::IPV4_HEADER_LEN};
 
@@ -52,29 +52,28 @@ pub fn echo_pkt(buf: &mut [u8]) {
 }
 
 #[inline(always)]
-pub fn read_proto_and_port(buf: &[u8]) -> (IpNextHeaderProtocol, Port) {
-    let ipv4_packet = &buf[ETHER_HDR_LEN..];
-    let next_header = *&ipv4_packet[9];
+pub fn read_proto_and_port(buf: &[u8]) -> Result<(IpNextHeaderProtocol, Port), ()> {
+    if let Some(ipv4_packet) = Ipv4Packet::new(&buf[ETHER_HDR_LEN..]) {
+    let next_header = ipv4_packet.get_next_level_protocol();
 
-    if next_header == (IpNextHeaderProtocols::Udp.0) {
-        (Udp, read_udp_port(ipv4_packet))
-    } else if next_header == (IpNextHeaderProtocols::Tcp.0) {
-        (IpNextHeaderProtocols::Tcp, read_tcp_port(ipv4_packet))
+        if next_header == IpNextHeaderProtocols::Udp {
+            if let Some(udp_packet) = UdpPacket::new(ipv4_packet.payload()) {
+                let port = udp_packet.get_destination();
+                Ok((IpNextHeaderProtocols::Udp, port))
+            } else {
+                Err(())
+            }
+        } else if next_header == IpNextHeaderProtocols::Tcp {
+            if let Some(tcp_packet) = TcpPacket::new(ipv4_packet.payload()) {
+                let port = tcp_packet.get_destination();
+                Ok((IpNextHeaderProtocols::Tcp, port))
+            } else {
+                Err(())
+            }
+        } else {
+            Err(())
+        }
     } else {
-        panic!("unsupported ipv4 next header");
+        Err(())
     }
-}
-
-fn read_tcp_port(ipv4_packet: &[u8]) -> Port {
-    let tcp_packet = &ipv4_packet[IPV4_HEADER_LEN..];
-    let tcp_port = u16::from_be_bytes([tcp_packet[2], tcp_packet[3]]);
-
-    tcp_port
-}
-
-fn read_udp_port(ipv4_packet: &[u8]) -> Port {
-    let udp_packet = &ipv4_packet[IPV4_HEADER_LEN..];
-    let udp_port = u16::from_be_bytes([udp_packet[2], udp_packet[3]]);
-
-    udp_port
 }
