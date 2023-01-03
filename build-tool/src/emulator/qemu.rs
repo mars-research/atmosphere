@@ -13,15 +13,19 @@ use tokio::process::Command;
 use super::output_filter::InitialOutputFilter;
 use super::{
     CpuModel, Emulator, EmulatorExit, GdbServer, RunConfiguration, /*InitialOutputFilter*/
+    GdbConnectionInfo,
 };
 use crate::error::Result;
 use crate::grub::BootableImage;
-use crate::project::{Binary, ProjectHandle};
+use crate::project::ProjectHandle;
 
 /// A QEMU instance.
 pub struct Qemu {
     /// The QEMU binary to use.
     qemu_binary: PathBuf,
+
+    /// The run configuration.
+    config: RunConfiguration,
 
     /// I/O port for the isa-debug-exit device.
     debug_exit_io_base: u16,
@@ -29,9 +33,10 @@ pub struct Qemu {
 
 impl Qemu {
     /// Create a QEMU instance.
-    pub fn new(_project: ProjectHandle) -> Self {
+    pub fn new(_project: ProjectHandle, config: RunConfiguration) -> Self {
         Self {
             qemu_binary: PathBuf::from("qemu-system-x86_64"),
+            config,
             debug_exit_io_base: 0xf4,
         }
     }
@@ -40,7 +45,8 @@ impl Qemu {
 #[async_trait]
 impl Emulator for Qemu {
     /// Start the QEMU process.
-    async fn run(&mut self, config: &RunConfiguration, kernel: &Binary) -> Result<EmulatorExit> {
+    async fn run(&mut self) -> Result<EmulatorExit> {
+        let config = &self.config;
         let memory = config.memory.get_adjusted_unit(ByteUnit::MiB).get_value() as usize;
 
         let command_line = config.full_command_line()
@@ -61,7 +67,7 @@ impl Emulator for Qemu {
             ]);
             command.args(&[
                 "-initrd",
-                kernel
+                config.kernel
                     .path()
                     .to_str()
                     .expect("Kernel path contains non-UTF-8"),
@@ -73,7 +79,7 @@ impl Emulator for Qemu {
         } else {
             // FIXME: Make this cachable
             let grub_image =
-                grub_image.insert(BootableImage::generate(command_line, Some(kernel)).await?);
+                grub_image.insert(BootableImage::generate(command_line, Some(&config.kernel)).await?);
             let hda = format!(
                 "file={},format=raw,index=0,media=disk",
                 grub_image
@@ -158,6 +164,14 @@ impl Emulator for Qemu {
         } else {
             Ok(EmulatorExit::Success)
         }
+    }
+
+    /// Returns the GDB connection info for the instance.
+    fn gdb_connection_info(&self) -> Option<GdbConnectionInfo> {
+        let kernel = &self.config.kernel;
+        let gdb_server = self.config.gdb_server.as_ref()?;
+        let gdb_info = GdbConnectionInfo::new(kernel.path().to_owned(), gdb_server.to_owned());
+        Some(gdb_info)
     }
 }
 

@@ -21,12 +21,15 @@ use super::output_filter::InitialOutputFilter;
 use super::{CpuModel, Emulator, EmulatorExit, GdbServer, RunConfiguration};
 use crate::error::Result;
 use crate::grub::BootableImage;
-use crate::project::{Binary, ProjectHandle};
+use crate::project::ProjectHandle;
 
 /// A Bochs instance.
 pub struct Bochs {
     /// Which Bochs binary to use.
     bochs_binary: PathBuf,
+
+    /// The run configuration.
+    config: RunConfiguration,
 
     /// Bochs APM IO port.
     apm_io_base: u16,
@@ -34,9 +37,10 @@ pub struct Bochs {
 
 impl Bochs {
     /// Create a new Bochs instance.
-    pub fn new(_project: ProjectHandle) -> Self {
+    pub fn new(_project: ProjectHandle, config: RunConfiguration) -> Self {
         Self {
             bochs_binary: PathBuf::from("bochs"),
+            config,
             apm_io_base: 0x8900,
         }
     }
@@ -45,7 +49,8 @@ impl Bochs {
 #[async_trait]
 impl Emulator for Bochs {
     /// Start the Bochs process.
-    async fn run(&mut self, config: &RunConfiguration, kernel: &Binary) -> Result<EmulatorExit> {
+    async fn run(&mut self) -> Result<EmulatorExit> {
+        let config = &self.config;
         let memory = config.memory.get_adjusted_unit(ByteUnit::MiB).get_value() as usize;
 
         if memory > 2048 {
@@ -60,7 +65,7 @@ impl Emulator for Bochs {
             config.full_command_line() + &format!(" bochs_apm_io_base={}", self.apm_io_base);
 
         // FIXME: Make this cachable
-        let grub = BootableImage::generate(command_line, Some(kernel)).await?;
+        let grub = BootableImage::generate(command_line, Some(&self.config.kernel)).await?;
 
         let bochsrc = {
             let mut f = NamedTempFile::new()?;

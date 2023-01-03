@@ -9,7 +9,7 @@ use tokio::fs;
 
 use super::{GlobalOpts, SubCommand};
 use crate::emulator::{
-    Bochs, CpuModel, Emulator, EmulatorExit, GdbConnectionInfo, GdbServer, Qemu, RunConfiguration,
+    Bochs, CpuModel, Emulator, EmulatorExit, GdbServer, Qemu, RunConfiguration,
 };
 use crate::error::Result;
 use crate::project::{Binary, BuildOptions, Project};
@@ -92,7 +92,7 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
             .expect("No binary was produced")
     };
 
-    let mut run_config = RunConfiguration::default();
+    let mut run_config = RunConfiguration::new(kernel);
     run_config.use_virtualization(local.kvm);
     run_config.auto_shutdown(!local.no_shutdown);
 
@@ -148,9 +148,16 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
         if local.bochs {
             unimplemented!("GDB support for Bochs not implemented yet")
         }
+    }
 
+    let mut emulator: Box<dyn Emulator> = if local.bochs {
+        Box::new(Bochs::new(project.clone(), run_config))
+    } else {
+        Box::new(Qemu::new(project.clone(), run_config))
+    };
+
+    if let Some(gdb_info) = emulator.gdb_connection_info() {
         // Save connection info to `.gdb`
-        let gdb_info = GdbConnectionInfo::new(kernel.path().to_owned(), gdb_server);
         let json_path = project.gdb_info_path();
         let json = serde_json::to_vec(&gdb_info)?;
 
@@ -163,13 +170,7 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
         log::warn!("Run `atmo gdb` in another terminal. Execution will be frozen until you continue in the debugger.");
     }
 
-    let mut emulator: Box<dyn Emulator> = if local.bochs {
-        Box::new(Bochs::new(project.clone()))
-    } else {
-        Box::new(Qemu::new(project.clone()))
-    };
-    // let mut qemu = Qemu::new(project.clone());
-    let ret = emulator.run(&run_config, &kernel).await?;
+    let ret = emulator.run().await?;
 
     if local.gdb {
         let json_path = project.gdb_info_path();

@@ -20,11 +20,24 @@ pub use qemu::Qemu;
 #[async_trait]
 pub trait Emulator {
     /// Start the emulator.
-    async fn run(&mut self, config: &RunConfiguration, kernel: &Binary) -> Result<EmulatorExit>;
+    async fn run(&mut self) -> Result<EmulatorExit>;
+
+    /// Returns the GDB connection info for the instance.
+    fn gdb_connection_info(&self) -> Option<GdbConnectionInfo> {
+        None
+    }
 }
 
 /// Run configuration.
 pub struct RunConfiguration {
+    /// The kernel image to use.
+    kernel: Binary,
+
+    /// The early loader to use.
+    ///
+    /// This will become required.
+    early_loader: Option<Binary>,
+
     /// Memory for the virtual machine.
     memory: Byte,
 
@@ -54,11 +67,6 @@ pub struct RunConfiguration {
     /// Whether to freeze on start-up to wait for the debugger.
     freeze_on_startup: bool,
 
-    /// The early loader to use.
-    ///
-    /// This will become required.
-    early_loader: Option<Binary>,
-
     /// Whether to suppress inital outputs from the emulator.
     ///
     /// By default, we suppress initial outputs from the emulator (BIOS, GRUB,
@@ -70,6 +78,28 @@ pub struct RunConfiguration {
 }
 
 impl RunConfiguration {
+    pub fn new(kernel: Binary) -> Self {
+        Self {
+            kernel,
+            memory: Byte::from_unit(8.0f64, ByteUnit::GiB).unwrap(),
+            use_virtualization: false,
+            cpu_model: CpuModel::Haswell,
+            script: None,
+            command_line: String::new(),
+            auto_shutdown: true,
+            gdb_server: None,
+            freeze_on_startup: false,
+            early_loader: None,
+            suppress_initial_outputs: true,
+        }
+    }
+
+    /// Set the early loader to use.
+    pub fn early_loader(&mut self, early_loader: Option<Binary>) -> &mut Self {
+        self.early_loader = early_loader;
+        self
+    }
+
     /// Set the script to run.
     pub fn script(&mut self, script: String) -> &mut Self {
         self.script = Some(script);
@@ -112,12 +142,6 @@ impl RunConfiguration {
         self
     }
 
-    /// Set whether to use the early loader.
-    pub fn early_loader(&mut self, early_loader: Option<Binary>) -> &mut Self {
-        self.early_loader = early_loader;
-        self
-    }
-
     /// Set the initial output suppression config.
     pub fn suppress_initial_outputs(&mut self, suppress_initial_outputs: bool) -> &mut Self {
         self.suppress_initial_outputs = suppress_initial_outputs;
@@ -141,23 +165,6 @@ impl RunConfiguration {
         }
 
         cmdline
-    }
-}
-
-impl Default for RunConfiguration {
-    fn default() -> Self {
-        Self {
-            memory: Byte::from_unit(2.0f64, ByteUnit::GiB).unwrap(),
-            use_virtualization: false,
-            cpu_model: CpuModel::Haswell,
-            script: None,
-            command_line: String::new(),
-            auto_shutdown: true,
-            gdb_server: None,
-            freeze_on_startup: false,
-            early_loader: None,
-            suppress_initial_outputs: true,
-        }
     }
 }
 
