@@ -7,5 +7,5 @@ edition = "2021"
 
 [dependencies]
 asys = { path = "../asys" }
-
 log = "0.4.19"
+x86 = "0.52.0"

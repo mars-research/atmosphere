@@ -3,6 +3,6 @@ target = "src/x86_64-unknown-aloader.json"
 rustflags = [ "-Z", "emit-stack-sizes" ]
 
 [unstable]
-build-std = [ "core" ]
+build-std = [ "core" , "alloc" ]
 build-std-features = [ "compiler-builtins-mem" ]
 unstable-options = true
