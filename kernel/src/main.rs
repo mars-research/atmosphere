@@ -173,6 +173,7 @@ unsafe fn try_sysret(pc: *const c_void, sp: *mut c_void) -> ! {
         "pushfq",
         "pop r11",
         "mov rsp, {sp}",
+        "or r11, (3 << 12)", // set IOPL to 3. Temp workaround for dom0 to access PCI CFG
         "sysretq",
 
         in("rcx") pc,
