@@ -42,6 +42,10 @@ pub struct Opts {
     #[clap(long)]
     gdb: bool,
 
+    /// Whether to enable Nvme emulation
+    #[clap(long)]
+    nvme: bool,
+
     /// Whether to emit full output from the emulator.
     #[clap(long)]
     full_output: bool,
@@ -97,6 +101,7 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
     run_config.use_virtualization(local.kvm);
     run_config.auto_shutdown(!local.no_shutdown);
     run_config.dom0(dom0);
+    run_config.enable_nvme(local.nvme);
 
     if let Some(cpu_model) = local.cpu_model {
         run_config.cpu_model(cpu_model);

@@ -76,6 +76,9 @@ pub struct RunConfiguration {
     /// terminal to values that make sense when they are output to a standalone
     /// terminal, but are frustrating when run as a normal CLI program.
     suppress_initial_outputs: bool,
+
+    /// Whether to enable emulated nvme device for development purposes
+    enable_nvme: bool,
 }
 
 impl RunConfiguration {
@@ -93,6 +96,7 @@ impl RunConfiguration {
             gdb_server: None,
             freeze_on_startup: false,
             suppress_initial_outputs: true,
+            enable_nvme: true,
         }
     }
 
@@ -117,6 +121,12 @@ impl RunConfiguration {
     /// Set whether to use hardware virtualization.
     pub fn use_virtualization(&mut self, use_virtualization: bool) -> &mut Self {
         self.use_virtualization = use_virtualization;
+        self
+    }
+
+    /// Set whether to use Qemu's Nvme emulation.
+    pub fn enable_nvme(&mut self, enable_nvme: bool) -> &mut Self {
+        self.enable_nvme = enable_nvme;
         self
     }
 
