@@ -1,12 +1,11 @@
 #![no_std]
 #![no_main]
-#![feature(start, strict_provenance)]
+#![feature(start, strict_provenance, asm_const, alloc_layout_extra)]
 
 extern crate alloc;
 
 use alloc::format;
-pub use alloc::string::String;
-use alloc::vec;
+use alloc::string::String;
 pub use alloc::vec::Vec;
 use core::arch::asm;
 use core::panic::PanicInfo;
@@ -15,7 +14,8 @@ pub use log::info as println;
 
 mod allocator;
 
-static mut MEMORY_REGION: [u8; 4096] = [0u8; 4096];
+const REGION_SIZE: usize = 65536 * 4;
+static mut MEMORY_REGION: [u8; REGION_SIZE] = [0u8; REGION_SIZE];
 
 use pci::{Pci, PciClass, PciHeader, PciHeaderError, PciHeaderType};
 mod pci;
@@ -36,7 +36,7 @@ fn handle_parsed_header(pci: &Pci, bus_num: u8, dev_num: u8, func_num: u8, heade
         header.class()
     );
 
-    match header.class() {
+    /*match header.class() {
         PciClass::Storage => match header.subclass() {
             0x01 => {
                 string.push_str(" IDE");
@@ -65,31 +65,27 @@ fn handle_parsed_header(pci: &Pci, bus_num: u8, dev_num: u8, func_num: u8, heade
             _ => (),
         },
         _ => (),
-    }
+    }*/
 
     for (i, bar) in header.bars().iter().enumerate() {
         if !bar.is_none() {
-            string.push_str(&format!(" {}={}", i, bar));
+            string.push_str(&format!("\n\t{} => {}", i, bar.unwrap()));
         }
     }
 
     println!("{}", string);
 }
 
-fn dump_pci_bus() {
+fn scan_pci_devs() {
     let pci = Pci::new();
     for bus in pci.buses() {
         for dev in bus.devs() {
             for func in dev.funcs() {
-                let func_num = func.num;
-                match PciHeader::from_reader(func) {
+                match pci::utils::get_config(bus.num, dev.num, func.num) {
                     Ok(header) => {
-                        handle_parsed_header(&pci, bus.num, dev.num, func_num, header);
+                        handle_parsed_header(&pci, bus.num, dev.num, func.num, header.pci_hdr.hdr);
                     }
-                    Err(PciHeaderError::NoDevice) => {}
-                    Err(PciHeaderError::UnknownHeaderType(id)) => {
-                        log::info!("pcid: unknown header type: {}", id);
-                    }
+                    Err(_) => {}
                 }
             }
         }
@@ -118,7 +114,8 @@ fn main() -> isize {
     //     log::info!("*{:x?} = {:x?}", (0xA000000000usize + i * 4096), user_value);
     // }
 
-    dump_pci_bus();
+    scan_pci_devs();
+    //dump_pci_bus();
     loop {}
 }
 

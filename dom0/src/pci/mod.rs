@@ -4,6 +4,8 @@ pub use self::class::PciClass;
 pub use self::dev::{PciDev, PciDevIter};
 pub use self::func::PciFunc;
 pub use self::header::{PciHeader, PciHeaderError, PciHeaderType};
+pub use super::println;
+use core::result::Result;
 
 use core::arch::asm;
 
@@ -13,6 +15,7 @@ mod class;
 mod dev;
 mod func;
 pub mod header;
+pub mod utils;
 
 pub struct Pci;
 

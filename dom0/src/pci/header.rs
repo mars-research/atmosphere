@@ -1,9 +1,16 @@
 use byteorder::{ByteOrder, LittleEndian};
 
+use super::super::println;
 use super::bar::PciBar;
 use super::class::PciClass;
 use super::func::ConfigReader;
+use super::utils::{
+    pci_enable_bus_mastering, pci_read, pci_read_bars, pci_read_range, pci_write, PciAddress,
+};
+use crate::pci::utils::PciBarAddr;
 use bitflags::bitflags;
+use core::result::Result;
+use heapless::Vec as AVec;
 
 #[derive(Debug, PartialEq)]
 pub enum PciHeaderError {
@@ -27,6 +34,37 @@ bitflags! {
     }
 }
 
+#[derive(Debug)]
+pub struct PciDeviceHeader {
+    pub hdr: PciHeader,
+}
+
+impl PciDeviceHeader {
+    fn new(hdr: PciHeader) -> PciDeviceHeader {
+        PciDeviceHeader { hdr }
+    }
+
+    pub fn get_bar(&self, idx: usize) -> Option<&PciBarAddr> {
+        self.hdr.get_bar(idx)
+    }
+
+    pub fn class(&self) -> PciClass {
+        self.hdr.class()
+    }
+
+    pub fn subclass(&self) -> u8 {
+        self.hdr.subclass()
+    }
+
+    pub fn vendor_id(&self) -> u16 {
+        self.hdr.vendor_id()
+    }
+
+    pub fn device_id(&self) -> u16 {
+        self.hdr.device_id()
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum PciHeader {
     General {
@@ -42,7 +80,7 @@ pub enum PciHeader {
         latency_timer: u8,
         header_type: PciHeaderType,
         bist: u8,
-        bars: [PciBar; 6],
+        bars: AVec<Option<PciBarAddr>, 6>,
         cardbus_cis_ptr: u32,
         subsystem_vendor_id: u16,
         subsystem_id: u16,
@@ -66,7 +104,7 @@ pub enum PciHeader {
         latency_timer: u8,
         header_type: PciHeaderType,
         bist: u8,
-        bars: [PciBar; 2],
+        bars: AVec<Option<PciBarAddr>, 6>,
         primary_bus_num: u8,
         secondary_bus_num: u8,
         subordinate_bus_num: u8,
@@ -90,141 +128,147 @@ pub enum PciHeader {
     },
 }
 
-impl PciHeader {
-    /// Parse the bytes found in the Configuration Space of the PCI device into
-    /// a more usable PciHeader.
-    pub fn from_reader<T: ConfigReader>(reader: T) -> Result<PciHeader, PciHeaderError> {
-        if unsafe { reader.read_u32(0) } != 0xffffffff {
-            // Read the initial 16 bytes and set variables used by all header types.
-            let bytes = unsafe { reader.read_range(0, 16) };
-            let vendor_id = LittleEndian::read_u16(&bytes[0..2]);
-            let device_id = LittleEndian::read_u16(&bytes[2..4]);
-            let command = LittleEndian::read_u16(&bytes[4..6]);
-            let status = LittleEndian::read_u16(&bytes[6..8]);
-            let revision = bytes[8];
-            let interface = bytes[9];
-            let subclass = bytes[10];
-            let class = PciClass::from(bytes[11]);
-            let cache_line_size = bytes[12];
-            let latency_timer = bytes[13];
-            let header_type = PciHeaderType::from_bits_truncate(bytes[14]);
-            let bist = bytes[15];
-            match header_type & PciHeaderType::HEADER_TYPE {
-                PciHeaderType::GENERAL => {
-                    let bytes = unsafe { reader.read_range(16, 48) };
-                    let bars = [
-                        PciBar::from(LittleEndian::read_u32(&bytes[0..4])),
-                        PciBar::from(LittleEndian::read_u32(&bytes[4..8])),
-                        PciBar::from(LittleEndian::read_u32(&bytes[8..12])),
-                        PciBar::from(LittleEndian::read_u32(&bytes[12..16])),
-                        PciBar::from(LittleEndian::read_u32(&bytes[16..20])),
-                        PciBar::from(LittleEndian::read_u32(&bytes[20..24])),
-                    ];
-                    let cardbus_cis_ptr = LittleEndian::read_u32(&bytes[24..28]);
-                    let subsystem_vendor_id = LittleEndian::read_u16(&bytes[28..30]);
-                    let subsystem_id = LittleEndian::read_u16(&bytes[30..32]);
-                    let expansion_rom_bar = LittleEndian::read_u32(&bytes[32..36]);
-                    // TODO: Parse out the capabilities list.
-                    let cap_pointer = bytes[36];
-                    let interrupt_line = bytes[44];
-                    let interrupt_pin = bytes[45];
-                    let min_grant = bytes[46];
-                    let max_latency = bytes[47];
-                    Ok(PciHeader::General {
-                        vendor_id,
-                        device_id,
-                        command,
-                        status,
-                        revision,
-                        interface,
-                        subclass,
-                        class,
-                        cache_line_size,
-                        latency_timer,
-                        header_type,
-                        bist,
-                        bars,
-                        cardbus_cis_ptr,
-                        subsystem_vendor_id,
-                        subsystem_id,
-                        expansion_rom_bar,
-                        cap_pointer,
-                        interrupt_line,
-                        interrupt_pin,
-                        min_grant,
-                        max_latency,
-                    })
-                }
-                PciHeaderType::PCITOPCI => {
-                    let bytes = unsafe { reader.read_range(16, 48) };
-                    let bars = [
-                        PciBar::from(LittleEndian::read_u32(&bytes[0..4])),
-                        PciBar::from(LittleEndian::read_u32(&bytes[4..8])),
-                    ];
-                    let primary_bus_num = bytes[8];
-                    let secondary_bus_num = bytes[9];
-                    let subordinate_bus_num = bytes[10];
-                    let secondary_latency_timer = bytes[11];
-                    let io_base = bytes[12];
-                    let io_limit = bytes[13];
-                    let secondary_status = LittleEndian::read_u16(&bytes[14..16]);
-                    let mem_base = LittleEndian::read_u16(&bytes[16..18]);
-                    let mem_limit = LittleEndian::read_u16(&bytes[18..20]);
-                    let prefetch_base = LittleEndian::read_u16(&bytes[20..22]);
-                    let prefetch_limit = LittleEndian::read_u16(&bytes[22..24]);
-                    let prefetch_base_upper = LittleEndian::read_u32(&bytes[24..28]);
-                    let prefetch_limit_upper = LittleEndian::read_u32(&bytes[28..32]);
-                    let io_base_upper = LittleEndian::read_u16(&bytes[32..34]);
-                    let io_limit_upper = LittleEndian::read_u16(&bytes[34..36]);
-                    // TODO: Parse out the capabilities list.
-                    let cap_pointer = bytes[36];
-                    let expansion_rom = LittleEndian::read_u32(&bytes[40..44]);
-                    let interrupt_line = bytes[44];
-                    let interrupt_pin = bytes[45];
-                    let bridge_control = LittleEndian::read_u16(&bytes[46..48]);
-                    Ok(PciHeader::PciToPci {
-                        vendor_id,
-                        device_id,
-                        command,
-                        status,
-                        revision,
-                        interface,
-                        subclass,
-                        class,
-                        cache_line_size,
-                        latency_timer,
-                        header_type,
-                        bist,
-                        bars,
-                        primary_bus_num,
-                        secondary_bus_num,
-                        subordinate_bus_num,
-                        secondary_latency_timer,
-                        io_base,
-                        io_limit,
-                        secondary_status,
-                        mem_base,
-                        mem_limit,
-                        prefetch_base,
-                        prefetch_limit,
-                        prefetch_base_upper,
-                        prefetch_limit_upper,
-                        io_base_upper,
-                        io_limit_upper,
-                        cap_pointer,
-                        expansion_rom,
-                        interrupt_line,
-                        interrupt_pin,
-                        bridge_control,
-                    })
-                }
-                id => Err(PciHeaderError::UnknownHeaderType(id.bits())),
-            }
-        } else {
-            Err(PciHeaderError::NoDevice)
-        }
-    }
+/// Parse the bytes found in the Configuration Space of the PCI device into
+/// a more usable PciHeader.
+pub fn read_config_space(pci_addr: &PciAddress) -> Result<PciDeviceHeader, PciHeaderError> {
+    if pci_read(&pci_addr, 0) != 0xffff_ffff {
+        // Read the initial 16 bytes and set variables used by all header types.
+        let mut bytes = pci_read_range(&pci_addr, 0, 16);
+        let vendor_id = LittleEndian::read_u16(&bytes[0..2]);
+        let device_id = LittleEndian::read_u16(&bytes[2..4]);
+        let command = LittleEndian::read_u16(&bytes[4..6]);
+        let status = LittleEndian::read_u16(&bytes[6..8]);
 
+        //println!("command {:x} status {:x}", command, status);
+
+        // TODO: Move this into a trait object from where a driver can invoke this
+        pci_enable_bus_mastering(pci_addr);
+        let revision = bytes[8];
+        let interface = bytes[9];
+        let subclass = bytes[10];
+        let class = PciClass::from(bytes[11]);
+        let cache_line_size = bytes[12];
+        let latency_timer = bytes[13];
+        let header_type = PciHeaderType::from_bits_truncate(bytes[14]);
+        let bist = bytes[15];
+        match header_type & PciHeaderType::HEADER_TYPE {
+            PciHeaderType::GENERAL => {
+                let bars = pci_read_bars(pci_addr, PciHeaderType::GENERAL);
+
+                #[cfg(feature = "c220g2_ixgbe")]
+                {
+                    // Cloudlab has dual port ixgbe devices and the we need to attach our driver
+                    // to the second device.
+                    if bars[0] == unsafe { Some(PciBarAddr::new(0xc7900000, 0)) } {
+                        return Err(Error::new(ENODEV));
+                    }
+                }
+
+                let bytes = pci_read_range(&pci_addr, 30, 24);
+                let cardbus_cis_ptr = LittleEndian::read_u32(&bytes[0..4]);
+                let subsystem_vendor_id = LittleEndian::read_u16(&bytes[4..6]);
+                let subsystem_id = LittleEndian::read_u16(&bytes[6..8]);
+                let expansion_rom_bar = LittleEndian::read_u32(&bytes[8..12]);
+                // TODO: Parse out the capabilities list.
+                let cap_pointer = bytes[12];
+                let interrupt_line = bytes[20];
+                let interrupt_pin = bytes[21];
+                let min_grant = bytes[22];
+                let max_latency = bytes[23];
+                Ok(PciDeviceHeader::new(PciHeader::General {
+                    vendor_id,
+                    device_id,
+                    command,
+                    status,
+                    revision,
+                    interface,
+                    subclass,
+                    class,
+                    cache_line_size,
+                    latency_timer,
+                    header_type,
+                    bist,
+                    bars,
+                    cardbus_cis_ptr,
+                    subsystem_vendor_id,
+                    subsystem_id,
+                    expansion_rom_bar,
+                    cap_pointer,
+                    interrupt_line,
+                    interrupt_pin,
+                    min_grant,
+                    max_latency,
+                }))
+            }
+            PciHeaderType::PCITOPCI => {
+                let bars = pci_read_bars(pci_addr, PciHeaderType::PCITOPCI);
+
+                let bytes = pci_read_range(&pci_addr, 24, 40);
+                let primary_bus_num = bytes[0];
+                let secondary_bus_num = bytes[1];
+                let subordinate_bus_num = bytes[2];
+                let secondary_latency_timer = bytes[3];
+                let io_base = bytes[4];
+                let io_limit = bytes[5];
+                let secondary_status = LittleEndian::read_u16(&bytes[6..8]);
+                let mem_base = LittleEndian::read_u16(&bytes[8..10]);
+                let mem_limit = LittleEndian::read_u16(&bytes[10..12]);
+                let prefetch_base = LittleEndian::read_u16(&bytes[12..14]);
+                let prefetch_limit = LittleEndian::read_u16(&bytes[14..16]);
+                let prefetch_base_upper = LittleEndian::read_u32(&bytes[16..20]);
+                let prefetch_limit_upper = LittleEndian::read_u32(&bytes[20..24]);
+                let io_base_upper = LittleEndian::read_u16(&bytes[24..26]);
+                let io_limit_upper = LittleEndian::read_u16(&bytes[26..28]);
+                // TODO: Parse out the capabilities list.
+                let cap_pointer = bytes[28];
+                let expansion_rom = LittleEndian::read_u32(&bytes[32..36]);
+                let interrupt_line = bytes[36];
+                let interrupt_pin = bytes[37];
+                let bridge_control = LittleEndian::read_u16(&bytes[38..40]);
+                Ok(PciDeviceHeader::new(PciHeader::PciToPci {
+                    vendor_id,
+                    device_id,
+                    command,
+                    status,
+                    revision,
+                    interface,
+                    subclass,
+                    class,
+                    cache_line_size,
+                    latency_timer,
+                    header_type,
+                    bist,
+                    bars,
+                    primary_bus_num,
+                    secondary_bus_num,
+                    subordinate_bus_num,
+                    secondary_latency_timer,
+                    io_base,
+                    io_limit,
+                    secondary_status,
+                    mem_base,
+                    mem_limit,
+                    prefetch_base,
+                    prefetch_limit,
+                    prefetch_base_upper,
+                    prefetch_limit_upper,
+                    io_base_upper,
+                    io_limit_upper,
+                    cap_pointer,
+                    expansion_rom,
+                    interrupt_line,
+                    interrupt_pin,
+                    bridge_control,
+                }))
+            }
+            id => Err(PciHeaderError::UnknownHeaderType(id.bits())),
+        }
+    } else {
+        Err(PciHeaderError::NoDevice)
+    }
+}
+
+impl PciHeader {
     /// Return the Header Type.
     pub fn header_type(&self) -> PciHeaderType {
         match self {
@@ -287,7 +331,7 @@ impl PciHeader {
     }
 
     /// Return the Headers BARs.
-    pub fn bars(&self) -> &[PciBar] {
+    pub fn bars(&self) -> &AVec<Option<PciBarAddr>, 6> {
         match self {
             &PciHeader::General { ref bars, .. } => bars,
             &PciHeader::PciToPci { ref bars, .. } => bars,
@@ -299,15 +343,21 @@ impl PciHeader {
     /// # Panics
     /// This function panics if the requested BAR index is beyond the length of the header
     /// types BAR array.
-    pub fn get_bar(&self, idx: usize) -> PciBar {
+    pub fn get_bar(&self, idx: usize) -> Option<&PciBarAddr> {
         match self {
-            &PciHeader::General { bars, .. } => {
+            PciHeader::General { bars, .. } => {
                 assert!(idx < 6, "the general PCI device only has 6 BARs");
-                bars[idx]
+                match &bars[idx] {
+                    Some(bar) => Some(bar),
+                    _ => None,
+                }
             }
-            &PciHeader::PciToPci { bars, .. } => {
+            PciHeader::PciToPci { bars, .. } => {
                 assert!(idx < 2, "the general PCI device only has 2 BARs");
-                bars[idx]
+                match &bars[idx] {
+                    Some(bar) => Some(bar),
+                    _ => None,
+                }
             }
         }
     }

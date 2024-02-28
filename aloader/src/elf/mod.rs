@@ -338,10 +338,7 @@ where
             dynamic.fixup();
         }
 
-        log::debug!(
-            "GDB: add-symbol-file /path/to/elf -o 0x{:x}",
-            load_bias
-        );
+        log::debug!("GDB: add-symbol-file /path/to/elf -o 0x{:x}", load_bias);
 
         Ok((
             ElfMapping {

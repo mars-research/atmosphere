@@ -17,7 +17,7 @@ impl<'pci> PciBus<'pci> {
 
 pub struct PciBusIter<'pci> {
     bus: &'pci PciBus<'pci>,
-    num: u32,
+    num: u8,
 }
 
 impl<'pci> PciBusIter<'pci> {
