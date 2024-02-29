@@ -4,6 +4,10 @@
 
 extern crate alloc;
 
+mod allocator;
+mod nvme;
+use nvme::device::NvmeDevice;
+
 use alloc::format;
 use alloc::string::String;
 pub use alloc::vec::Vec;
@@ -12,9 +16,7 @@ use core::panic::PanicInfo;
 
 pub use log::info as println;
 
-mod allocator;
-
-const REGION_SIZE: usize = 65536 * 4;
+const REGION_SIZE: usize = 10 << 20;
 static mut MEMORY_REGION: [u8; REGION_SIZE] = [0u8; REGION_SIZE];
 
 use pci::{Pci, PciClass, PciHeader, PciHeaderError, PciHeaderType};
@@ -115,6 +117,15 @@ fn main() -> isize {
     // }
 
     scan_pci_devs();
+    let mut nvme_dev =
+        unsafe { NvmeDevice::new(crate::pci::utils::PciBarAddr::new(0xfebf_0000, 0x2000)) };
+    nvme_dev.init();
+    unsafe {
+        println!("{:08x}", core::ptr::read_volatile(0xFEBF0000 as *const u32));
+        println!("meow");
+        println!("{:08x}", *(0xFEBF0004 as *const u32));
+        println!("{:08x}", *(0xFEBF0008 as *const u32));
+    }
     //dump_pci_bus();
     loop {}
 }
@@ -122,5 +133,6 @@ fn main() -> isize {
 /// The kernel panic handler.
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
+    println!("panic");
     loop {}
 }
