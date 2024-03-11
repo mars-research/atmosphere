@@ -101,12 +101,12 @@ impl Emulator for Qemu {
             .args(config.cpu_model.to_qemu()?);
 
         if config.enable_nvme {
-            command.args(&["-device", "nvme,id=nvme-ctrl,serial=deadbeef"]);
             command.args(&[
                 "-drive",
                 "file=/local/device/atmosphere/nvm.img,if=none,id=nvm",
             ]);
-            command.args(&["-device", "nvme-ns,drive=nvm"]);
+            command.args(&["-device", "nvme,id=nvm,serial=deadbeef"]);
+            //command.args(&["-device", "nvme-ns,drive=nvm"]);
         }
         if config.use_virtualization {
             command.arg("-enable-kvm");

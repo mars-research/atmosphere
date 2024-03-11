@@ -80,8 +80,8 @@ fn main(boot_info: *const BootInfo) -> isize {
         print_logo();
     }
 
-    kernel::kernel_test();
-    kernel::kernel_new();
+    //kernel::kernel_test();
+    //kernel::kernel_new();
 
     log::info!("Command line: {}", boot::get_raw_command_line());
     #[cfg(debug_assertions)]
