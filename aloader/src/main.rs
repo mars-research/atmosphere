@@ -232,6 +232,15 @@ where
 
     debugger::add_binary(name, dom_map.load_bias);
 
+    let mut cur = 0xfedf_0000;
+    while cur < 0xfedf_0000 + 0x4000 {
+        unsafe {
+            address_space.map(page_table_allocator, cur + virt_base, cur, true, false, true);
+            cur = cur + PAGE_SIZE as u64;
+        }
+    }
+>>>>>>> 42d53b9 (fix map)
+
     Ok(DomainMapping {
         reserved_start,
         reserved_size: DOM0_RESERVATION,
