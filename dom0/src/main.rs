@@ -103,7 +103,10 @@ fn main() -> isize {
     log::info!("hello {}", "world");
 
     unsafe {
-        allocator::init(&mut MEMORY_REGION as *mut [u8; 4096] as *mut u8, 4096);
+        allocator::init(
+            &mut MEMORY_REGION as *mut [u8; REGION_SIZE] as *mut u8,
+            REGION_SIZE,
+        );
         asys::sys_print("meow".as_ptr(), 4);
         log::info!(
             "sys_mmap {:?}",
