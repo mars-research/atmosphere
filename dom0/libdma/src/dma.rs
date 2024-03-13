@@ -33,7 +33,7 @@ pub struct Dma<T> {
     value: Box<T>,
 }
 
-const PHYS_OFFSET: usize = 0;
+const PHYS_OFFSET: usize = 0x7455_2000;
 
 impl<T> Dma<T> {
     pub fn new(value: T) -> Result<Dma<T>, i32> {

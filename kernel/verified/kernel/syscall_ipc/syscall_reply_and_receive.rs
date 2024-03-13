@@ -132,7 +132,7 @@ impl Kernel {
                             self.cpu_list.set_current_thread(cpu_id,Some(caller_ptr));
                             return SyscallReturnStruct::new(SUCCESS,new_pcid,new_cr3,new_pt_regs);
                         }
-                        
+
                     }
                 }
             }

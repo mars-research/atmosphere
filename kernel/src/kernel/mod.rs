@@ -1,3 +1,4 @@
+use crate::cpu;
 use astd::boot::PhysicalMemoryType;
 use astd::heapless::Vec as ArrayVec;
 use astd::sync::Mutex;
@@ -18,7 +19,6 @@ use verified::proc::Process;
 use verified::proc::ProcessManager;
 use verified::proc::Thread;
 use verified::trap::PtRegs as vPtRegs;
-use crate::cpu;
 static KERNEL: Mutex<Option<Kernel>> = Mutex::new(None);
 
 use vstd::prelude::*;
@@ -646,25 +646,23 @@ pub fn kernel_init(
     );
     log::info!("kernel init ret_code {:?}", ret_code);
     let dom0_retstruc = KERNEL
-    .lock()
-    .as_mut()
-    .unwrap()
-    .kernel_idle_pop_sched(0, vPtRegs::new_empty());
+        .lock()
+        .as_mut()
+        .unwrap()
+        .kernel_idle_pop_sched(0, vPtRegs::new_empty());
     log::info!("dom0 is running on CPU 0");
     // kernel_test_ipc_test_call(dom0_pagetable_ptr);
 
     log::info!("End of kernel syscall test \n\n\n\n\n\n");
 }
 
-pub fn sys_mmap(va:usize, perm_bits:usize, range:usize) -> usize{
+pub fn sys_mmap(va: usize, perm_bits: usize, range: usize) -> usize {
     let cpu_id = cpu::get_cpu_id();
     let pt_regs = vPtRegs::new_empty();
-    let ret_struc =  KERNEL.lock().as_mut().unwrap().syscall_malloc(
-        cpu_id,
-        pt_regs,
-        va,
-        perm_bits,
-        range,
-    );
+    let ret_struc = KERNEL
+        .lock()
+        .as_mut()
+        .unwrap()
+        .syscall_malloc(cpu_id, pt_regs, va, perm_bits, range);
     return ret_struc.0.error_code;
 }

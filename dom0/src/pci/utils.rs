@@ -56,7 +56,7 @@ impl PciDevice {
 
 #[derive(Copy, Clone, Debug)]
 pub struct PciBarAddr {
-    base: u32,
+    base: u64,
     size: usize,
 }
 
@@ -72,11 +72,11 @@ impl PartialEq for PciBarAddr {
 }
 
 impl PciBarAddr {
-    pub unsafe fn new(base: u32, size: usize) -> PciBarAddr {
+    pub unsafe fn new(base: u64, size: usize) -> PciBarAddr {
         PciBarAddr { base, size }
     }
 
-    pub unsafe fn get_base(&self) -> u32 {
+    pub unsafe fn get_base(&self) -> u64 {
         self.base
     }
 
@@ -147,7 +147,10 @@ pub fn pci_read_bars(pci: &PciAddress, hdr_type: PciHeaderType) -> AVec<Option<P
             // Restore the original bar address
             pci_write(pci, off, addr);
             unsafe {
-                bar_vec.push(Some(PciBarAddr::new(addr & 0xFFFF_FFF0, size as usize)));
+                bar_vec.push(Some(PciBarAddr::new(
+                    addr as u64 & 0xFFFF_FFF0,
+                    size as usize,
+                )));
             }
             //println!("BarAddr {:x} size {:x}", addr, size);
         } else {
@@ -158,7 +161,7 @@ pub fn pci_read_bars(pci: &PciAddress, hdr_type: PciHeaderType) -> AVec<Option<P
             // Restore the original bar address
             pci_write(pci, off, addr);
             unsafe {
-                bar_vec.push(Some(PciBarAddr::new(addr & 0xFFFC, size as usize)));
+                bar_vec.push(Some(PciBarAddr::new(addr as u64 & 0xFFFC, size as usize)));
             }
             //println!("Bar I/O Addr {:x} size {:x}", addr, size);
         }

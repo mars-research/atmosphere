@@ -108,6 +108,6 @@ pub unsafe fn init_cpu0() {
     msr::wrmsr(msr::IA32_GS_BASE, address as u64);
 }
 
-pub fn get_cpu_id() -> usize{
+pub fn get_cpu_id() -> usize {
     0
 }

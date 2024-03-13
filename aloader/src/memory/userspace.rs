@@ -6,7 +6,7 @@ use crate::memory::{
 use crate::PAGE_SIZE;
 
 /// The virtual base address userspace programs are loaded to.
-pub const USERSPACE_BASE: u64 = 0x8000000000;
+pub const USERSPACE_BASE: u64 = 0x80_0000_0000;
 
 pub struct UserspaceMapper<'a, 'b, PGA, PA>
 where

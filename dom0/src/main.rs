@@ -16,6 +16,8 @@ use core::panic::PanicInfo;
 
 pub use log::info as println;
 
+pub const USERSPACE_BASE: u64 = 0x80_0000_0000;
+
 const REGION_SIZE: usize = 10 << 20;
 static mut MEMORY_REGION: [u8; REGION_SIZE] = [0u8; REGION_SIZE];
 
@@ -103,7 +105,10 @@ fn main() -> isize {
     unsafe {
         allocator::init(&mut MEMORY_REGION as *mut [u8; 4096] as *mut u8, 4096);
         asys::sys_print("meow".as_ptr(), 4);
-        log::info!("sys_mmap {:?}", asys::sys_mmap(0xA000000000, 0x0000_0000_0000_0002u64 as usize, 20));
+        log::info!(
+            "sys_mmap {:?}",
+            asys::sys_mmap(0xA000000000, 0x0000_0000_0000_0002u64 as usize, 1)
+        );
     }
     // for i in 0..20{
     //     let mut user_value: usize = 0;
@@ -117,8 +122,13 @@ fn main() -> isize {
     // }
 
     scan_pci_devs();
-    let mut nvme_dev =
-        unsafe { NvmeDevice::new(crate::pci::utils::PciBarAddr::new(0xfebf_0000, 0x2000)) };
+
+    let mut nvme_dev = unsafe {
+        NvmeDevice::new(crate::pci::utils::PciBarAddr::new(
+            USERSPACE_BASE + 0xfebf_0000,
+            0x2000,
+        ))
+    };
     nvme_dev.init();
     unsafe {
         println!("{:08x}", core::ptr::read_volatile(0xFEBF0000 as *const u32));
@@ -126,7 +136,6 @@ fn main() -> isize {
         println!("{:08x}", *(0xFEBF0004 as *const u32));
         println!("{:08x}", *(0xFEBF0008 as *const u32));
     }
-    //dump_pci_bus();
     loop {}
 }
 

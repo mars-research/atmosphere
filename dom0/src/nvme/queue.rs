@@ -329,7 +329,7 @@ impl NvmeCompletionQueue {
             if self.i == 0 {
                 self.phase = !self.phase;
             }
-            //println!("=> {:?}", entry);
+            println!("=> {:?}", entry);
             Some((self.i, entry, cq_entry))
         } else {
             None

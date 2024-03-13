@@ -77,7 +77,7 @@ impl NvmeDevice {
 
         /// 7.6.1 Initialization (Nvme spec 1.4-2019.06.10)
         // Reset the controller
-        self.write_reg32(NvmeRegs32::NSSR, 0x4E564D65);
+        //self.write_reg32(NvmeRegs32::NSSR, 0x4E564D65);
         self.reset_controller();
 
         // Configure admin queue
@@ -117,7 +117,7 @@ impl NvmeDevice {
             namespaces: Vec::new(),
             dstrd: {
                 unsafe {
-                    ((ptr::read_volatile((bar.get_base() + NvmeRegs64::CAP as u32) as *const u64)
+                    ((ptr::read_volatile((bar.get_base() + NvmeRegs64::CAP as u64) as *const u64)
                         >> 32)
                         & 0b1111) as u16
                 }
@@ -131,7 +131,7 @@ impl NvmeDevice {
 
     #[inline(always)]
     pub fn read_reg32(&self, reg: NvmeRegs32) -> u32 {
-        unsafe { ptr::read_volatile((self.bar.get_base() + reg as u32) as *const u32) }
+        unsafe { ptr::read_volatile((self.bar.get_base() + reg as u64) as *const u32) }
     }
 
     fn wait_set_reg32(&self, reg: NvmeRegs32, value: u32, delay_in_ms: u64) {
@@ -164,20 +164,20 @@ impl NvmeDevice {
 
     #[inline(always)]
     pub fn read_reg64(&self, reg: NvmeRegs64) -> u64 {
-        unsafe { ptr::read_volatile((self.bar.get_base() + reg as u32) as *const u64) }
+        unsafe { ptr::read_volatile((self.bar.get_base() + reg as u64) as *const u64) }
     }
 
     #[inline(always)]
     pub fn write_reg32(&self, reg: NvmeRegs32, val: u32) {
         unsafe {
-            ptr::write_volatile((self.bar.get_base() + reg as u32) as *mut u32, val as u32);
+            ptr::write_volatile((self.bar.get_base() + reg as u64) as *mut u32, val as u32);
         }
     }
 
     #[inline(always)]
     pub fn write_reg64(&self, reg: NvmeRegs64, val: u64) {
         unsafe {
-            ptr::write_volatile((self.bar.get_base() + reg as u32) as *mut u64, val as u64);
+            ptr::write_volatile((self.bar.get_base() + reg as u64) as *mut u64, val as u64);
         }
     }
 
@@ -195,14 +195,14 @@ impl NvmeDevice {
         match reg {
             NvmeArrayRegs::SQyTDBL => unsafe {
                 ptr::read_volatile(
-                    (self.bar.get_base() + 0x1000 + ((4 << self.dstrd) * (2 * qid)) as u32)
+                    (self.bar.get_base() + 0x1000 + ((4 << self.dstrd) * (2 * qid)) as u64)
                         as *mut u32,
                 )
             },
 
             NvmeArrayRegs::CQyHDBL => unsafe {
                 ptr::read_volatile(
-                    (self.bar.get_base() + 0x1000 + ((4 << self.dstrd) * (2 * qid + 1)) as u32)
+                    (self.bar.get_base() + 0x1000 + ((4 << self.dstrd) * (2 * qid + 1)) as u64)
                         as *mut u32,
                 )
             },
@@ -213,7 +213,7 @@ impl NvmeDevice {
         match reg {
             NvmeArrayRegs::SQyTDBL => unsafe {
                 ptr::write_volatile(
-                    (self.bar.get_base() + 0x1000 + ((4 << self.dstrd) * (2 * qid)) as u32)
+                    (self.bar.get_base() + 0x1000 + ((4 << self.dstrd) * (2 * qid)) as u64)
                         as *mut u32,
                     val,
                 );
@@ -221,7 +221,7 @@ impl NvmeDevice {
 
             NvmeArrayRegs::CQyHDBL => unsafe {
                 ptr::write_volatile(
-                    (self.bar.get_base() + 0x1000 + ((4 << self.dstrd) * (2 * qid + 1)) as u32)
+                    (self.bar.get_base() + 0x1000 + ((4 << self.dstrd) * (2 * qid + 1)) as u64)
                         as *mut u32,
                     val,
                 );
@@ -349,7 +349,7 @@ impl NvmeDevice {
             self.completion_queue_head(qid as u16, head as u16);
         }
 
-        // println!("  - Dumping identify controller");
+        println!("  - Dumping identify controller");
 
         let mut serial: String<64> = String::new();
         for &b in &data[4..24] {
