@@ -826,6 +826,8 @@ dependencies = [
  "libtime",
  "log",
  "serde",
+ "slabmalloc",
+ "spin",
  "x86 0.52.0",
 ]
 
@@ -3184,6 +3186,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f92a496fb766b417c996b9c5e57daf2f7ad3b0bebe1ccfca4856390e3d3bb67"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "slabmalloc"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52b274c61b9873a19293c96f2bf132ebc51fe21f507a91a0e5df0ba6989073b7"
+dependencies = [
+ "log",
 ]
 
 [[package]]

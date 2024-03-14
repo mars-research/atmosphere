@@ -77,7 +77,7 @@ impl NvmeDevice {
 
         /// 7.6.1 Initialization (Nvme spec 1.4-2019.06.10)
         // Reset the controller
-        //self.write_reg32(NvmeRegs32::NSSR, 0x4E564D65);
+        self.write_reg32(NvmeRegs32::NSSR, 0x4E564D65);
         self.reset_controller();
 
         // Configure admin queue
@@ -322,8 +322,8 @@ impl NvmeDevice {
         println!("asq.data.phys {:08x}", asq.data.physical() as u64);
         println!("acq.data.phys {:08x}", asq.data.physical() as u64);
 
-        self.write_reg64(NvmeRegs64::ASQ, (asq.data.physical() as u64) << 12);
-        self.write_reg64(NvmeRegs64::ACQ, (acq.data.physical() as u64) << 12);
+        self.write_reg64(NvmeRegs64::ASQ, asq.data.physical() as u64);
+        self.write_reg64(NvmeRegs64::ACQ, acq.data.physical() as u64);
         println!("finish configure_admin_queue");
     }
 

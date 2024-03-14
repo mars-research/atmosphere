@@ -81,7 +81,7 @@ fn main(boot_info: *const BootInfo) -> isize {
     }
 
     //kernel::kernel_test();
-    //kernel::kernel_new();
+    kernel::kernel_new();
 
     log::info!("Command line: {}", boot::get_raw_command_line());
     #[cfg(debug_assertions)]
@@ -107,7 +107,7 @@ fn main(boot_info: *const BootInfo) -> isize {
     log::info!("kernel_pml4: {:x}", kernel_pml4);
     log::info!("page_array_len: {:x}", boot_info.pages.len());
 
-    //kernel::kernel_init(&boot_info.pages, pml4 as usize, kernel_pml4 as usize);
+    kernel::kernel_init(&boot_info.pages, pml4 as usize, kernel_pml4 as usize);
 
     let initial_sp = unsafe { dom0.virt_start.add(dom0.reserved_size - 0x1000) };
     log::info!("initial_sp: {:?}", initial_sp);

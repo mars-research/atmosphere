@@ -101,11 +101,10 @@ impl Emulator for Qemu {
             .args(config.cpu_model.to_qemu()?);
 
         if config.enable_nvme {
-            command.args(&[
-                "-drive",
-                "file=/local/device/atmosphere/nvm.img,if=none,id=nvm",
-            ]);
-            command.args(&["-device", "nvme,id=nvm,serial=deadbeef"]);
+            // vfio-pci,romfile=,host=${LOCATION}
+            command.args(&["-device", "vfio-pci,romfile=,host=05:00.0"]);
+            //command.args(&["-drive", "file=/opt/atmosphere/nvm.img,if=none,id=nvm"]);
+            //command.args(&["-device", "nvme,id=nvm,serial=deadbeef"]);
             //command.args(&["-device", "nvme-ns,drive=nvm"]);
         }
         if config.use_virtualization {

@@ -4,8 +4,9 @@
 
 extern crate alloc;
 
-mod allocator;
+//mod allocator;
 mod nvme;
+mod slab_alloc;
 use nvme::device::NvmeDevice;
 
 use alloc::format;
@@ -103,14 +104,14 @@ fn main() -> isize {
     log::info!("hello {}", "world");
 
     unsafe {
-        allocator::init(
+        /*allocator::init(
             &mut MEMORY_REGION as *mut [u8; REGION_SIZE] as *mut u8,
             REGION_SIZE,
-        );
+        );*/
         asys::sys_print("meow".as_ptr(), 4);
         log::info!(
             "sys_mmap {:?}",
-            asys::sys_mmap(0xA000000000, 0x0000_0000_0000_0002u64 as usize, 1)
+            asys::sys_mmap(0xA0_0000_0000, 0x0000_0000_0000_0002u64 as usize, 1)
         );
     }
     // for i in 0..20{
@@ -129,7 +130,7 @@ fn main() -> isize {
     let mut nvme_dev = unsafe {
         NvmeDevice::new(crate::pci::utils::PciBarAddr::new(
             USERSPACE_BASE + 0xfebf_0000,
-            0x2000,
+            0x4000,
         ))
     };
     nvme_dev.init();
