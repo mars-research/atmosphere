@@ -308,7 +308,7 @@ impl Kernel {
         if page_entry.is_none() {
             return (SyscallReturnStruct::new(VADDR_NOMAPPING,pcid, cr3,pt_regs),0);
         }else{
-            return (SyscallReturnStruct::new(SUCCESS,pcid, cr3,pt_regs),page_entry.unwrap().addr & page_entry.unwrap().perm);
+            return (SyscallReturnStruct::new(SUCCESS,pcid, cr3,pt_regs),page_entry.unwrap().addr | page_entry.unwrap().perm);
         }
     }
 }

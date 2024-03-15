@@ -666,3 +666,18 @@ pub fn sys_mmap(va: usize, perm_bits: usize, range: usize) -> usize {
         .syscall_malloc(cpu_id, pt_regs, va, perm_bits, range);
     return ret_struc.0.error_code;
 }
+
+pub fn sys_resolve(va: usize) -> usize {
+    let cpu_id = cpu::get_cpu_id();
+    let pt_regs = vPtRegs::new_empty();
+    let ret_struc = KERNEL
+        .lock()
+        .as_mut()
+        .unwrap()
+        .syscall_resolve_va(cpu_id, pt_regs, va);
+    if ret_struc.0.error_code != 0 {
+        ret_struc.0.error_code
+    } else {
+        return ret_struc.1;
+    }
+}

@@ -152,6 +152,7 @@ impl ProcessManager {
             self.get_thread(thread_ptr).endpoint_descriptors =~= old(self).get_thread(thread_ptr).endpoint_descriptors,
             self.get_thread(thread_ptr).ipc_payload =~= old(self).get_thread(thread_ptr).ipc_payload,
             self.get_thread(thread_ptr).error_code =~= error_code,
+            self.scheduler@ =~= old(self).scheduler@.push(thread_ptr),
     {
 
         let ret = self.scheduler.push(thread_ptr);
@@ -202,6 +203,7 @@ impl ProcessManager {
             self.get_proc_man_page_closure() =~= old(self).get_proc_man_page_closure(),
             self.scheduler.len() == old(self).scheduler.len() - 1,
             self.get_thread_ptrs().contains(ret.0),
+            self.scheduler@ =~= old(self).scheduler@.subrange(1,old(self).scheduler.len() as int),
     {
         let tmp_thread_ptr = self.scheduler.get_head();
         assert(self.scheduler@.contains(tmp_thread_ptr));

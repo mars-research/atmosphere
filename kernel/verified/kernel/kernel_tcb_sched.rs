@@ -14,11 +14,74 @@ use crate::trap::*;
 
 use crate::kernel::*;
 
+pub closed spec fn kernel_timer_int_spec(old:Kernel,new:Kernel,cpu_id:CPUID) -> bool
+{
+    if !old.wf() || !new.wf()
+    {
+        false
+    }
+    else{
+        //checking arguments
+        let valid_thread = (cpu_id < NUM_CPUS &&
+            old.cpu_list@[cpu_id as int].get_is_idle() == false);
+        let scheduler_has_thread = old.proc_man.scheduler.len() != 0;
+
+        if valid_thread && scheduler_has_thread
+        {
+            forall|i:CPUID|#![auto] 0 <= i < NUM_CPUS && i != cpu_id ==> new.cpu_list@[i as int] =~= old.cpu_list@[i as int]
+            &&
+            new.cpu_list@[cpu_id as int].get_current_thread().unwrap() =~= old.proc_man.scheduler@[0]
+            &&
+            new.proc_man.scheduler@ =~= old.proc_man.scheduler@.subrange(1, old.proc_man.scheduler.len() as int).push(old.cpu_list@[cpu_id as int].get_current_thread().unwrap())
+            &&
+            new.mmu_man =~= old.mmu_man
+            &&
+            new.page_alloc =~= old.page_alloc
+        }else{
+            //if the syscall is not success, nothing will change, goes back to user level
+            old =~= new
+        }
+    }
+}
+
+pub closed spec fn kernel_idle_pop_sched_spec(old:Kernel,new:Kernel,cpu_id:CPUID) -> bool
+{
+    if !old.wf() || !new.wf()
+    {
+        false
+    }
+    else{
+        //checking arguments
+        let cpu_idle = (cpu_id < NUM_CPUS &&
+            old.cpu_list@[cpu_id as int].get_is_idle());
+        let scheduler_has_thread = old.proc_man.scheduler.len() != 0;
+
+        if cpu_idle && scheduler_has_thread
+        {
+            forall|i:CPUID|#![auto] 0 <= i < NUM_CPUS && i != cpu_id ==> new.cpu_list@[i as int] =~= old.cpu_list@[i as int]
+            &&
+            new.cpu_list@[cpu_id as int].get_current_thread().unwrap() =~= old.proc_man.scheduler@[0]
+            &&
+            new.proc_man.scheduler@ =~= old.proc_man.scheduler@.subrange(1, old.proc_man.scheduler.len() as int)
+            &&
+            new.mmu_man =~= old.mmu_man
+            &&
+            new.page_alloc =~= old.page_alloc
+        }else{
+            //if the syscall is not success, nothing will change, goes back to user level
+            old =~= new
+        }
+    }
+
+}
 
 impl Kernel {
     pub fn kernel_timer_int(&mut self, cpu_id:CPUID, pt_regs: PtRegs) -> (ret:SyscallReturnStruct)
         requires
             old(self).wf(),
+        ensures
+            self.wf(),
+            kernel_timer_int_spec(*old(self), *self, cpu_id),
     {
         let (default_pcid, default_cr3) = self.mmu_man.get_reserved_pcid_and_cr3();
         if cpu_id >= NUM_CPUS{
@@ -87,6 +150,7 @@ impl Kernel {
             old(self).wf(),
         ensures
             self.wf(),
+            kernel_idle_pop_sched_spec(*old(self), *self, cpu_id),
     {
         let (default_pcid, default_cr3) = self.mmu_man.get_reserved_pcid_and_cr3();
         if cpu_id >= NUM_CPUS{
