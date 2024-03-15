@@ -25,9 +25,7 @@ impl StartTrampoline {
             return Err("Destination not page aligned");
         }
 
-        let mut handle = Self {
-            base,
-        };
+        let mut handle = Self { base };
 
         handle.copy_binary();
 
@@ -71,7 +69,11 @@ impl StartTrampoline {
 
     fn copy_binary(&mut self) {
         unsafe {
-            ptr::copy(TRAMPOLINE_CODE as *const _ as *const u8, self.base_ptr(), TRAMPOLINE_CODE.len());
+            ptr::copy(
+                TRAMPOLINE_CODE as *const _ as *const u8,
+                self.base_ptr(),
+                TRAMPOLINE_CODE.len(),
+            );
         }
     }
 }

@@ -34,10 +34,10 @@ fn x86_64_asm_bin(source: &str, text_base: u64) {
 
     let objects = build_x86_64_asm(&path);
     for object in objects {
-        let out_dir = object.parent()
-            .expect("Must have a parent");
+        let out_dir = object.parent().expect("Must have a parent");
 
-        let object_stem = object.file_stem()
+        let object_stem = object
+            .file_stem()
             .expect("Must be a file, not a directory")
             .to_str()
             .expect("Must be UTF-8");
@@ -50,7 +50,8 @@ fn x86_64_asm_bin(source: &str, text_base: u64) {
         // .o -> elf with 0x7000
         let ld = Command::new("ld")
             .args(&["-N", "-Ttext", &format!("{:#x}", text_base)])
-            .arg("-o").arg(&linked)
+            .arg("-o")
+            .arg(&linked)
             .arg(&object)
             .status()
             .expect("Failed to spawn ld");

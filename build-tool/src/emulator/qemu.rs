@@ -84,7 +84,12 @@ impl Emulator for Qemu {
 
         command
             .arg("-nographic")
-            .args(&["-serial", "mon:stdio"])
+            .args(&["-serial", "chardev:char0"])
+            .args(&["-mon", "chardev=char0"])
+            .args(&[
+                "-chardev",
+                "stdio,id=char0,mux=on,logfile=serial.log,signal=off",
+            ])
             .args(&["-smp", "2"])
             // .args(&["-serial", "file:serial.log"])
             .args(&["-m", &format!("{}", memory)])
@@ -162,10 +167,8 @@ impl Emulator for Qemu {
     /// Returns the GDB connection info for the instance.
     fn gdb_connection_info(&self) -> Option<GdbConnectionInfo> {
         let gdb_server = self.config.gdb_server.as_ref()?;
-        let mut gdb_info = GdbConnectionInfo::new(
-            self.config.loader.path().to_owned(),
-            gdb_server.to_owned(),
-        );
+        let mut gdb_info =
+            GdbConnectionInfo::new(self.config.loader.path().to_owned(), gdb_server.to_owned());
 
         gdb_info.add_binary("kernel".to_string(), self.config.kernel.path().to_owned());
 

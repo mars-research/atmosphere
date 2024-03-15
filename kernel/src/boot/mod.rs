@@ -2,8 +2,8 @@
 //!
 //! We are loaded by the boot manager which implements Xen PVH and Multiboot v2.
 
-pub mod command_line;
 pub mod ap_start;
+pub mod command_line;
 
 use core::arch::asm;
 

@@ -56,6 +56,9 @@ zeroed_allocator!([NvmeCompletion; 1024]);
 zeroed_allocator!([NvmeCommand; 8]);
 zeroed_allocator!([NvmeCompletion; 8]);
 
+zeroed_allocator!([NvmeCommand; 2]);
+zeroed_allocator!([NvmeCompletion; 2]);
+
 zeroed_allocator!([NvmeCommand; 32]);
 zeroed_allocator!([NvmeCompletion; 32]);
 

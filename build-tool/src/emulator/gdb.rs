@@ -3,7 +3,7 @@
 //! When launching `atmo run --gdb`, the build tool writes a JSON file
 //! at `.gdb` under the workspace root with information in `GdbConnectionInfo`.
 
-use std::{path::PathBuf, collections::HashMap};
+use std::{collections::HashMap, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 

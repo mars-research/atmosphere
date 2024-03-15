@@ -21,7 +21,7 @@ pub closed spec fn syscall_malloc_spec(old:Kernel, new:Kernel, cpu_id:CPUID, va:
         false
     }
     else{
-        let valid_thread = (cpu_id < NUM_CPUS && 
+        let valid_thread = (cpu_id < NUM_CPUS &&
             old.cpu_list@[cpu_id as int].get_is_idle() == false);
         let perm_bits_valid = spec_va_perm_bits_valid(perm_bits);
         let system_has_memory = old.page_alloc.free_pages.len() >= 4 * range;
@@ -40,15 +40,15 @@ pub closed spec fn syscall_malloc_spec(old:Kernel, new:Kernel, cpu_id:CPUID, va:
             &&
             new.mmu_man.free_ioids =~= old.mmu_man.free_ioids
             &&
-            (forall|_pcid:Pcid| #![auto] 0<=_pcid<PCID_MAX && new.mmu_man.get_free_pcids_as_set().contains(_pcid) == false && _pcid != pcid ==> 
+            (forall|_pcid:Pcid| #![auto] 0<=_pcid<PCID_MAX && new.mmu_man.get_free_pcids_as_set().contains(_pcid) == false && _pcid != pcid ==>
                 new.mmu_man.get_pagetable_mapping_by_pcid(_pcid) =~= old.mmu_man.get_pagetable_mapping_by_pcid(_pcid))
             &&
-            (forall|ioid:IOid| #![auto] 0<=ioid<IOID_MAX && new.mmu_man.get_free_ioids_as_set().contains(ioid) == false ==> 
+            (forall|ioid:IOid| #![auto] 0<=ioid<IOID_MAX && new.mmu_man.get_free_ioids_as_set().contains(ioid) == false ==>
                 new.mmu_man.get_iommutable_mapping_by_ioid(ioid) =~= old.mmu_man.get_iommutable_mapping_by_ioid(ioid))
             &&
             (forall|j:usize| #![auto] 0<=j<range ==> new.mmu_man.get_pagetable_mapping_by_pcid(pcid)[spec_va_add_range(va,j)].is_Some())
             &&
-            (forall|_va:VAddr| #![auto] spec_va_valid(_va) && 
+            (forall|_va:VAddr| #![auto] spec_va_valid(_va) &&
             (
                 forall|j:usize| #![auto] 0<=j<range ==> spec_va_add_range(va,j) != _va
             )
@@ -58,13 +58,13 @@ pub closed spec fn syscall_malloc_spec(old:Kernel, new:Kernel, cpu_id:CPUID, va:
             //if the syscall is not success, nothing will change, goes back to user level
             old == new
         }
-            
+
     }
 }
 
 impl Kernel {
 
-    
+
     pub fn syscall_malloc(&mut self, cpu_id:CPUID, pt_regs: PtRegs, va: usize, perm_bits:usize, range: usize) -> (ret:(SyscallReturnStruct,Option<ProcPtr>,Option<ThreadPtr>))
         requires
             old(self).wf(),
@@ -82,12 +82,12 @@ impl Kernel {
             assert(current_thread_ptr_op.is_Some());
             let current_thread_ptr = current_thread_ptr_op.unwrap();
             let current_proc_ptr = self.proc_man.get_parent_proc_ptr_by_thread_ptr(current_thread_ptr);
-    
+
             let pcid = self.proc_man.get_pcid_by_thread_ptr(current_thread_ptr);
             let cr3 = self.mmu_man.get_cr3_by_pcid(pcid);
-    
+
             assert(self.mmu_man.get_free_pcids_as_set().contains(pcid) == false);
-    
+
             if va_perm_bits_valid(perm_bits) == false{
                 return (SyscallReturnStruct::new(VMEM_PERMBITS_INVALID,0,0,pt_regs),None,None);
             }else if range == 0 || range >= (usize::MAX/4) {
@@ -128,7 +128,7 @@ impl Kernel {
                 {
                     if va_valid(va_add_range(va,i)) == false {
                         proof{
-                            let valid_thread = (cpu_id < NUM_CPUS && 
+                            let valid_thread = (cpu_id < NUM_CPUS &&
                                 old(self).cpu_list@[cpu_id as int].get_is_idle() == false);
                             let perm_bits_valid = spec_va_perm_bits_valid(perm_bits);
                             let system_has_memory = old(self).page_alloc.free_pages.len() >= 4 * range;
@@ -145,7 +145,7 @@ impl Kernel {
                     if self.mmu_man.mmu_get_va_entry_by_pcid(pcid,va_add_range(va,i)).is_some(){
                         assert(self.mmu_man.get_pagetable_mapping_by_pcid(pcid)[spec_va_add_range(va,i)].is_Some());
                         proof{
-                            let valid_thread = (cpu_id < NUM_CPUS && 
+                            let valid_thread = (cpu_id < NUM_CPUS &&
                                 old(self).cpu_list@[cpu_id as int].get_is_idle() == false);
                             let perm_bits_valid = spec_va_perm_bits_valid(perm_bits);
                             let system_has_memory = old(self).page_alloc.free_pages.len() >= 4 * range;
@@ -164,14 +164,14 @@ impl Kernel {
                     }
                     i = i + 1;
                 }
-        
+
                 self.kernel_create_and_map_range_new_pages(pcid,va,perm_bits,range);
                 assert(forall|j:usize| #![auto] 0<=j<range ==> self.mmu_man.get_pagetable_mapping_by_pcid(pcid)[spec_va_add_range(va,j)].is_Some());
                 assert(self.wf());
                 return (SyscallReturnStruct::new(SUCCESS,0,0,pt_regs),None,None);
             }
         }
-       
+
     }
 
     pub fn syscall_map_pagetable_pages_to_iommutable(&mut self, cpu_id:CPUID, pt_regs: PtRegs, va:VAddr, perm_bits:usize, range:usize) -> (ret:(SyscallReturnStruct,Option<ProcPtr>,Option<ThreadPtr>))

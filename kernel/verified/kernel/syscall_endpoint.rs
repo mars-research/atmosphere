@@ -14,7 +14,7 @@ use crate::trap::*;
 
 use crate::kernel::*;
 
-pub closed spec fn syscall_new_endpoint_spec(old:Kernel,new:Kernel,cpu_id:CPUID, endpoint_index: EndpointIdx) -> bool 
+pub closed spec fn syscall_new_endpoint_spec(old:Kernel,new:Kernel,cpu_id:CPUID, endpoint_index: EndpointIdx) -> bool
 {
     if !old.wf() || !new.wf()
     {
@@ -22,9 +22,9 @@ pub closed spec fn syscall_new_endpoint_spec(old:Kernel,new:Kernel,cpu_id:CPUID,
     }
     else{
         //checking arguments
-        let valid_thread = (cpu_id < NUM_CPUS && 
+        let valid_thread = (cpu_id < NUM_CPUS &&
             old.cpu_list@[cpu_id as int].get_is_idle() == false);
-        let valid_endpoint = endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS && 
+        let valid_endpoint = endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS &&
             old.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).endpoint_descriptors@[endpoint_index as int] == 0;
         let system_has_memory = old.page_alloc.free_pages.len() >= 1;
 
@@ -46,7 +46,7 @@ pub closed spec fn syscall_new_endpoint_spec(old:Kernel,new:Kernel,cpu_id:CPUID,
             old =~= new
         }
     }
-    
+
 }
 
 impl Kernel {

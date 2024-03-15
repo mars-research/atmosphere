@@ -231,5 +231,5 @@ pub fn pci_enable_bus_mastering(pci_addr: &PciAddress) {
     command |= 1 << 2;
     let value = u32::from(command) | (u32::from(status) << 16);
     pci_write(pci_addr, 4, value);
-    //println!("Enable bus mastering for device");
+    println!("Enable bus mastering for device");
 }

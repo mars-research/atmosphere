@@ -299,7 +299,7 @@ impl NvmeCommandQueue {
     }*/
 }
 
-pub const QUEUE_DEPTH: usize = 1024;
+pub const QUEUE_DEPTH: usize = 2;
 
 pub(crate) struct NvmeCompletionQueue {
     pub data: Dma<[NvmeCompletion; QUEUE_DEPTH]>,

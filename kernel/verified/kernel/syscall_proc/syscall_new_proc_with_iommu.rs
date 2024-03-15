@@ -14,7 +14,7 @@ use crate::trap::*;
 
 use crate::kernel::*;
 
-pub closed spec fn syscall_new_proc_with_iommu_spec(old:Kernel,new:Kernel,cpu_id:CPUID, endpoint_index: EndpointIdx, new_proc:Option<ProcPtr>, new_thread:Option<ThreadPtr>) -> bool 
+pub closed spec fn syscall_new_proc_with_iommu_spec(old:Kernel,new:Kernel,cpu_id:CPUID, endpoint_index: EndpointIdx, new_proc:Option<ProcPtr>, new_thread:Option<ThreadPtr>) -> bool
 {
     if !old.wf() || !new.wf()
     {
@@ -22,9 +22,9 @@ pub closed spec fn syscall_new_proc_with_iommu_spec(old:Kernel,new:Kernel,cpu_id
     }
     else{
         //checking arguments
-        let valid_thread = (cpu_id < NUM_CPUS && 
+        let valid_thread = (cpu_id < NUM_CPUS &&
             old.cpu_list@[cpu_id as int].get_is_idle() == false);
-        let valid_endpoint = (endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS && 
+        let valid_endpoint = (endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS &&
             old.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).endpoint_descriptors@[endpoint_index as int] != 0 &&
             old.proc_man.get_endpoint(old.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).endpoint_descriptors@[endpoint_index as int]).rf_counter != usize::MAX);
         let proc_list_has_space = old.proc_man.proc_ptrs.len() != MAX_NUM_PROCS;
@@ -63,7 +63,7 @@ pub closed spec fn syscall_new_proc_with_iommu_spec(old:Kernel,new:Kernel,cpu_id
             old =~= new
         }
     }
-    
+
 }
 
 impl Kernel {

@@ -159,7 +159,7 @@ impl Kernel{
             old(self).page_alloc.free_pages.len() >= 3,
             old(self).mmu_man.get_free_pcids_as_set().contains(pcid) == false,
         ensures
-            self.wf(),                
+            self.wf(),
             self.proc_man =~= old(self).proc_man,
             self.cpu_list =~= old(self).cpu_list,
             self.mmu_man.free_pcids =~= old(self).mmu_man.free_pcids,
