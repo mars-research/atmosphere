@@ -24,6 +24,7 @@
 //   WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 use alloc::boxed::Box;
+use asys::sys_mresolve;
 use core::mem;
 use core::ops::{Deref, DerefMut};
 
@@ -50,7 +51,9 @@ impl<T> Dma<T> {
 
     pub fn physical(&self) -> usize {
         let tr: &T = &self.value;
-        tr as *const _ as usize - PHYS_OFFSET
+        let vaddr = tr as *const _ as usize;
+        let (paddr, perm) = unsafe { asys::sys_mresolve(vaddr) };
+        paddr
     }
 
     pub fn from_box(b: Box<T>) -> Dma<T> {

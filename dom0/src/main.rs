@@ -135,11 +135,12 @@ fn main() -> isize {
         ))
     };
     nvme_dev.init();
+
     unsafe {
-        println!("{:08x}", core::ptr::read_volatile(0xFEBF0000 as *const u32));
+        //println!("{:08x}", core::ptr::read_volatile(0xFEBF0000 as *const u32));
         println!("meow");
-        println!("{:08x}", *(0xFEBF0004 as *const u32));
-        println!("{:08x}", *(0xFEBF0008 as *const u32));
+        //println!("{:08x}", *(0xFEBF0004 as *const u32));
+        //println!("{:08x}", *(0xFEBF0008 as *const u32));
     }
     loop {}
 }
