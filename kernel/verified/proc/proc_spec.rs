@@ -314,6 +314,21 @@ impl ProcessManager {
         return proc.owned_threads.get_head();
     }
 
+    pub fn get_head_of_endpoint_by_endpoint_ptr(&self, endpoint_ptr:EndpointPtr) -> (ret: ThreadPtr)
+        requires
+            self.wf(),
+            self.get_endpoint_ptrs().contains(endpoint_ptr),
+            self.get_endpoint(endpoint_ptr).queue.len() != 0,
+        ensures
+            ret =~= self.get_endpoint(endpoint_ptr).queue@[0],
+    {
+        assert(self.endpoint_perms@.dom().contains(endpoint_ptr));
+        let tracked endpoint_perm = self.endpoint_perms.borrow().tracked_borrow(endpoint_ptr);
+        let endpoint : &Endpoint = PPtr::<Endpoint>::from_usize(endpoint_ptr).borrow(Tracked(endpoint_perm));
+        let ret = endpoint.queue.get_head();
+        return ret;
+    }
+
     pub fn get_endpoint_rf_counter_by_endpoint_ptr(&self, endpoint_ptr:EndpointPtr) -> (ret :usize)
         requires
             self.wf(),

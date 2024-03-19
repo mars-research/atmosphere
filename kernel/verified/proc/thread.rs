@@ -54,7 +54,14 @@ pub struct IPCPayLoad{
     pub pci_payload: Option<(u8,u8,u8)>,
 }
 impl IPCPayLoad {
-    pub fn new_to_none() -> (ret:Self){
+    pub fn new_to_none() -> (ret:Self)
+        ensures
+            ret.calling == false,
+            ret.message.is_None(),
+            ret.page_payload.is_None(),
+            ret.endpoint_payload.is_None(),
+            ret.pci_payload.is_None(),
+    {
         Self{
             calling: false,
             message: None,
@@ -540,6 +547,10 @@ impl ProcessManager {
         self.get_pcid_closure() =~= old(self).get_pcid_closure(),
         forall|endpoint_index:EndpointIdx|#![auto] 1<=endpoint_index<MAX_NUM_ENDPOINT_DESCRIPTORS ==> self.get_thread(ret).endpoint_descriptors[endpoint_index as int] == 0,
         self.get_proc(self.get_thread(ret).parent).pcid == old(self).get_proc(parent_ptr).pcid,
+
+        forall|proc_ptr:ProcPtr|#![auto] old(self).get_proc_ptrs().contains(proc_ptr) && proc_ptr != parent_ptr ==> self.get_proc(proc_ptr) =~= old(self).get_proc(proc_ptr),
+        forall|thread_ptr:ThreadPtr|#![auto] old(self).get_thread_ptrs().contains(thread_ptr) ==> self.get_thread(thread_ptr) =~= old(self).get_thread(thread_ptr),
+        forall|_endpoint_ptr:EndpointPtr|#![auto] old(self).get_endpoint_ptrs().contains(_endpoint_ptr) && _endpoint_ptr != endpoint_ptr ==> self.get_endpoint(_endpoint_ptr) =~= old(self).get_endpoint(_endpoint_ptr),
     {
 
     assert(self.thread_ptrs@.contains(page_ptr) == false);

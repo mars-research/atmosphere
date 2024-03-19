@@ -22,7 +22,7 @@ pub struct MMUManager{
     pub iommu_table_pages: Ghost<Set<PagePtr>>,
 
     pub root_table:RootTable,
-
+    pub root_table_cache: Ghost<Seq<Seq<Seq<Option<(IOid,usize)>>>>>,
     // pub device_table:MarsArray<MarsArray<Option<(u8,u8,u8)>,256>,IOID_MAX>,
     // pub ioid_device_table: Ghost<Seq<Set<(u8,u8,u8)>>>,
 
@@ -201,6 +201,19 @@ impl MMUManager{
         //     )
     }
 
+    pub open spec fn root_table_cache_wf(&self) -> bool{
+        &&&
+        self.root_table_cache@.len() == 256
+        &&&
+        forall|bus:u8|#![auto] 0<=bus<256 ==> self.root_table_cache@[bus as int].len() == 32
+        &&&
+        forall|bus:u8,dev:u8|#![auto] 0<=bus<256 && 0<=dev<32 ==> self.root_table_cache@[bus as int][dev as int].len() == 8
+        &&&
+        (forall|bus:u8,dev:u8,fun:u8|#![auto] 0<=bus<256 && 0<=dev<32 && 0<=fun<8 && self.root_table_cache@[bus as int][dev as int][fun as int].is_Some() ==>
+            self.root_table_cache@[bus as int][dev as int][fun as int] =~= self.root_table.resolve(bus,dev,fun)
+        )
+    }
+
     #[verifier(inline)]
     pub open spec fn get_free_pcids_as_set(&self) -> Set<Pcid>
     {
@@ -276,10 +289,12 @@ impl MMUManager{
     }
 
     pub fn get_cr3_by_ioid(&self, ioid:IOid) -> (ret:usize)
-    requires
-        self.wf(),
-        0<=ioid<IOID_MAX,
-        self.get_free_ioids_as_set().contains(ioid) == false,
+        requires
+            self.wf(),
+            0<=ioid<IOID_MAX,
+            self.get_free_ioids_as_set().contains(ioid) == false,
+        ensures
+            self.get_iommutable_by_ioid(ioid).dummy.cr3 == ret,
     {
         return self.iommu_tables.get(ioid).dummy.cr3;
     }
@@ -291,6 +306,16 @@ impl MMUManager{
             self.get_pagetable_by_pcid(ret.0).cr3 == ret.1,
     {
         return (0,self.page_tables.get(0).cr3);
+    }
+
+    pub fn get_pci_binding(&self, bus:u8,dev:u8,fun:u8) -> (ret:Option<(IOid,usize)>)
+        requires
+            0<=bus<256 && 0<=dev<32 && 0<=fun<8,
+            self.wf(),
+        ensures
+            ret =~= self.root_table.resolve(bus,dev,fun),
+    {
+        return self.root_table.get_ioid(bus,dev,fun);
     }
 
     // #[verifier(inline)]
@@ -315,6 +340,10 @@ impl MMUManager{
         &&&
         (
             self.root_table_wf()
+        )
+        &&&
+        (
+            self.root_table_cache_wf()
         )
     }
 }

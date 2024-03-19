@@ -37,6 +37,11 @@ impl MMUManager{
             forall|i:int|#![auto] 0<=i<IOID_MAX ==> old(self).iommu_tables[i].dummy.l2_tables@ =~= Map::empty(),
             forall|i:int|#![auto] 0<=i<IOID_MAX ==> old(self).iommu_tables[i].dummy.l1_tables@ =~= Map::empty(),
             forall|i:usize, va: VAddr|#![auto] 0<=i<IOID_MAX && spec_va_valid(va) ==>  old(self).get_iommutable_mapping_by_ioid(i)[va].is_None(),
+
+            old(self).root_table_cache@.len() == 256,
+            forall|bus:u8|#![auto] 0<=bus<256 ==> old(self).root_table_cache@[bus as int].len() == 32,
+            forall|bus:u8,dev:u8|#![auto] 0<=bus<256 && 0<=dev<32 ==> old(self).root_table_cache@[bus as int][dev as int].len() == 8,
+            (forall|bus:u8,dev:u8,fun:u8|#![auto] 0<=bus<256 && 0<=dev<32 && 0<=fun<8 ==> old(self).root_table_cache@[bus as int][dev as int][fun as int].is_None()),
         ensures
             // self.wf(),
             self.pagetables_wf(),
@@ -70,6 +75,11 @@ impl MMUManager{
             forall|i:int|#![auto] 0<=i<IOID_MAX ==> self.iommu_tables[i].dummy.l2_tables@ =~= Map::empty(),
             forall|i:int|#![auto] 0<=i<IOID_MAX ==> self.iommu_tables[i].dummy.l1_tables@ =~= Map::empty(),
             forall|i:usize, va: VAddr|#![auto] 0<=i<IOID_MAX && spec_va_valid(va) ==>  self.get_iommutable_mapping_by_ioid(i)[va].is_None(),
+
+            self.root_table_cache@.len() == 256,
+            forall|bus:u8|#![auto] 0<=bus<256 ==> self.root_table_cache@[bus as int].len() == 32,
+            forall|bus:u8,dev:u8|#![auto] 0<=bus<256 && 0<=dev<32 ==> self.root_table_cache@[bus as int][dev as int].len() == 8,
+            (forall|bus:u8,dev:u8,fun:u8|#![auto] 0<=bus<256 && 0<=dev<32 && 0<=fun<8 ==> self.root_table_cache@[bus as int][dev as int][fun as int].is_None()),
     {
         let mut i = 0;
 
@@ -98,6 +108,11 @@ impl MMUManager{
                 forall|i:int|#![auto] 0<=i<IOID_MAX ==> self.iommu_tables[i].dummy.l3_tables@ =~= Map::empty(),
                 forall|i:int|#![auto] 0<=i<IOID_MAX ==> self.iommu_tables[i].dummy.l2_tables@ =~= Map::empty(),
                 forall|i:int|#![auto] 0<=i<IOID_MAX ==> self.iommu_tables[i].dummy.l1_tables@ =~= Map::empty(),
+
+                self.root_table_cache@.len() == 256,
+                forall|bus:u8|#![auto] 0<=bus<256 ==> self.root_table_cache@[bus as int].len() == 32,
+                forall|bus:u8,dev:u8|#![auto] 0<=bus<256 && 0<=dev<32 ==> self.root_table_cache@[bus as int][dev as int].len() == 8,
+                (forall|bus:u8,dev:u8,fun:u8|#![auto] 0<=bus<256 && 0<=dev<32 && 0<=fun<8 ==> self.root_table_cache@[bus as int][dev as int][fun as int].is_None()),
             ensures
                 i==PCID_MAX,
                 self.free_pcids.wf(),
@@ -122,6 +137,11 @@ impl MMUManager{
                 forall|i:int|#![auto] 0<=i<IOID_MAX ==> self.iommu_tables[i].dummy.l3_tables@ =~= Map::empty(),
                 forall|i:int|#![auto] 0<=i<IOID_MAX ==> self.iommu_tables[i].dummy.l2_tables@ =~= Map::empty(),
                 forall|i:int|#![auto] 0<=i<IOID_MAX ==> self.iommu_tables[i].dummy.l1_tables@ =~= Map::empty(),
+
+                self.root_table_cache@.len() == 256,
+                forall|bus:u8|#![auto] 0<=bus<256 ==> self.root_table_cache@[bus as int].len() == 32,
+                forall|bus:u8,dev:u8|#![auto] 0<=bus<256 && 0<=dev<32 ==> self.root_table_cache@[bus as int][dev as int].len() == 8,
+                (forall|bus:u8,dev:u8,fun:u8|#![auto] 0<=bus<256 && 0<=dev<32 && 0<=fun<8 ==> self.root_table_cache@[bus as int][dev as int][fun as int].is_None()),
         {
             self.free_pcids.push_unique(PCID_MAX - i - 1);
             self.free_ioids.push_unique(IOID_MAX - i - 1);
@@ -177,6 +197,13 @@ impl MMUManager{
                 page_ptr_valid(pagetable.get_pagetable_mapping()[va].get_Some_0().addr),
             forall|va:usize| #![auto] spec_va_valid(va) && pagetable.get_pagetable_mapping()[va].is_Some() ==>
                 spec_va_perm_bits_valid(pagetable.get_pagetable_mapping()[va].get_Some_0().perm),
+
+            forall|bus:u8,dev:u8,fun:u8|#![auto] 0<=bus<256 && 0<=dev<32 && 0<=fun<8 ==> old(self).root_table.resolve(bus,dev,fun).is_None(),
+
+            old(self).root_table_cache@.len() == 256,
+            forall|bus:u8|#![auto] 0<=bus<256 ==> old(self).root_table_cache@[bus as int].len() == 32,
+            forall|bus:u8,dev:u8|#![auto] 0<=bus<256 && 0<=dev<32 ==> old(self).root_table_cache@[bus as int][dev as int].len() == 8,
+            (forall|bus:u8,dev:u8,fun:u8|#![auto] 0<=bus<256 && 0<=dev<32 && 0<=fun<8 ==> old(self).root_table_cache@[bus as int][dev as int][fun as int].is_None()),
         ensures
             self.wf(),
             self.free_ioids.wf(),
@@ -202,6 +229,13 @@ impl MMUManager{
             self.get_mmu_page_closure() =~= pagetable.get_pagetable_page_closure(),
             forall|i:usize, va: VAddr|#![auto] 1<=i<PCID_MAX && spec_va_valid(va) ==>  self.get_pagetable_mapping_by_pcid(i)[va].is_None(),
             self.get_free_pcids_as_set().contains(0) == false,
+
+            forall|bus:u8,dev:u8,fun:u8|#![auto] 0<=bus<256 && 0<=dev<32 && 0<=fun<8 ==> self.root_table.resolve(bus,dev,fun).is_None(),
+
+            self.root_table_cache@.len() == 256,
+            forall|bus:u8|#![auto] 0<=bus<256 ==> self.root_table_cache@[bus as int].len() == 32,
+            forall|bus:u8,dev:u8|#![auto] 0<=bus<256 && 0<=dev<32 ==> self.root_table_cache@[bus as int][dev as int].len() == 8,
+            (forall|bus:u8,dev:u8,fun:u8|#![auto] 0<=bus<256 && 0<=dev<32 && 0<=fun<8 ==> self.root_table_cache@[bus as int][dev as int][fun as int].is_None()),
     {
         let pcid = self.free_pcids.pop_unique();
         assert(pcid == 0);
@@ -237,6 +271,10 @@ impl MMUManager{
             forall|i:int|#![auto] 0<=i<IOID_MAX ==> ret.iommu_tables[i].dummy.l1_tables@ =~= Map::empty(),
             forall|i:usize, va: VAddr|#![auto] 0<=i<IOID_MAX && spec_va_valid(va) ==>  ret.get_iommutable_mapping_by_ioid(i)[va].is_None(),
             // ret.pci_bitmap.wf(),
+            ret.root_table_cache@.len() == 256,
+            forall|bus:u8|#![auto] 0<=bus<256 ==> ret.root_table_cache@[bus as int].len() == 32,
+            forall|bus:u8,dev:u8|#![auto] 0<=bus<256 && 0<=dev<32 ==> ret.root_table_cache@[bus as int][dev as int].len() == 8,
+            (forall|bus:u8,dev:u8,fun:u8|#![auto] 0<=bus<256 && 0<=dev<32 && 0<=fun<8 ==> ret.root_table_cache@[bus as int][dev as int][fun as int].is_None()),
     {
         unsafe{
         let ret = Self{
@@ -247,6 +285,7 @@ impl MMUManager{
             iommu_tables: MarsArray::<IOMMUTable,IOID_MAX>::new(),
             iommu_table_pages: Ghost(Set::empty()),
             root_table: RootTable::new(),
+            root_table_cache: Ghost(Seq::empty()),
             // device_table: MaybeUninit::uninit().assume_init(),
             pci_bitmap:PCIBitMap::new(),
         };

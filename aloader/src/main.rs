@@ -112,6 +112,7 @@ fn main(_argc: isize, _argv: *const *const u8) -> ! {
         }
     }
 
+    let mut free_page_count = 0;
     let mut cur = 0;
     log::info!("Populating physical page list");
     for (region, label) in memory::get_physical_memory_map().regions.iter() {
@@ -130,6 +131,9 @@ fn main(_argc: isize, _argv: *const *const u8) -> ! {
             cur += PAGE_SIZE as u64;
         }
         while cur < region.end_inclusive() {
+            if page_type == PhysicalMemoryType::Available {
+                free_page_count = free_page_count + 1;
+            }
             boot_info
                 .pages
                 .push((cur, page_type))
@@ -144,6 +148,8 @@ fn main(_argc: isize, _argv: *const *const u8) -> ! {
             .expect("Too many pages");
         cur += PAGE_SIZE as u64;
     }
+
+    log::info!("ALoader: Num of free pages --> {:?}", free_page_count);
 
     debugger::on_ready();
 

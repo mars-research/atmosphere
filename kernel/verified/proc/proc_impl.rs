@@ -40,7 +40,9 @@ impl ProcessManager {
             self.get_proc(ret).pcid == new_pcid,
             self.get_proc_man_page_closure() =~= old(self).get_proc_man_page_closure().insert(ret),
             self.get_thread_ptrs() =~= old(self).get_thread_ptrs(),
+            self.get_endpoint_ptrs() =~= old(self).get_endpoint_ptrs(),
             self.proc_perms@[ret]@.value.get_Some_0().owned_threads.len() == 0,
+            forall|proc_ptr:ProcPtr|#![auto] old(self).get_proc_ptrs().contains(proc_ptr) ==> self.get_proc(proc_ptr) =~= old(self).get_proc(proc_ptr),
             forall|thread_ptr:ThreadPtr|#![auto] self.get_thread_ptrs().contains(thread_ptr) ==> self.get_thread(thread_ptr) =~= old(self).get_thread(thread_ptr),
             forall|endpoint_ptr:EndpointPtr|#![auto] self.get_endpoint_ptrs().contains(endpoint_ptr) ==> self.get_endpoint(endpoint_ptr) =~= old(self).get_endpoint(endpoint_ptr),
     {

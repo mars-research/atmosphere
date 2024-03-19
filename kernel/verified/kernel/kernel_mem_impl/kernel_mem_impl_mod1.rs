@@ -42,6 +42,9 @@ impl Kernel{
             forall|i:IOid,_va:VAddr| #![auto] 0<=i<IOID_MAX && spec_va_valid(_va) ==> self.mmu_man.get_iommutable_mapping_by_ioid(i)[_va] =~= old(self).mmu_man.get_iommutable_mapping_by_ioid(i)[_va],
             forall|_va:VAddr| #![auto] spec_va_valid(_va) && va != _va ==> self.mmu_man.get_pagetable_mapping_by_pcid(pcid)[_va] =~= old(self).mmu_man.get_pagetable_mapping_by_pcid(pcid)[_va],
             self.mmu_man.get_pagetable_mapping_by_pcid(pcid)[va].is_Some(),
+            self.mmu_man.get_pagetable_mapping_by_pcid(pcid)[va].get_Some_0().addr == dst.addr,
+            self.cpu_list =~= old(self).cpu_list,
+            self.proc_man =~= old(self).proc_man,
     {
         let result = self.mmu_man.map_pagetable_page(pcid,va,dst);
         assert(result == true);
@@ -176,6 +179,8 @@ impl Kernel{
             // self.resolve_mapping_l2(l4i,l3i,l2i).is_Some(),
             self.mmu_man.get_pagetable_by_pcid(pcid).is_va_entry_exist(va),
             self.page_alloc.free_pages.len() >= old(self).page_alloc.free_pages.len() - 3,
+            self.cpu_list =~= old(self).cpu_list,
+            self.proc_man =~= old(self).proc_man,
 
     {
         proof{

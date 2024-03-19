@@ -76,6 +76,10 @@ pub const PCI_DEV_PAYLOAD_INVALID:ErrorCodeType = 32;
 pub const VADDR_INVALID:ErrorCodeType = 33;
 pub const VADDR_NOMAPPING:ErrorCodeType = 34;
 pub const ENDPOINT_SENDER_QUEUE:ErrorCodeType = 35;
+pub const IPC_TYPE_NOT_MATCH:ErrorCodeType = 36;
+pub const PCI_DEV_NUM_INVALID:ErrorCodeType = 37;
+pub const PCI_DEV_NO_OWNERSHIP:ErrorCodeType = 38;
+pub const PCI_DEV_TAKEN:ErrorCodeType = 39;
 
 pub type ThreadState = usize;
 pub const SCHEDULED:ThreadState = 1;
@@ -93,7 +97,7 @@ pub type ProcPtr = usize;
 pub type EndpointIdx = usize;
 pub type EndpointPtr = usize;
 
-pub const MAX_NUM_ENDPOINT_DESCRIPTORS:usize = 32;
+pub const MAX_NUM_ENDPOINT_DESCRIPTORS:usize = 128;
 pub const MAX_NUM_THREADS_PER_PROC:usize = 250;
 pub const MAX_NUM_THREADS_PER_ENDPOINT:usize = 250;
 pub const MAX_NUM_PROCS:usize = PCID_MAX;

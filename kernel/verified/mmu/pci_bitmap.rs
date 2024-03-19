@@ -101,5 +101,6 @@ impl PCIBitMap{
             self.bit_map[ioid][bus as usize][dev as usize] = old | (0x1u8 << fun);
         }
     }
+
 }
 }

@@ -15,6 +15,21 @@ use crate::page_alloc::*;
 use crate::kernel::*;
 
 
+pub closed spec fn kernel_page_sharing_spec_helper(kernel: Kernel, sender_pcid:Pcid, receiver_pcid:Pcid, sender_page_start:VAddr, receiver_page_start:VAddr, sender_page_len:usize) -> bool {
+    (forall|j:usize| #![auto] 0<=j<sender_page_len ==> spec_va_valid(spec_va_add_range(sender_page_start,j)))
+    &&
+    (forall|j:usize| #![auto] 0<=j<sender_page_len ==> spec_va_valid(spec_va_add_range(receiver_page_start,j)))
+    &&
+    (forall|j:usize| #![auto] 0<=j<sender_page_len  ==> kernel.mmu_man.get_pagetable_mapping_by_pcid(sender_pcid)[spec_va_add_range(sender_page_start,j)].is_Some())
+    &&
+    (forall|j:usize| #![auto] 0<=j<sender_page_len ==>  kernel.page_alloc.page_array@[
+        page_ptr2page_index(kernel.mmu_man.get_pagetable_mapping_by_pcid(sender_pcid)[spec_va_add_range(sender_page_start,j)].get_Some_0().addr) as int].rf_count < usize::MAX - sender_page_len)
+    &&
+    (forall|j:usize| #![auto] 0<=j<sender_page_len ==> kernel.mmu_man.get_pagetable_mapping_by_pcid(receiver_pcid)[spec_va_add_range(receiver_page_start,j)].is_None())
+
+}
+
+
 impl Kernel {
 
     pub fn kernel_page_sharing_helper(&self, sender_pcid:Pcid, receiver_pcid:Pcid, perm_bits:usize, sender_page_start:VAddr, receiver_page_start:VAddr, sender_page_len:usize) -> (ret: bool)
@@ -23,23 +38,14 @@ impl Kernel {
             self.page_alloc.free_pages.len() >= 3 * sender_page_len,
             sender_page_len < usize::MAX/3,
             0<=sender_pcid<PCID_MAX,
-            0<=receiver_pcid<IOID_MAX,
+            0<=receiver_pcid<PCID_MAX,
             self.mmu_man.get_free_pcids_as_set().contains(sender_pcid) == false,
             self.mmu_man.get_free_pcids_as_set().contains(receiver_pcid) == false,
-            spec_va_perm_bits_valid(perm_bits),
         ensures
-            ret == true ==> (
-                spec_va_perm_bits_valid(perm_bits)
-                &&
+            ret == true <==> (
                 (forall|j:usize| #![auto] 0<=j<sender_page_len ==> spec_va_valid(spec_va_add_range(sender_page_start,j)))
                 &&
                 (forall|j:usize| #![auto] 0<=j<sender_page_len ==> spec_va_valid(spec_va_add_range(receiver_page_start,j)))
-                &&
-                (self.page_alloc.free_pages.len() >= 3 * sender_page_len)
-                &&
-                (self.mmu_man.get_free_pcids_as_set().contains(sender_pcid) == false)
-                &&
-                (self.mmu_man.get_free_pcids_as_set().contains(receiver_pcid) == false)
                 &&
                 (forall|j:usize| #![auto] 0<=j<sender_page_len  ==> self.mmu_man.get_pagetable_mapping_by_pcid(sender_pcid)[spec_va_add_range(sender_page_start,j)].is_Some())
                 &&
@@ -47,7 +53,21 @@ impl Kernel {
                     page_ptr2page_index(self.mmu_man.get_pagetable_mapping_by_pcid(sender_pcid)[spec_va_add_range(sender_page_start,j)].get_Some_0().addr) as int].rf_count < usize::MAX - sender_page_len)
                 &&
                 (forall|j:usize| #![auto] 0<=j<sender_page_len ==> self.mmu_man.get_pagetable_mapping_by_pcid(receiver_pcid)[spec_va_add_range(receiver_page_start,j)].is_None())
-            )
+            ),
+            ret == false ==> !(
+                (forall|j:usize| #![auto] 0<=j<sender_page_len ==> spec_va_valid(spec_va_add_range(sender_page_start,j)))
+                &&
+                (forall|j:usize| #![auto] 0<=j<sender_page_len ==> spec_va_valid(spec_va_add_range(receiver_page_start,j)))
+                &&
+                (forall|j:usize| #![auto] 0<=j<sender_page_len  ==> self.mmu_man.get_pagetable_mapping_by_pcid(sender_pcid)[spec_va_add_range(sender_page_start,j)].is_Some())
+                &&
+                (forall|j:usize| #![auto] 0<=j<sender_page_len ==>  self.page_alloc.page_array@[
+                    page_ptr2page_index(self.mmu_man.get_pagetable_mapping_by_pcid(sender_pcid)[spec_va_add_range(sender_page_start,j)].get_Some_0().addr) as int].rf_count < usize::MAX - sender_page_len)
+                &&
+                (forall|j:usize| #![auto] 0<=j<sender_page_len ==> self.mmu_man.get_pagetable_mapping_by_pcid(receiver_pcid)[spec_va_add_range(receiver_page_start,j)].is_None())
+            ),
+
+            ret == kernel_page_sharing_spec_helper(*self, sender_pcid, receiver_pcid, sender_page_start, receiver_page_start, sender_page_len),
     {
         let mut i = 0;
         while i != sender_page_len
@@ -56,7 +76,6 @@ impl Kernel {
                 self.wf(),
                 0<=sender_pcid<PCID_MAX,
                 0<=receiver_pcid<IOID_MAX,
-                spec_va_perm_bits_valid(perm_bits),
                 self.page_alloc.free_pages.len() >= 3 * sender_page_len,
                 forall|j:usize| #![auto] 0<=j<i ==> spec_va_valid(spec_va_add_range(sender_page_start,j)),
                 forall|j:usize| #![auto] 0<=j<i ==> spec_va_valid(spec_va_add_range(receiver_page_start,j)),
@@ -71,7 +90,6 @@ impl Kernel {
                 self.wf(),
                 0<=sender_pcid<PCID_MAX,
                 0<=receiver_pcid<IOID_MAX,
-                spec_va_perm_bits_valid(perm_bits),
                 forall|j:usize| #![auto] 0<=j<sender_page_len ==> spec_va_valid(spec_va_add_range(sender_page_start,j)),
                 forall|j:usize| #![auto] 0<=j<sender_page_len ==> spec_va_valid(spec_va_add_range(receiver_page_start,j)),
                 self.page_alloc.free_pages.len() >= 3 * sender_page_len,

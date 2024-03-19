@@ -2,9 +2,10 @@
 //!
 //! ## AP Boot ABI
 //!
+//! -32 @ 0x6fe0: Argument
 //! -24 @ 0x6fe8: Code Pointer
-//! -16 @ 0x6ff0: CR3
-//!  -8 @ 0x6ff8: Stack Pointer
+//! -16 @ 0x6ff8: Stack Pointer
+//!  -8 @ 0x6ff0: CR3
 //!   0 @ 0x7000: Trampoline Code
 
 use core::ptr;
@@ -16,9 +17,10 @@ pub struct StartTrampoline {
 }
 
 impl StartTrampoline {
-    const STACK_PTR_OFFSET: isize = -8;
-    const CR3_OFFSET: isize = -16;
+    const CR3_OFFSET: isize = -8;
+    const STACK_PTR_OFFSET: isize = -16;
     const CODE_POINTER_OFFSET: isize = -24;
+    const ARG_OFFSET: isize = -32;
 
     pub unsafe fn new(base: u16) -> Result<Self, &'static str> {
         if base & (4096 - 1) != 0 {
@@ -54,6 +56,15 @@ impl StartTrampoline {
         unsafe {
             let code_dst = self.base_ptr().offset(Self::CODE_POINTER_OFFSET) as *mut u64;
             ptr::write_volatile(code_dst, code);
+        }
+
+        self
+    }
+
+    pub fn with_arg(&mut self, arg: u64) -> &mut Self {
+        unsafe {
+            let arg_dst = self.base_ptr().offset(Self::ARG_OFFSET) as *mut u64;
+            ptr::write_volatile(arg_dst, arg);
         }
 
         self

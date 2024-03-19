@@ -41,6 +41,12 @@ pub closed spec fn syscall_new_endpoint_spec(old:Kernel,new:Kernel,cpu_id:CPUID,
             new.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).endpoint_descriptors@[endpoint_index as int] != 0
             &&
             new.proc_man.get_endpoint_ptrs().len() == old.proc_man.get_endpoint_ptrs().len() + 1
+            &&
+            forall|_thread_ptr:ThreadPtr| #![auto] new.proc_man.get_thread_ptrs().contains(_thread_ptr) && _thread_ptr != old.cpu_list@[cpu_id as int].get_current_thread().unwrap() ==> new.proc_man.get_thread(_thread_ptr) =~= old.proc_man.get_thread(_thread_ptr)
+            &&
+            forall|_proc_ptr:ProcPtr| #![auto] new.proc_man.get_proc_ptrs().contains(_proc_ptr) ==> new.proc_man.get_proc(_proc_ptr) =~= old.proc_man.get_proc(_proc_ptr)
+            &&
+            forall|_endpoint_ptr:EndpointPtr| #![auto] old.proc_man.endpoint_ptrs@.contains(_endpoint_ptr) ==> new.proc_man.get_endpoint(_endpoint_ptr) =~= old.proc_man.get_endpoint(_endpoint_ptr)
         }else{
             //if the syscall is not success, nothing will change, goes back to user level
             old =~= new

@@ -49,6 +49,12 @@ pub unsafe fn init_cpu() {
     SYSCALLS[asys::__NR_PRINT] = sys_print as u64;
     SYSCALLS[asys::__NR_MMAP] = kernel::sys_mmap as u64;
     SYSCALLS[asys::__NR_MRESOLVE] = kernel::sys_resolve as u64;
+    SYSCALLS[asys::__NR_NEW_END] = kernel::sys_new_endpoint as u64;
+    SYSCALLS[asys::__NR_NEW_PROC] = kernel::sys_new_proc as u64;
+    SYSCALLS[asys::__NR_NEW_PROC_W_IO] = kernel::sys_new_proc_with_iommu as u64;
+    SYSCALLS[asys::__NR_NEW_THREAD] = kernel::sys_new_thread as u64;
+    SYSCALLS[asys::__NR_SEND_EMPTY_NW] = kernel::sys_send_empty_no_wait as u64;
+    SYSCALLS[asys::__NR_LOG] = sys_log as u64;
 }
 
 // rax - syscall number
@@ -110,5 +116,14 @@ extern "C" fn sys_print(data: *const u8, len: usize) -> isize {
         core::str::from_utf8_unchecked(slice)
     };
     log::info!("print: {}", s);
+    0
+}
+
+extern "C" fn sys_log(data: *const u8, len: usize, level: log::Level) -> isize {
+    let s = unsafe {
+        let slice = core::slice::from_raw_parts(data, len);
+        core::str::from_utf8_unchecked(slice)
+    };
+    log::log!(level, "{}", s);
     0
 }

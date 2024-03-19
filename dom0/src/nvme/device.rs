@@ -101,6 +101,8 @@ impl NvmeDevice {
         self.identify_ns(1);
 
         self.create_io_queues();
+
+        log::info!("Nvme Initialized!");
     }
 
     pub fn new(bar: PciBarAddr) -> NvmeDevice {

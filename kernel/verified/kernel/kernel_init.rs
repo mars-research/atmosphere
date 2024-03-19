@@ -78,7 +78,7 @@ impl Kernel{
 
     // #[verifier(external_body)]
     pub fn kernel_init(&mut self, boot_page_ptrs: &ArrayVec<(PageState,VAddr),NUM_PAGES>, mut boot_page_perms: Tracked<Map<PagePtr,PagePerm>>,
-                        dom0_pagetable: PageTable, kernel_pml4_entry: PageEntry, dom0_pt_regs: PtRegs) -> (ret: isize)
+                        dom0_pagetable: PageTable, kernel_pml4_entry: PageEntry, dom0_pt_regs: PtRegs, init_pci_map: PCIBitMap) -> (ret: isize)
         requires
             old(self).proc_man.proc_ptrs.arr_seq@.len() == MAX_NUM_PROCS,
             old(self).proc_man.proc_perms@ =~= Map::empty(),
@@ -121,8 +121,12 @@ impl Kernel{
             forall|i:int|#![auto] 0<=i<IOID_MAX ==> old(self).mmu_man.iommu_tables[i].dummy.l2_tables@ =~= Map::empty(),
             forall|i:int|#![auto] 0<=i<IOID_MAX ==> old(self).mmu_man.iommu_tables[i].dummy.l1_tables@ =~= Map::empty(),
             forall|i:usize, va: VAddr|#![auto] 0<=i<IOID_MAX && spec_va_valid(va) ==>   old(self).mmu_man.get_iommutable_by_ioid(i).wf() && old(self).mmu_man.get_iommutable_mapping_by_ioid(i)[va].is_None(),
-            old(self).cpu_list.wf(),
+            old(self).mmu_man.root_table_cache@.len() == 256,
+            forall|bus:u8|#![auto] 0<=bus<256 ==> old(self).mmu_man.root_table_cache@[bus as int].len() == 32,
+            forall|bus:u8,dev:u8|#![auto] 0<=bus<256 && 0<=dev<32 ==> old(self).mmu_man.root_table_cache@[bus as int][dev as int].len() == 8,
+            (forall|bus:u8,dev:u8,fun:u8|#![auto] 0<=bus<256 && 0<=dev<32 && 0<=fun<8 ==> old(self).mmu_man.root_table_cache@[bus as int][dev as int][fun as int].is_None()),
 
+            old(self).cpu_list.wf(),
             boot_page_ptrs.wf(),
             boot_page_ptrs.len() == NUM_PAGES,
             (forall|i:usize| #![auto] 0<=i<NUM_PAGES ==> boot_page_ptrs@[i as int].1 == page_index2page_ptr(i)),
@@ -171,7 +175,12 @@ impl Kernel{
                     0<=page_ptr2page_index(page_ptr as usize)<NUM_PAGES
                     &&
                     boot_page_ptrs@[page_ptr2page_index(page_ptr as usize) as int].0 == PAGETABLE
-                )
+                ),
+            init_pci_map.wf(),
+            (forall|ioid:IOid,bus:u8,dev:u8,fun:u8|#![auto] 1<=ioid<IOID_MAX && 0<=bus<256 && 0<=dev<32 && 0<=fun<8 ==>
+                (
+                    init_pci_map@[(ioid,bus,dev,fun)] == false
+                )),
     {
         proof{page_ptr_lemma();}
         self.cpu_list.init_to_none();
@@ -198,15 +207,17 @@ impl Kernel{
         assert(self.page_alloc.get_allocated_pages() =~= self.proc_man.get_proc_man_page_closure());
         assert(self.kernel_mem_layout_wf());
         self.kernel_pml4_entry = kernel_pml4_entry;
-        return self.kernel_init_helper(dom0_pt_regs);
+        return self.kernel_init_helper(dom0_pt_regs,init_pci_map);
 
     }
 
-    fn kernel_init_helper(&mut self, dom0_pt_regs: PtRegs) -> isize
+    fn kernel_init_helper(&mut self, dom0_pt_regs: PtRegs, init_pci_map: PCIBitMap) -> isize
         requires
             old(self).proc_man.wf(),
             old(self).mmu_man.wf(),
             old(self).mmu_man.get_free_pcids_as_set().contains(0) == false,
+            old(self).mmu_man.free_ioids@ =~= Seq::new(IOID_MAX as nat, |i:int| {(IOID_MAX - i - 1) as usize}),
+            old(self).mmu_man.free_ioids.len() == IOID_MAX,
             old(self).page_alloc.wf(),
             old(self).kernel_mmu_page_alloc_pagetable_wf(),
             old(self).kernel_mmu_page_alloc_iommutable_wf(),
@@ -230,14 +241,25 @@ impl Kernel{
             forall|i:CPUID, pcid: Pcid| #![auto] 0<=i<NUM_CPUS && 0 <= pcid< PCID_MAX ==> old(self).cpu_list@[i as int].tlb@[pcid] =~= Map::empty(),
             forall|i:CPUID, ioid: IOid| #![auto] 0<=i<NUM_CPUS && 0 <= ioid< IOID_MAX ==> old(self).cpu_list@[i as int].iotlb@[ioid] =~= Map::empty(),
             forall|thread_ptr:ThreadPtr| #![auto] old(self).proc_man.get_thread_ptrs().contains(thread_ptr) ==> old(self).proc_man.get_thread(thread_ptr).state != TRANSIT,
+            init_pci_map.wf(),
+            (forall|ioid:IOid,bus:u8,dev:u8,fun:u8|#![auto] 1<=ioid<IOID_MAX && 0<=bus<256 && 0<=dev<32 && 0<=fun<8 ==>
+                (
+                    init_pci_map@[(ioid,bus,dev,fun)] == false
+                )),
+            forall|bus:u8,dev:u8,fun:u8|#![auto] 0<=bus<256 && 0<=dev<32 && 0<=fun<8 ==> old(self).mmu_man.root_table.resolve(bus,dev,fun).is_None(),
     {
-        if self.page_alloc.free_pages.len() < 2{
+        if self.page_alloc.free_pages.len() < 3{
             return -1;
         }
         else{
             let (page_ptr1, page_perm1) = self.page_alloc.alloc_kernel_mem();
             let (page_ptr2, page_perm2) = self.page_alloc.alloc_kernel_mem();
-            let new_proc = self.proc_man.new_proc(page_ptr1, page_perm1, 0, None);
+            let (page_ptr3, page_perm3) = self.page_alloc.alloc_pagetable_mem();
+            let new_ioid = self.mmu_man.new_iommutable(page_ptr3,page_perm3);
+            self.mmu_man.pci_bitmap = init_pci_map;
+            assert(new_ioid == old(self).mmu_man.free_ioids@[IOID_MAX - 1]);
+            assert(new_ioid == 0);
+            let new_proc = self.proc_man.new_proc(page_ptr1, page_perm1, 0, Some(new_ioid));
             let new_thread = self.proc_man.new_thread(dom0_pt_regs,page_ptr2, page_perm2,new_proc);
             assert(
                 self.proc_man.wf());
@@ -265,6 +287,7 @@ impl Kernel{
             assert(self.kernel_proc_mmu_wf());
             assert(self.kernel_proc_no_thread_in_transit());
             assert(self.kernel_tlb_wf());
+            assert(self.wf());
             return 0;
         }
     }

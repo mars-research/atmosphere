@@ -10,6 +10,7 @@ use verified::define::PagePtr;
 use verified::kernel::Kernel;
 use verified::mars_staticlinkedlist::Node;
 use verified::mmu::MMUManager;
+use verified::mmu::PCIBitMap as vPCIBitMap;
 use verified::page_alloc::PageAllocator;
 use verified::pagetable::PageEntry as vPageEntry;
 use verified::pagetable::PageTable as vPageTable;
@@ -637,12 +638,14 @@ pub fn kernel_init(
     let mut dom0_pt_regs = vPtRegs::new_empty();
     dom0_pt_regs.r15 = 233;
     let page_perms: Tracked<Map<PagePtr, PagePerm>> = Tracked::assume_new();
+    let init_pci_map = vPCIBitMap::new();
     let ret_code = KERNEL.lock().as_mut().unwrap().kernel_init(
         &boot_pages,
         page_perms,
         dom0_pagetable,
         kernel_page_entry,
         dom0_pt_regs,
+        init_pci_map,
     );
     log::info!("kernel init ret_code {:?}", ret_code);
     let dom0_retstruc = KERNEL
@@ -680,4 +683,68 @@ pub fn sys_resolve(va: usize) -> usize {
     } else {
         return ret_struc.1;
     }
+}
+
+pub fn sys_new_endpoint(endpoint_index: usize) -> usize {
+    let cpu_id = cpu::get_cpu_id();
+    let pt_regs = vPtRegs::new_empty();
+    let ret_struc =
+        KERNEL
+            .lock()
+            .as_mut()
+            .unwrap()
+            .syscall_new_endpoint(cpu_id, pt_regs, endpoint_index);
+    ret_struc.error_code
+}
+
+pub fn sys_new_proc(endpoint_index: usize, ip: usize, sp: usize) -> usize {
+    let cpu_id = cpu::get_cpu_id();
+    let pt_regs = vPtRegs::new_empty();
+    let new_proc_pt_regs = vPtRegs::new_empty();
+    let ret_struc = KERNEL.lock().as_mut().unwrap().syscall_new_proc(
+        cpu_id,
+        pt_regs,
+        endpoint_index,
+        new_proc_pt_regs,
+    );
+    ret_struc.0.error_code
+}
+
+pub fn sys_new_proc_with_iommu(endpoint_index: usize, ip: usize, sp: usize) -> usize {
+    let cpu_id = cpu::get_cpu_id();
+    let pt_regs = vPtRegs::new_empty();
+    let new_proc_pt_regs = vPtRegs::new_empty();
+    let ret_struc = KERNEL.lock().as_mut().unwrap().syscall_new_proc_with_iommu(
+        cpu_id,
+        pt_regs,
+        endpoint_index,
+        new_proc_pt_regs,
+    );
+    ret_struc.0.error_code
+}
+
+pub fn sys_new_thread(endpoint_index: usize, ip: usize, sp: usize) -> usize {
+    let cpu_id = cpu::get_cpu_id();
+    let pt_regs = vPtRegs::new_empty();
+    let new_proc_pt_regs = vPtRegs::new_empty();
+    let ret_struc = KERNEL.lock().as_mut().unwrap().syscall_new_thread(
+        cpu_id,
+        pt_regs,
+        endpoint_index,
+        new_proc_pt_regs,
+    );
+    ret_struc.0.error_code
+}
+
+pub fn sys_send_empty_no_wait(endpoint_index: usize) -> usize {
+    let cpu_id = cpu::get_cpu_id();
+    let pt_regs = vPtRegs::new_empty();
+    let new_proc_pt_regs = vPtRegs::new_empty();
+    let ret_struc =
+        KERNEL
+            .lock()
+            .as_mut()
+            .unwrap()
+            .syscall_send_empty_no_wait(cpu_id, pt_regs, endpoint_index);
+    ret_struc.error_code
 }

@@ -51,6 +51,8 @@ use astd::boot::{BootInfo, PhysicalMemoryType};
 
 static mut SHUTDOWN_ON_PANIC: bool = false;
 
+static mut AP_STACK: [u8; 64 * 1024 * 1024] = [0; 64 * 1024 * 1024];
+
 use verified::array_vec::ArrayVec as vArrayVec;
 
 /// CPU 0 entry point.
@@ -61,7 +63,7 @@ fn main(boot_info: *const BootInfo) -> isize {
         console::early_init();
         logging::early_init();
 
-        cpu::init_cpu0(); // Now get_current() can be used
+        cpu::init_cpu(0); // Now get_current() can be used
 
         interrupt::init();
         interrupt::init_cpu();
@@ -78,6 +80,14 @@ fn main(boot_info: *const BootInfo) -> isize {
 
     if !cmdline.nologo {
         print_logo();
+    }
+
+    unsafe {
+        interrupt::boot_ap(
+            1,
+            &AP_STACK as *const _ as u64 + AP_STACK.len() as u64,
+            ap_main as u64,
+        );
     }
 
     //kernel::kernel_test();
@@ -119,6 +129,20 @@ fn main(boot_info: *const BootInfo) -> isize {
         scripts::run_script_from_command_line();
         boot::spin_forever();
     }
+}
+
+/// AP entry point.
+fn ap_main(cpu_id: u64) {
+    unsafe {
+        cpu::init_cpu(cpu_id as usize);
+        interrupt::init_cpu();
+        gdt::init_cpu();
+        syscalls::init_cpu();
+    }
+
+    log::info!("Hello from CPU {}", cpu::get_cpu_id());
+
+    loop {}
 }
 
 /// Runs all tests.

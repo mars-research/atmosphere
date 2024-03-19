@@ -51,7 +51,7 @@ ap_start32:
 
 	; Load CR3
 	lea ebx, ap_start16
-	sub ebx, 16
+	sub ebx, 8
 	mov eax, [ebx]
 	mov cr3, eax
 
@@ -61,7 +61,7 @@ ap_start32:
 	mov cr4, eax
 
 	; Enable Long Mode
-	mov eax, 0xc0000080
+	mov ecx, 0xc0000080
 	rdmsr
 	or eax, 1 << 8
 	wrmsr
@@ -71,10 +71,6 @@ ap_start32:
 	or eax, 1 << 31
 	mov cr0, eax
 
-	; TODO
-	loop:
-		jmp loop
-
 	; Load 64-bit GDT
 	lgdt [gdt64.pointer]
 
@@ -83,9 +79,25 @@ ap_start32:
 
 bits 64
 start64:
+	; Reset segments
+	mov ax, 0
+	mov ss, ax
+	mov ds, ax
+	mov es, ax
+	mov fs, ax
+	mov gs, ax
 
-todo:
-	jmp todo
+	; Load stack
+	lea rbx, ap_start16
+	sub rbx, 16
+	mov rsp, [rbx]
+
+	mov rdi, [rbx - 16]
+	call [rbx - 8]
+
+hlt:
+	hlt
+	jmp hlt
 
 section .rodata
 align 4096

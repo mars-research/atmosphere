@@ -21,5 +21,5 @@ Run `atmo help` for more information.
 
 ## TODO
 
-Remove transit state for threads @Xiangdong
-Add real implementation for page permissions @Xiangdong
+Remove transit state for threads @Xiangdong. 
+Move per CPU cache to MMU Manager @Xiangdong

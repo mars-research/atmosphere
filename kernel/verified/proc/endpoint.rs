@@ -241,6 +241,9 @@ impl ProcessManager{
             forall|_thread_ptr:ThreadPtr| #![auto] self.get_thread_ptrs().contains(_thread_ptr) == old(self).get_thread_ptrs().contains(_thread_ptr),
             forall|_thread_ptr:ThreadPtr| #![auto] self.get_thread_ptrs().contains(_thread_ptr) && _thread_ptr != ret.0 ==> self.get_thread(_thread_ptr) =~= old(self).get_thread(_thread_ptr),
             forall|_thread_ptr:ThreadPtr| #![auto] self.get_thread_ptrs().contains(_thread_ptr) && _thread_ptr != ret.0 ==> self.get_thread(_thread_ptr).state =~= old(self).get_thread(_thread_ptr).state,
+            forall|_thread_ptr:ThreadPtr| #![auto] self.get_thread_ptrs().contains(_thread_ptr) ==> self.get_thread(_thread_ptr).ipc_payload =~= old(self).get_thread(_thread_ptr).ipc_payload,
+            forall|_thread_ptr:ThreadPtr| #![auto] self.get_thread_ptrs().contains(_thread_ptr) ==> self.get_thread(_thread_ptr).endpoint_descriptors =~= old(self).get_thread(_thread_ptr).endpoint_descriptors,
+            forall|_endpoint_ptr:EndpointPtr| #![auto] self.get_endpoint_ptrs().contains(_endpoint_ptr) ==> self.get_endpoint(_endpoint_ptr).rf_counter =~= old(self).get_endpoint(_endpoint_ptr).rf_counter,
             self.proc_ptrs =~= old(self).proc_ptrs,
             self.proc_perms =~= old(self).proc_perms,
             self.thread_ptrs =~= old(self).thread_ptrs,
@@ -346,6 +349,7 @@ impl ProcessManager{
             self.get_thread(thread_ptr).scheduler_rf =~= old(self).get_thread(thread_ptr).scheduler_rf,
             self.get_thread(thread_ptr).endpoint_descriptors =~= old(self).get_thread(thread_ptr).endpoint_descriptors,
             self.get_thread(thread_ptr).ipc_payload =~= endpoint_payload,
+            self.get_thread(thread_ptr).endpoint_ptr == Some(old(self).get_thread(thread_ptr).endpoint_descriptors@[endpoint_index as int]),
             self.get_thread(thread_ptr).state == BLOCKED,
     {
         assert(self.thread_perms@.dom().contains(thread_ptr));
@@ -416,6 +420,7 @@ impl ProcessManager{
             self.get_thread(thread_ptr).scheduler_rf =~= old(self).get_thread(thread_ptr).scheduler_rf,
             self.get_thread(thread_ptr).endpoint_descriptors =~= old(self).get_thread(thread_ptr).endpoint_descriptors,
             self.get_thread(thread_ptr).ipc_payload =~= endpoint_payload,
+            self.get_thread(thread_ptr).endpoint_ptr == Some(old(self).get_thread(thread_ptr).endpoint_descriptors@[endpoint_index as int]),
             self.get_thread(thread_ptr).state == BLOCKED,
     {
         assert(self.thread_perms@.dom().contains(thread_ptr));
@@ -464,7 +469,7 @@ impl ProcessManager{
             self.wf(),
             self.get_thread_ptrs().contains(receiver_ptr),
         ensures
-            ret == true ==> (
+            ret == (
                 forall|i:int| #![auto] 0 <= i < MAX_NUM_ENDPOINT_DESCRIPTORS ==> self.get_thread(receiver_ptr).endpoint_descriptors@[i as int] != target_endpoint_ptr
             )
         {
@@ -584,12 +589,15 @@ impl ProcessManager{
             self.thread_ptrs =~= old(self).thread_ptrs,
             //self.thread_perms=@ =~= old(self).thread_perms@,
             self.scheduler =~= old(self).scheduler,
-            // self.endpoint_ptrs =~= old(self).endpoint_ptrs,
+            self.endpoint_ptrs@ =~= old(self).endpoint_ptrs@.insert(page_ptr),
             //self.endpoint_perms =~= old(self).endpoint_perms,
             self.pcid_closure =~= old(self).pcid_closure,
             self.ioid_closure =~= old(self).ioid_closure,
             self.get_endpoint_ptrs().len() == old(self).get_endpoint_ptrs().len() + 1,
             self.get_thread(parent_ptr).endpoint_descriptors@[endpoint_index as int] != 0,
+            forall|_thread_ptr:ThreadPtr| #![auto] self.get_thread_ptrs().contains(_thread_ptr) && _thread_ptr != parent_ptr ==> self.get_thread(_thread_ptr) =~= old(self).get_thread(_thread_ptr),
+            forall|_proc_ptr:ProcPtr| #![auto] self.get_proc_ptrs().contains(_proc_ptr) ==> self.get_proc(_proc_ptr) =~= old(self).get_proc(_proc_ptr),
+            forall|_endpoint_ptr:EndpointPtr| #![auto] old(self).endpoint_ptrs@.contains(_endpoint_ptr) ==> self.get_endpoint(_endpoint_ptr) =~= old(self).get_endpoint(_endpoint_ptr),
     {
         let (endpoint_pptr,mut endpoint_perm) = page_to_endpoint((PPtr::<[u8; PAGE_SZ]>::from_usize(page_ptr),page_perm));
         let endpoint_ptr = endpoint_pptr.to_usize();

@@ -149,10 +149,12 @@ impl MMUManager{
         ensures
             self.wf(),
             self.get_free_ioids_as_set() =~= old(self).get_free_ioids_as_set().remove(ret),
+            ret == old(self).free_ioids@[old(self).free_ioids@.len() - 1],
             old(self).get_free_ioids_as_set().contains(ret),
             self.free_pcids =~= old(self).free_pcids,
             self.page_tables =~= old(self).page_tables,
             self.page_table_pages =~= old(self).page_table_pages,
+            self.root_table =~= old(self).root_table,
             self.get_mmu_page_closure() =~= old(self).get_mmu_page_closure().insert(page_ptr),
             forall|i:Pcid|#![auto] 0<=i<PCID_MAX ==> self.get_pagetable_mapping_by_pcid(i) =~= old(self).get_pagetable_mapping_by_pcid(i),
             forall|ioid:IOid| #![auto] 0<=ioid<IOID_MAX ==> self.get_iommutable_mapping_by_ioid(ioid) =~= old(self).get_iommutable_mapping_by_ioid(ioid),
@@ -343,6 +345,31 @@ impl MMUManager{
     {
         self.pci_bitmap.set(ioid, bus,dev,fun,true);
 
+    }
+
+    pub fn mmu_register_pci_dev(&mut self, ioid:IOid, bus:u8,dev:u8,fun:u8)
+        requires
+            old(self).wf(),
+            old(self).get_free_ioids_as_set().contains(ioid) == false,
+            0<=ioid<IOID_MAX,
+            0<=bus<256 && 0<=dev<32 && 0<=fun<8,
+            old(self).root_table.resolve(bus,dev,fun).is_None(),
+            old(self).pci_bitmap@[(ioid, bus,dev,fun)] == true,
+        ensures
+            self.wf(),
+            self.free_pcids =~= old(self).free_pcids,
+            self.free_ioids =~= old(self).free_ioids,
+            forall|_bus:u8,_dev:u8,_fun:u8|#![auto] 0<=_bus<256 && 0<=_dev<32 && 0<=_fun<8 &&
+                (_bus != bus || _dev != dev || _fun != fun)
+                ==> self.root_table.resolve(_bus,_dev,_fun) =~= old(self).root_table.resolve(_bus,_dev,_fun),
+            forall|pcid:Pcid, va:usize| #![auto] 0<=pcid<PCID_MAX && spec_va_valid(va) ==> self.get_pagetable_mapping_by_pcid(pcid)[va] =~= old(self).get_pagetable_mapping_by_pcid(pcid)[va],
+            forall|ioid:IOid, va:usize| #![auto] 0<=ioid<IOID_MAX && spec_va_valid(va) ==> self.get_iommutable_mapping_by_ioid(ioid)[va] =~= old(self).get_iommutable_mapping_by_ioid(ioid)[va],
+            self.get_mmu_page_closure() =~= old(self).get_mmu_page_closure(),
+            self.root_table.resolve(bus,dev,fun).is_Some() && self.root_table.resolve(bus,dev,fun).get_Some_0().0 == ioid,
+    {
+        assert(self.root_table_cache@[bus as int][dev as int][fun as int].is_None());
+        let cr3 = self.get_cr3_by_ioid(ioid);
+        self.root_table.set(bus,dev,fun, Some((ioid,cr3)));
     }
 
 }

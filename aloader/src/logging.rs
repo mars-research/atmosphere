@@ -13,6 +13,6 @@ pub unsafe fn init() {
     LOGGER.init(get_writer);
     LOGGER.set_colors(false);
     log::set_logger(&LOGGER)
-        .map(|_| log::set_max_level(log::LevelFilter::Trace))
+        .map(|_| log::set_max_level(log::LevelFilter::Info))
         .unwrap();
 }

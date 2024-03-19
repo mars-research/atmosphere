@@ -6,9 +6,6 @@
 //! - GDT
 //! - TSS
 //! - IST stack spaces
-//!
-//! We preallocate the structure for CPU 0, and the space for other
-//! CPUs are provided by Cpu capabilities.
 
 use core::arch::asm;
 use core::mem::MaybeUninit;
@@ -19,11 +16,16 @@ use x86::msr;
 
 use crate::gdt::{GlobalDescriptorTable, IstStack, TaskStateSegment};
 
-/// Per-processor data for CPU 0.
-static mut CPU0: Cpu = Cpu::new();
+const NEW_CPU: Cpu = Cpu::new();
+
+/// Per-processor data.
+static mut CPUS: [Cpu; 16] = [NEW_CPU; 16];
 
 /// Offset of GS where the pointer to `Cpu` is stored.
 const GS_SELF_PTR_OFFSET: usize = 0;
+
+/// Offset of GS where the CPU ID is located.
+const GS_CPU_ID_OFFSET: usize = 8;
 
 /// Returns a handle to the current CPU's data structure.
 pub fn get_current() -> &'static mut Cpu {
@@ -48,9 +50,6 @@ pub struct Cpu {
     // WARNING: If you change the position of `self_ptr`, you must also
     // change `GS_SELF_PTR_OFFSET` above!
 
-    // Previously, the VMXON region was stored here. Now there is nothing.
-    // Put things that require page-alignment here.
-
     // WARNING: If you change the position of `self_ptr`, you must also
     // change `GS_SELF_PTR_OFFSET` above!
     /// A pointer to ourselves.
@@ -58,6 +57,8 @@ pub struct Cpu {
     /// We do a `mov rax, gs:[GS_SELF_PTR_OFFSET]` to get our own address.
     /// We also want to be able to easily access other fields directly.
     pub self_ptr: *const Cpu,
+
+    pub id: usize,
 
     /// State for the xAPIC driver.
     pub xapic: MaybeUninit<XAPIC>,
@@ -81,6 +82,7 @@ impl Cpu {
     pub const fn new() -> Self {
         Self {
             self_ptr: ptr::null(),
+            id: 0,
             xapic: MaybeUninit::uninit(),
             gdt: GlobalDescriptorTable::empty(),
             tss: TaskStateSegment::new(),
@@ -97,17 +99,32 @@ impl Cpu {
     }
 }
 
-/// Initialize the CPU-local data structure for CPU 0.
+/// Initialize the CPU-local data structure.
 ///
 /// This should only be called once.
-pub unsafe fn init_cpu0() {
-    let address = &CPU0 as *const Cpu;
+pub unsafe fn init_cpu(cpu_id: usize) {
+    let mut cpu = &mut CPUS[cpu_id];
+    let address = cpu as *const Cpu;
 
-    CPU0.self_ptr = address;
+    log::info!("CPU{} @ {:?}", cpu_id, address);
+
+    let self_ptr_ptr = &mut cpu.self_ptr as *mut *const Cpu;
+    cpu.self_ptr = address;
+    cpu.id = cpu_id;
 
     msr::wrmsr(msr::IA32_GS_BASE, address as u64);
 }
 
 pub fn get_cpu_id() -> usize {
-    0
+    let cpu_id;
+
+    unsafe {
+        asm!(
+            "mov {result}, gs:{offset}",
+            offset = const GS_CPU_ID_OFFSET,
+            result = out(reg) cpu_id,
+        );
+    }
+
+    cpu_id
 }

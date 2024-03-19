@@ -1,6 +1,5 @@
 //! QEMU integration.
 
-use std::env;
 use std::ffi::OsString;
 use std::fs::OpenOptions as SyncOpenOptions;
 use std::path::PathBuf;
@@ -52,10 +51,6 @@ impl Emulator for Qemu {
         let suppress_initial_outputs = config.suppress_initial_outputs; // FIXME
 
         let mut command = Command::new(self.qemu_binary.as_os_str());
-
-        //if let Ok(qboot) = env::var("QBOOT_BIOS") {
-        //    command.args(&["-bios", &qboot]);
-        //}
 
         let mut initrd = JumboBinary::new()?;
         initrd.push(&config.kernel)?;
