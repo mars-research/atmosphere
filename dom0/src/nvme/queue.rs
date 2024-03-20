@@ -237,7 +237,10 @@ impl NvmeCommandQueue {
 
             self.block = (self.block + 8) % NUM_LBAS;
 
-            //println!("Submitting block[{}] {} at slot {}", cid, self.block, cur_idx);
+            /*println!(
+                "Submitting block[{}] {} at slot {}",
+                cid, self.block, cur_idx
+            );*/
 
             self.req_slot[cur_idx] = true;
             self.i = (cur_idx + 1) % self.data.len();
@@ -299,7 +302,7 @@ impl NvmeCommandQueue {
     }*/
 }
 
-pub const QUEUE_DEPTH: usize = 1024;
+pub const QUEUE_DEPTH: usize = 256;
 
 pub(crate) struct NvmeCompletionQueue {
     pub data: Dma<[NvmeCompletion; QUEUE_DEPTH]>,

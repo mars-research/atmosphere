@@ -7,7 +7,9 @@ extern crate alloc;
 //mod allocator;
 mod nvme;
 mod slab_alloc;
-use nvme::device::NvmeDevice;
+use crate::nvme::nvme_test;
+pub use asys::sys_mresolve;
+pub use nvme::device::NvmeDevice;
 
 use alloc::format;
 use alloc::string::String;
@@ -139,6 +141,8 @@ fn main() -> isize {
     };
     nvme_dev.init();
 
+    nvme_test::run_blocktest_raw_with_delay(&mut nvme_dev, 30, 16, true, false, 0);
+
     unsafe {
         //println!("{:08x}", core::ptr::read_volatile(0xFEBF0000 as *const u32));
         println!("meow");
@@ -264,4 +268,8 @@ fn test_mmap() {
 fn panic(_info: &PanicInfo) -> ! {
     println!("panic");
     loop {}
+}
+
+pub fn rdtsc() -> u64 {
+    unsafe { x86::time::rdtsc() }
 }
