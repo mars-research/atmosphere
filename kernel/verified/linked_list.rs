@@ -210,6 +210,182 @@ impl<T> Permissions<T> {
             slice[ptr.index_concrete()].prev = prev;
         }
     }
+
+    proof fn lemma_owns_same_ptr(&self, a: &NodePtr<T>, b: &NodePtr<T>) 
+        requires
+            self.wf(),
+            a.same_ptr(b),
+            self.owns(*a),
+        ensures
+            self.owns(*b),
+    {
+    }
+}
+
+pub struct LinkedList2<T: Default> {
+    free_head: Option<NodePtr<T>>,
+    free_ptrs: Ghost<Seq<NodePtr<T>>>,
+
+    permissions: Permissions<T>,
+}
+
+impl<T: Default> LinkedList2<T> {
+
+    // **********************
+    // Well formed
+
+    pub closed spec fn wf(&self) -> bool {
+        &&& self.wf_permissions()
+        &&& Self::wf_free_head(self.free_head, self.free_ptrs@)
+        &&& Self::wf_free_ptrs(self.free_ptrs@, self.permissions)
+    }
+
+    spec fn wf_permissions(&self) -> bool {
+        &&& self.permissions.wf()
+        &&& self.permissions.owns_seq(self.free_ptrs@)
+    }
+
+    spec fn wf_free_head(free_head: Option<NodePtr<T>>, free_ptrs: Seq<NodePtr<T>>) -> bool {
+        let head = if free_ptrs.len() == 0 { None::<NodePtr<T>> } else { Some(free_ptrs[0]) };
+        same_ptr_opt(free_head, head)
+    }
+
+    spec fn wf_free_ptrs(free_ptrs: Seq<NodePtr<T>>, permissions: Permissions<T>) -> bool
+        recommends
+            permissions.owns_seq(free_ptrs)
+    {
+        forall|i: int| 0 <= i < free_ptrs.len() ==> #[trigger] Self::wf_free_ptr(free_ptrs, permissions, i)
+    }
+
+    spec fn wf_free_ptr(free_ptrs: Seq<NodePtr<T>>, permissions: Permissions<T>, i: int) -> bool
+        recommends
+            permissions.owns_seq(free_ptrs),
+            0 <= i < free_ptrs.len()
+    {
+        same_ptr_opt(permissions.node(free_ptrs[i]).next, Self::node_next_of(free_ptrs, i))
+    }
+
+    // **********************
+    // Specs
+
+    spec fn node_next_of(ptrs: Seq<NodePtr<T>>, i: int) -> Option<NodePtr<T>> {
+        if i + 1 == ptrs.len() {
+            None::<NodePtr<T>>
+        } else {
+            Some(ptrs[i + 1int])
+        }
+    }
+
+    spec fn node_prev_of(ptrs: Seq<NodePtr<T>>, i: int) -> Option<NodePtr<T>> {
+        if i == 0 {
+            None::<NodePtr<T>>
+        } else {
+            Some(ptrs[i - 1])
+        }
+    }
+
+    // ***************************
+    // API
+
+    pub fn new() -> (res: Self)
+        ensures
+            res.wf()
+    {
+        Self {
+            free_head: None::<NodePtr::<T>>,
+            free_ptrs: Ghost(Seq::empty()),
+
+            permissions: Permissions::<T>::new(),
+        }
+    }
+
+    pub closed spec fn len_free(&self) -> nat
+    {
+        self.free_ptrs@.len()
+    }
+
+    pub fn pop_free(&mut self) -> (res: NodePtr<T>) 
+        requires
+            old(self).len_free() > 0,
+            old(self).wf(),
+        ensures
+            self.wf(),
+    {
+        assert(same_ptr_opt(self.free_head, Some(self.free_ptrs@[0])));
+
+        let free_head_ref = self.free_head.as_ref().unwrap();
+        assert(free_head_ref.same_ptr(&self.free_ptrs@[0]));
+
+        let ptr = free_head_ref.clone();
+        assert(ptr.same_ptr(&self.free_ptrs@[0]));
+
+        proof {
+            self.permissions.lemma_owns_same_ptr(&self.free_ptrs@[0], &ptr)
+        }
+
+        let next = self.permissions.next(&ptr);
+
+        assert(Self::wf_free_head(self.free_head, self.free_ptrs@));
+        assert(Self::wf_free_ptrs(self.free_ptrs@, self.permissions));
+        assert(Self::wf_free_ptr(self.free_ptrs@, self.permissions, 0));
+        assert(same_ptr_opt(next, Self::node_next_of(self.free_ptrs@, 0)));
+
+        self.free_head = next;
+
+        proof {
+            self.lemma_pop_wf_free_ptrs();
+            self.free_ptrs@ = self.free_ptrs@.skip(1);
+        }
+
+        // assert(Self::wf_free_head(self.free_head, self.free_ptrs@))
+        assert(self.wf_permissions());
+        assert(Self::wf_free_head(self.free_head, self.free_ptrs@));
+        assert(Self::wf_free_ptrs(self.free_ptrs@, self.permissions));
+
+        ptr
+    }
+
+    proof fn lemma_pop_wf_free_ptrs(&self)
+        requires
+            self.len_free() > 0,
+            self.wf_permissions(),
+            Self::wf_free_ptrs(self.free_ptrs@, self.permissions)
+        ensures
+            Self::wf_free_ptrs(self.free_ptrs@.skip(1), self.permissions)
+    {
+        assert(forall|i: int| 0 <= i < self.len_free() ==> #[trigger] Self::wf_free_ptr(self.free_ptrs@, self.permissions, i));
+
+        assert forall|i: int| 1 <= i < self.len_free() implies #[trigger]  Self::wf_free_ptr(self.free_ptrs@.skip(1), self.permissions, i - 1) by {
+            assert(Self::wf_free_ptr(self.free_ptrs@, self.permissions, i));
+            self.lemma_chain_wf_free_ptr(i)
+        }
+
+        assert(self.free_ptrs@.skip(1).len() == self.free_ptrs@.len() - 1);
+
+        assert forall|i: int| 0 <= i < self.free_ptrs@.skip(1).len() implies #[trigger] Self::wf_free_ptr(self.free_ptrs@.skip(1), self.permissions, i) by {
+            let j = i + 1;
+
+            assert(1 <= j < self.free_ptrs@.len());
+            assert(Self::wf_free_ptr(self.free_ptrs@.skip(1), self.permissions, j - 1));
+            assert(Self::wf_free_ptr(self.free_ptrs@.skip(1), self.permissions, i));
+        }
+
+        // assert(forall|i: int| 0 <= i < ptrs.skip(1).len() ==> #[trigger] Self::wf_free_ptr(ptrs.skip(1), i, perms))
+    }
+
+    proof fn lemma_chain_wf_free_ptr(&self, i: int) 
+        requires
+            1 <= i < self.len_free(),
+            self.wf_permissions(),
+            Self::wf_free_ptr(self.free_ptrs@, self.permissions, i)
+        ensures
+            Self::wf_free_ptr(self.free_ptrs@.skip(1), self.permissions, i - 1)
+    {
+        vstd::seq::axiom_seq_subrange_index(self.free_ptrs@, 1, self.free_ptrs@.len() as int, i - 1);
+        assert(self.free_ptrs@[i] == self.free_ptrs@.skip(1)[i - 1]);
+        assert(self.free_ptrs@[i].index() == self.free_ptrs@.skip(1)[i - 1].index());
+        assert(same_ptr_opt(Self::node_next_of(self.free_ptrs@, i), Self::node_next_of(self.free_ptrs@.skip(1), i - 1)));
+    }
 }
 
 /// A doubly linked list holding sized values.
