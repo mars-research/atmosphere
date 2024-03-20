@@ -344,6 +344,15 @@ impl<T> PageElementPtr<T> {
         self.index as nat
     }
 
+    // Lukas: Temporary, used for linked list
+    pub fn page_pptr_concrete(&self) -> PagePPtr {
+        self.page_pptr
+    }
+
+    pub fn index_concrete(&self) -> usize {
+        self.index
+    }
+
     // Trusted methods
 
     #[verifier(external_body)]
