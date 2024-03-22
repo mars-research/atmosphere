@@ -277,7 +277,7 @@ impl Kernel {
 
         return (SyscallReturnStruct::new(SUCCESS,0,0),None,None);
     }
-    pub fn syscall_resolve_va(&self, cpu_id:CPUID, pt_regs: Registers, va: usize) -> (ret:(SyscallReturnStruct,PAddr))
+    pub fn syscall_resolve_va(&self, cpu_id:CPUID, va: usize) -> (ret:(SyscallReturnStruct,PAddr))
         requires
             self.wf(),
     {

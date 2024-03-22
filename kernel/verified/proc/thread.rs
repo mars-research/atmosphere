@@ -336,7 +336,7 @@ impl ProcessManager {
 
     }
 
-    pub fn set_thread_caller(&mut self, caller:ThreadPtr, callee:ThreadPtr, caller_trap_frame: &mut Registers)
+    pub fn set_thread_caller(&mut self, caller:ThreadPtr, callee:ThreadPtr, caller_trap_frame: &Registers)
         requires
             old(self).wf(),
             old(self).get_thread_ptrs().contains(caller),
