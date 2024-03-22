@@ -8,23 +8,20 @@ pub struct SyscallReturnStruct{
     pub error_code: ErrorCodeType,
     pub pcid: Pcid,
     pub cr3: usize,
-    pub pt_regs: Registers,
 }
 
 impl SyscallReturnStruct{
 
-    pub fn new(error_code:ErrorCodeType,pcid:Pcid,cr3:usize,pt_regs:Registers )->(ret:Self)
+    pub fn new(error_code:ErrorCodeType,pcid:Pcid,cr3:usize )->(ret:Self)
         ensures
             ret.error_code == error_code,
             ret.pcid == pcid,
             ret.cr3 == cr3,
-            ret.pt_regs == pt_regs,
     {
         return Self{
             error_code:error_code,
             pcid:pcid,
             cr3:cr3,
-            pt_regs:pt_regs,
         };
     }
 }

@@ -115,7 +115,7 @@ pub closed spec fn syscall_reply_message_spec(old:Kernel, new:Kernel, cpu_id:CPU
 }
 
 impl Kernel {
-    pub fn syscall_reply_message(&mut self, cpu_id:CPUID, pt_regs: Registers, message_va: VAddr, length:usize) -> (ret: SyscallReturnStruct)
+    pub fn syscall_reply_message(&mut self, cpu_id:CPUID, pt_regs: &mut Registers, message_va: VAddr, length:usize) -> (ret: SyscallReturnStruct)
         requires
             old(self).wf(),
         ensures
@@ -124,11 +124,11 @@ impl Kernel {
     {
         let (default_pcid, default_cr3) = self.mmu_man.get_reserved_pcid_and_cr3();
         if cpu_id >= NUM_CPUS{
-            return SyscallReturnStruct::new(CPU_ID_INVALID,default_pcid,default_cr3,pt_regs);
+            return SyscallReturnStruct::new(CPU_ID_INVALID,default_pcid,default_cr3);
         }
 
         if self.cpu_list.get(cpu_id).get_is_idle() {
-            return SyscallReturnStruct::new(CPU_NO_IDLE,default_pcid,default_cr3,pt_regs);
+            return SyscallReturnStruct::new(CPU_NO_IDLE,default_pcid,default_cr3);
         }
 
         assert(self.cpu_list[cpu_id as int].get_is_idle() == false);
@@ -142,12 +142,12 @@ impl Kernel {
         let caller_ptr_op = self.proc_man.get_thread_caller(current_thread_ptr);
 
         if caller_ptr_op.is_none() {
-            return SyscallReturnStruct::new(NO_CALLER,pcid,cr3,pt_regs);
+            return SyscallReturnStruct::new(NO_CALLER,pcid,cr3);
         }
 
         if self.proc_man.scheduler.len() == MAX_NUM_THREADS {
 
-            return SyscallReturnStruct::new(SCHEDULER_NO_SPACE,pcid,cr3,pt_regs);
+            return SyscallReturnStruct::new(SCHEDULER_NO_SPACE,pcid,cr3);
         }
         let caller_ptr = caller_ptr_op.unwrap();
 
@@ -161,37 +161,37 @@ impl Kernel {
             caller_ipc_payload.endpoint_payload.is_some() ||
             caller_ipc_payload.pci_payload.is_some()
         {
-            let new_pt_regs = self.proc_man.weak_up_caller_and_schedule(caller_ptr, current_thread_ptr, pt_regs, Some(IPC_TYPE_NOT_MATCH));
+            self.proc_man.weak_up_caller_and_schedule(caller_ptr, current_thread_ptr, pt_regs, Some(IPC_TYPE_NOT_MATCH));
             self.cpu_list.set_current_thread(cpu_id,Some(caller_ptr));
-            return SyscallReturnStruct::new(IPC_TYPE_NOT_MATCH,new_pcid,new_cr3,new_pt_regs);
+            return SyscallReturnStruct::new(IPC_TYPE_NOT_MATCH,new_pcid,new_cr3);
         }else if  (va_valid(message_va) == false) || (va_valid(caller_ipc_payload.message.unwrap().0) == false) || (length != caller_ipc_payload.message.unwrap().1)
                 || (length>4096) || (length<=0)
         {
-            let new_pt_regs = self.proc_man.weak_up_caller_and_schedule(caller_ptr, current_thread_ptr, pt_regs, Some(MESSAGE_INVALID));
+            self.proc_man.weak_up_caller_and_schedule(caller_ptr, current_thread_ptr, pt_regs, Some(MESSAGE_INVALID));
             self.cpu_list.set_current_thread(cpu_id,Some(caller_ptr));
-            return SyscallReturnStruct::new(MESSAGE_INVALID,new_pcid,new_cr3,new_pt_regs);
+            return SyscallReturnStruct::new(MESSAGE_INVALID,new_pcid,new_cr3);
         }else{
             let callee_pa_op = self.mmu_man.mmu_get_va_entry_by_pcid(pcid,message_va);
             let caller_pa_op = self.mmu_man.mmu_get_va_entry_by_pcid(new_pcid,caller_ipc_payload.message.unwrap().0);
 
             if callee_pa_op.is_none() || caller_pa_op.is_none() {
-                let new_pt_regs = self.proc_man.weak_up_caller_and_schedule(caller_ptr, current_thread_ptr, pt_regs, Some(MESSAGE_INVALID));
+                self.proc_man.weak_up_caller_and_schedule(caller_ptr, current_thread_ptr, pt_regs, Some(MESSAGE_INVALID));
                 self.cpu_list.set_current_thread(cpu_id,Some(caller_ptr));
-                return SyscallReturnStruct::new(MESSAGE_INVALID,new_pcid,new_cr3,new_pt_regs);
+                return SyscallReturnStruct::new(MESSAGE_INVALID,new_pcid,new_cr3);
             }else{
                 let callee_pa = callee_pa_op.unwrap().addr;
                 let caller_pa = caller_pa_op.unwrap().addr;
 
                 if callee_pa == caller_pa{
-                    let new_pt_regs = self.proc_man.weak_up_caller_and_schedule(caller_ptr, current_thread_ptr, pt_regs, Some(MESSAGE_INVALID));
+                    self.proc_man.weak_up_caller_and_schedule(caller_ptr, current_thread_ptr, pt_regs, Some(MESSAGE_INVALID));
                     self.cpu_list.set_current_thread(cpu_id,Some(caller_ptr));
-                    return SyscallReturnStruct::new(MESSAGE_INVALID,new_pcid,new_cr3,new_pt_regs);
+                    return SyscallReturnStruct::new(MESSAGE_INVALID,new_pcid,new_cr3);
                 }else{
                     self.kernel_pass_message(callee_pa, caller_pa, length);
 
-                    let new_pt_regs = self.proc_man.weak_up_caller_and_schedule(caller_ptr, current_thread_ptr, pt_regs, Some(SUCCESS));
+                    self.proc_man.weak_up_caller_and_schedule(caller_ptr, current_thread_ptr, pt_regs, Some(SUCCESS));
                     self.cpu_list.set_current_thread(cpu_id,Some(caller_ptr));
-                    return SyscallReturnStruct::new(SUCCESS,new_pcid,new_cr3,new_pt_regs);
+                    return SyscallReturnStruct::new(SUCCESS,new_pcid,new_cr3);
                 }
             }
         }

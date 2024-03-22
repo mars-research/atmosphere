@@ -45,7 +45,7 @@ pub closed spec fn syscall_reply_empty_spec(old:Kernel, new:Kernel, cpu_id:CPUID
 }
 
 impl Kernel {
-    pub fn syscall_reply_empty(&mut self, cpu_id:CPUID, pt_regs: Registers) -> (ret: SyscallReturnStruct)
+    pub fn syscall_reply_empty(&mut self, cpu_id:CPUID, pt_regs: &mut Registers) -> (ret: SyscallReturnStruct)
         requires
             old(self).wf(),
         ensures
@@ -54,11 +54,11 @@ impl Kernel {
     {
         let (default_pcid, default_cr3) = self.mmu_man.get_reserved_pcid_and_cr3();
         if cpu_id >= NUM_CPUS{
-            return SyscallReturnStruct::new(CPU_ID_INVALID,default_pcid,default_cr3,pt_regs);
+            return SyscallReturnStruct::new(CPU_ID_INVALID,default_pcid,default_cr3);
         }
 
         if self.cpu_list.get(cpu_id).get_is_idle() {
-            return SyscallReturnStruct::new(CPU_NO_IDLE,default_pcid,default_cr3,pt_regs);
+            return SyscallReturnStruct::new(CPU_NO_IDLE,default_pcid,default_cr3);
         }
 
         assert(self.cpu_list[cpu_id as int].get_is_idle() == false);
@@ -72,21 +72,21 @@ impl Kernel {
         let caller_ptr_op = self.proc_man.get_thread_caller(current_thread_ptr);
 
         if caller_ptr_op.is_none() {
-            return SyscallReturnStruct::new(NO_CALLER,pcid,cr3,pt_regs);
+            return SyscallReturnStruct::new(NO_CALLER,pcid,cr3);
         }
 
         if self.proc_man.scheduler.len() == MAX_NUM_THREADS {
 
-            return SyscallReturnStruct::new(SCHEDULER_NO_SPACE,pcid,cr3,pt_regs);
+            return SyscallReturnStruct::new(SCHEDULER_NO_SPACE,pcid,cr3);
         }
         let caller_ptr = caller_ptr_op.unwrap();
 
         let new_pcid = self.proc_man.get_pcid_by_thread_ptr(caller_ptr);
         let new_cr3 = self.mmu_man.get_cr3_by_pcid(new_pcid);
 
-        let new_pt_regs = self.proc_man.weak_up_caller_and_schedule(caller_ptr, current_thread_ptr, pt_regs, Some(SUCCESS));
+        self.proc_man.weak_up_caller_and_schedule(caller_ptr, current_thread_ptr, pt_regs, Some(SUCCESS));
         self.cpu_list.set_current_thread(cpu_id,Some(caller_ptr));
-        return SyscallReturnStruct::new(SUCCESS,new_pcid,new_cr3,new_pt_regs);
+        return SyscallReturnStruct::new(SUCCESS,new_pcid,new_cr3);
         
     }
 }

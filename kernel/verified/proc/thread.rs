@@ -73,7 +73,7 @@ impl IPCPayLoad {
 }
 impl ProcessManager {
 
-    pub fn weak_up_caller_change_queue_state_and_receive(&mut self, caller:ThreadPtr, callee:ThreadPtr, callee_pt_regs: Registers, callee_ipc_payload: IPCPayLoad, endpoint_index:EndpointIdx) -> (ret: Registers)
+    pub fn weak_up_caller_change_queue_state_and_receive(&mut self, caller:ThreadPtr, callee:ThreadPtr, callee_pt_regs: &mut Registers, callee_ipc_payload: IPCPayLoad, endpoint_index:EndpointIdx) -> (ret: Registers)
         requires
             old(self).wf(),
             old(self).get_thread_ptrs().contains(caller),
@@ -107,7 +107,7 @@ impl ProcessManager {
             Tracked((self.thread_perms.borrow_mut()).tracked_remove(caller));
         thread_set_state(&caller_pptr, &mut caller_perm, RUNNING);
         thread_set_callee(&caller_pptr, &mut caller_perm, None);
-        thread_set_trap_frame(&caller_pptr, &mut caller_perm, None);
+        thread_empty_trap_frame(&caller_pptr, &mut caller_perm);
         thread_set_error_code(&caller_pptr, &mut caller_perm, None);
         proof{
             assert(self.thread_perms@.dom().contains(caller) == false);
@@ -142,7 +142,7 @@ impl ProcessManager {
         thread_set_state(&PPtr::<Thread>::from_usize(callee), &mut callee_perm, BLOCKED);
         thread_set_caller(&PPtr::<Thread>::from_usize(callee), &mut callee_perm, None);
         thread_set_ipc_payload(&PPtr::<Thread>::from_usize(callee), &mut callee_perm, callee_ipc_payload);
-        thread_set_trap_frame(&PPtr::<Thread>::from_usize(callee), &mut callee_perm, Some(callee_pt_regs));
+        thread_set_trap_frame(&PPtr::<Thread>::from_usize(callee), &mut callee_perm, callee_pt_regs);
         thread_set_error_code(&PPtr::<Thread>::from_usize(callee), &mut callee_perm, None);
         proof{
             assert(self.thread_perms@.dom().contains(callee) == false);
@@ -150,6 +150,7 @@ impl ProcessManager {
                 .tracked_insert(callee, callee_perm.get());
         }
 
+        *callee_pt_regs = caller_pt_regs.unwrap();
         // let callee_pptr = PPtr::<Thread>::from_usize(callee);
         // let mut callee_perm =
         //     Tracked((self.thread_perms.borrow_mut()).tracked_remove(callee));
@@ -176,7 +177,7 @@ impl ProcessManager {
         return caller_pt_regs.unwrap();
     }
 
-    pub fn weak_up_caller_and_receive(&mut self, caller:ThreadPtr, callee:ThreadPtr, callee_pt_regs: Registers, callee_ipc_payload: IPCPayLoad, endpoint_index:EndpointIdx) -> (ret: Registers)
+    pub fn weak_up_caller_and_receive(&mut self, caller:ThreadPtr, callee:ThreadPtr, callee_pt_regs: &mut Registers, callee_ipc_payload: IPCPayLoad, endpoint_index:EndpointIdx) -> (ret: Registers)
         requires
             old(self).wf(),
             old(self).get_thread_ptrs().contains(caller),
@@ -210,7 +211,7 @@ impl ProcessManager {
             Tracked((self.thread_perms.borrow_mut()).tracked_remove(caller));
         thread_set_state(&caller_pptr, &mut caller_perm, RUNNING);
         thread_set_callee(&caller_pptr, &mut caller_perm, None);
-        thread_set_trap_frame(&caller_pptr, &mut caller_perm, None);
+        thread_empty_trap_frame(&caller_pptr, &mut caller_perm);
         thread_set_error_code(&caller_pptr, &mut caller_perm, None);
         proof{
             assert(self.thread_perms@.dom().contains(caller) == false);
@@ -244,14 +245,14 @@ impl ProcessManager {
         thread_set_state(&PPtr::<Thread>::from_usize(callee), &mut callee_perm, BLOCKED);
         thread_set_caller(&PPtr::<Thread>::from_usize(callee), &mut callee_perm, None);
         thread_set_ipc_payload(&PPtr::<Thread>::from_usize(callee), &mut callee_perm, callee_ipc_payload);
-        thread_set_trap_frame(&PPtr::<Thread>::from_usize(callee), &mut callee_perm, Some(callee_pt_regs));
+        thread_set_trap_frame(&PPtr::<Thread>::from_usize(callee), &mut callee_perm, callee_pt_regs);
         thread_set_error_code(&PPtr::<Thread>::from_usize(callee), &mut callee_perm, None);
         proof{
             assert(self.thread_perms@.dom().contains(callee) == false);
             (self.thread_perms.borrow_mut())
                 .tracked_insert(callee, callee_perm.get());
         }
-
+        *callee_pt_regs = caller_pt_regs.unwrap();
         // let callee_pptr = PPtr::<Thread>::from_usize(callee);
         // let mut callee_perm =
         //     Tracked((self.thread_perms.borrow_mut()).tracked_remove(callee));
@@ -278,7 +279,7 @@ impl ProcessManager {
         return caller_pt_regs.unwrap();
     }
 
-    pub fn weak_up_caller_and_schedule(&mut self, caller:ThreadPtr, callee:ThreadPtr, callee_pt_regs: Registers, callee_error_code: Option<ErrorCodeType>) -> (ret: Registers)
+    pub fn weak_up_caller_and_schedule(&mut self, caller:ThreadPtr, callee:ThreadPtr, callee_pt_regs: &mut Registers, callee_error_code: Option<ErrorCodeType>)
         requires
             old(self).wf(),
             old(self).get_thread_ptrs().contains(caller),
@@ -309,7 +310,7 @@ impl ProcessManager {
             Tracked((self.thread_perms.borrow_mut()).tracked_remove(caller));
         thread_set_state(&caller_pptr, &mut caller_perm, RUNNING);
         thread_set_callee(&caller_pptr, &mut caller_perm, None);
-        thread_set_trap_frame(&caller_pptr, &mut caller_perm, None);
+        thread_empty_trap_frame(&caller_pptr, &mut caller_perm);
         thread_set_error_code(&caller_pptr, &mut caller_perm, None);
         proof{
             assert(self.thread_perms@.dom().contains(caller) == false);
@@ -321,7 +322,7 @@ impl ProcessManager {
         let mut callee_perm =
             Tracked((self.thread_perms.borrow_mut()).tracked_remove(callee));
         thread_set_caller(&callee_pptr, &mut callee_perm, None);
-        thread_set_trap_frame(&callee_pptr, &mut callee_perm, None);
+        thread_empty_trap_frame(&callee_pptr, &mut callee_perm);
         thread_set_error_code(&callee_pptr, &mut callee_perm, None);
         proof{
             assert(self.thread_perms@.dom().contains(callee) == false);
@@ -331,10 +332,11 @@ impl ProcessManager {
 
         self.push_scheduler(callee,callee_error_code,callee_pt_regs);
         assert(self.wf());
-        return caller_pt_regs.unwrap();
+        *callee_pt_regs = caller_pt_regs.unwrap();
+
     }
 
-    pub fn set_thread_caller(&mut self, caller:ThreadPtr, callee:ThreadPtr, caller_trap_frame: Registers)
+    pub fn set_thread_caller(&mut self, caller:ThreadPtr, callee:ThreadPtr, caller_trap_frame: &mut Registers)
         requires
             old(self).wf(),
             old(self).get_thread_ptrs().contains(caller),
@@ -359,7 +361,7 @@ impl ProcessManager {
             Tracked((self.thread_perms.borrow_mut()).tracked_remove(caller));
         thread_set_state(&caller_pptr, &mut caller_perm, CALLING);
         thread_set_callee(&caller_pptr, &mut caller_perm, Some(callee));
-        thread_set_trap_frame(&caller_pptr, &mut caller_perm, Some(caller_trap_frame));
+        thread_set_trap_frame(&caller_pptr, &mut caller_perm, caller_trap_frame);
         proof{
             assert(self.thread_perms@.dom().contains(caller) == false);
             (self.thread_perms.borrow_mut())
@@ -573,7 +575,7 @@ impl ProcessManager {
             .tracked_insert(parent_ptr, proc_perm.get());
     }
     thread_set_parent_rf(&thread_pptr, &mut thread_perm,parent_rf);
-    thread_set_trap_frame(&thread_pptr, &mut thread_perm,Some(pt_regs));
+    thread_set_trap_frame(&thread_pptr, &mut thread_perm,&pt_regs);
     thread_set_error_code(&thread_pptr, &mut thread_perm,None);
     thread_set_endpoint_descriptors(&thread_pptr, &mut thread_perm,0,endpoint_ptr);
     assert(self.thread_perms@.dom().contains(parent_ptr) == false);
@@ -656,7 +658,7 @@ impl ProcessManager {
                 .tracked_insert(parent_ptr, proc_perm.get());
         }
         thread_set_parent_rf(&thread_pptr, &mut thread_perm,parent_rf);
-        thread_set_trap_frame(&thread_pptr, &mut thread_perm,Some(pt_regs));
+        thread_set_trap_frame(&thread_pptr, &mut thread_perm,&pt_regs);
         thread_set_error_code(&thread_pptr, &mut thread_perm,None);
         assert(self.thread_perms@.dom().contains(parent_ptr) == false);
         proof{

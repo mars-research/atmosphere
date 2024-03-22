@@ -80,7 +80,7 @@ pub closed spec fn syscall_new_thread_spec(old:Kernel,new:Kernel,cpu_id:CPUID, e
 
 impl Kernel {
 
-    pub fn syscall_new_thread(&mut self, cpu_id:CPUID, pt_regs: Registers, endpoint_index: EndpointIdx, pt_regs_new_thread: Registers) -> (ret:(SyscallReturnStruct,Option<ProcPtr>,Option<ThreadPtr>))
+    pub fn syscall_new_thread(&mut self, cpu_id:CPUID, endpoint_index: EndpointIdx, pt_regs_new_thread: Registers) -> (ret:(SyscallReturnStruct,Option<ProcPtr>,Option<ThreadPtr>))
         requires
             old(self).wf(),
         ensures
@@ -88,11 +88,11 @@ impl Kernel {
     {
         let (default_pcid, default_cr3) = self.mmu_man.get_reserved_pcid_and_cr3();
         if cpu_id >= NUM_CPUS{
-            return (SyscallReturnStruct::new(CPU_ID_INVALID,default_pcid,default_cr3,pt_regs),None,None);
+            return (SyscallReturnStruct::new(CPU_ID_INVALID,default_pcid,default_cr3),None,None);
         }
 
         if self.cpu_list.get(cpu_id).get_is_idle() {
-            return (SyscallReturnStruct::new(NO_RUNNING_THREAD,default_pcid,default_cr3,pt_regs),None,None);
+            return (SyscallReturnStruct::new(NO_RUNNING_THREAD,default_pcid,default_cr3),None,None);
         }
         assert(self.cpu_list[cpu_id as int].get_is_idle() == false);
         let current_thread_ptr_op = self.cpu_list.get(cpu_id).get_current_thread();
@@ -104,32 +104,32 @@ impl Kernel {
         let cr3 = self.mmu_man.get_cr3_by_pcid(pcid);
 
         if endpoint_index >= MAX_NUM_ENDPOINT_DESCRIPTORS{
-            return (SyscallReturnStruct::new(ENDPOINT_INDEX_INVALID,pcid,cr3,pt_regs),None,None);
+            return (SyscallReturnStruct::new(ENDPOINT_INDEX_INVALID,pcid,cr3),None,None);
         }
 
         let target_endpoint_ptr = self.proc_man.get_thread_endpoint_ptr_by_endpoint_idx(current_thread_ptr, endpoint_index);
         if target_endpoint_ptr == 0 {
-            return (SyscallReturnStruct::new(SHARED_ENDPOINT_NOT_EXIST,pcid,cr3,pt_regs),None,None);
+            return (SyscallReturnStruct::new(SHARED_ENDPOINT_NOT_EXIST,pcid,cr3),None,None);
         }
         assert(self.proc_man.endpoint_perms@.dom().contains(target_endpoint_ptr));
 
         if self.proc_man.get_endpoint_rf_counter_by_endpoint_ptr(target_endpoint_ptr) == usize::MAX {
-            return (SyscallReturnStruct::new(SHARED_ENDPOINT_REF_COUNT_OVERFLOW,pcid,cr3,pt_regs),None,None);
+            return (SyscallReturnStruct::new(SHARED_ENDPOINT_REF_COUNT_OVERFLOW,pcid,cr3),None,None);
         }
 
         if self.page_alloc.free_pages.len() < 1 {
-            return (SyscallReturnStruct::new(SYSTEM_OUT_OF_MEM,pcid,cr3,pt_regs),None,None);
+            return (SyscallReturnStruct::new(SYSTEM_OUT_OF_MEM,pcid,cr3),None,None);
         }
 
         if self.proc_man.scheduler.len() == MAX_NUM_THREADS{
-            return (SyscallReturnStruct::new(SCHEDULER_NO_SPACE,pcid,cr3,pt_regs),None,None);
+            return (SyscallReturnStruct::new(SCHEDULER_NO_SPACE,pcid,cr3),None,None);
         }
         if self.mmu_man.free_pcids.len() == 0 {
-            return (SyscallReturnStruct::new(NO_FREE_PCID,pcid,cr3,pt_regs),None,None);
+            return (SyscallReturnStruct::new(NO_FREE_PCID,pcid,cr3),None,None);
         }
 
         if self.proc_man.get_proc_num_of_threads_by_proc_ptr(current_proc_ptr) >= MAX_NUM_THREADS_PER_PROC {
-            return (SyscallReturnStruct::new(PROC_THREAD_LIST_FULL,pcid,cr3,pt_regs),None,None);
+            return (SyscallReturnStruct::new(PROC_THREAD_LIST_FULL,pcid,cr3),None,None);
         }
 
         let (page_ptr1, page_perm1) = self.page_alloc.alloc_kernel_mem();
@@ -137,7 +137,7 @@ impl Kernel {
 
 
         assert(self.wf());
-        return (SyscallReturnStruct::new(SUCCESS,pcid,cr3,pt_regs),None,None);
+        return (SyscallReturnStruct::new(SUCCESS,pcid,cr3),None,None);
     }
 
 }

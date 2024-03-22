@@ -187,6 +187,21 @@ impl ProcessManager {
             let trap_frame = thread.trap_frame;
             return trap_frame;
         }
+
+    pub fn set_kernel_pt_regs_by_thread_ptr(&self, thread_ptr:ThreadPtr, regs: &mut Registers)
+        requires
+            self.wf(),
+            self.get_thread_ptrs().contains(thread_ptr),
+            self.get_thread(thread_ptr).trap_frame.is_Some(),
+        ensures
+            *regs =~= self.get_thread(thread_ptr).trap_frame.unwrap(),
+            // ret =~= self.get_pcid_by_thread_ptr(thread_ptr),
+        {
+            let tracked thread_perm = self.thread_perms.borrow().tracked_borrow(thread_ptr);
+            let thread : &Thread = PPtr::<Thread>::from_usize(thread_ptr).borrow(Tracked(thread_perm));
+            *regs = thread.trap_frame.unwrap();
+        }
+
     pub fn get_pcid_by_thread_ptr(&self, thread_ptr:ThreadPtr) -> (ret: Pcid)
         requires
             self.wf(),
