@@ -74,7 +74,15 @@ pub fn run_blocktest_raw_with_delay(
         count += 1;
         submit_start = rdtsc();
         //println!("submit and poll raw count {}", count);
+        // {
+        //  NVME
+        //  &submit.vecdequeue()
+        //  &collect.vecdequue()
+        //  is_write
+        //  is_random
+        // }
         ret = dev.submit_and_poll_raw(&mut submit, &mut collect, is_write, is_random);
+
         submit_elapsed += rdtsc() - submit_start;
 
         submit_hist.record(ret as u64);

@@ -479,6 +479,24 @@ impl NvmeDevice {
         }
     }
 
+    /*
+    enum BlockOp {
+        READ,
+        WRITE,
+    }
+
+    struct BlockReq {
+        block: u64,
+        rw : BlockOp,
+        buf_addr : usize,
+    }
+
+    struct BlockResp {
+        req: BlockReq,
+        res: i32,
+    }
+    */
+
     pub fn submit_and_poll_raw(
         &mut self,
         submit: &mut VecDeque<Vec<u8>>,
@@ -495,6 +513,7 @@ impl NvmeDevice {
         let qid = 1;
 
         while let Some(breq) = submit.pop_front() {
+            // FIXME: store both (vaddr, paddr) to avoid calling this everytime
             let (ptr0, ptr1) = unsafe { (sys_mresolve(breq.as_ptr() as usize).0 as u64, 0) };
             //println!("breq 0x{:08x} ptr0 0x{:08x}", breq.as_ptr() as u64, ptr0);
             let queue = &mut self.submission_queues[qid];
