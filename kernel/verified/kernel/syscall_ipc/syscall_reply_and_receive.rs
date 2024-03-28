@@ -22,11 +22,11 @@ pub closed spec fn syscall_reply_and_receive_spec(old:Kernel, new:Kernel, cpu_id
         false
     }
     else{
-        let valid_thread = (cpu_id < NUM_CPUS && 
+        let valid_thread = (cpu_id < NUM_CPUS &&
             old.cpu_list@[cpu_id as int].get_is_idle() == false);
         let has_caller = old.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).caller.is_Some();
         let system_scheduler_has_space = old.proc_man.scheduler.len() != MAX_NUM_THREADS;
-        let valid_endpoint = endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS && 
+        let valid_endpoint = endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS &&
             old.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).endpoint_descriptors@[endpoint_index as int] != 0;
         let endpoint_has_space = old.proc_man.get_endpoint(old.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).endpoint_descriptors@[endpoint_index as int]).len() != MAX_NUM_THREADS_PER_ENDPOINT;
         let endpoint_ok_to_send = old.proc_man.get_endpoint(old.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).endpoint_descriptors@[endpoint_index as int]).len() == 0 ||
@@ -67,7 +67,7 @@ pub closed spec fn syscall_reply_and_receive_spec(old:Kernel, new:Kernel, cpu_id
                 }else{
                     let sender_va = return_message.unwrap().0;
                     let receiver_va = caller_ipc_payload.message.unwrap().0;
-    
+
                     let sender_len = return_message.unwrap().1;
                     let receiver_len = caller_ipc_payload.message.unwrap().1;
                     if (spec_va_valid(sender_va) == false) || (spec_va_valid(receiver_va) == false) || (sender_len != receiver_len)
@@ -85,7 +85,7 @@ pub closed spec fn syscall_reply_and_receive_spec(old:Kernel, new:Kernel, cpu_id
                     }else{
                         let sender_pa_op = old.mmu_man.get_pagetable_mapping_by_pcid(callee_pcid)[sender_va];
                         let receiver_pa_op = old.mmu_man.get_pagetable_mapping_by_pcid(caller_pcid)[receiver_va];
-                        
+
                         if sender_pa_op.is_none() || receiver_pa_op.is_none() {
                             forall|_cpu_id:CPUID| #![auto] 0 <= _cpu_id < NUM_CPUS && _cpu_id != cpu_id ==> new.cpu_list@[_cpu_id as int] =~= old.cpu_list@[_cpu_id as int]
                             &&
@@ -99,7 +99,7 @@ pub closed spec fn syscall_reply_and_receive_spec(old:Kernel, new:Kernel, cpu_id
                         }else{
                             let sender_pa = sender_pa_op.unwrap().addr;
                             let receiver_pa = receiver_pa_op.unwrap().addr;
-    
+
                             if sender_pa == receiver_pa {
                                 forall|_cpu_id:CPUID| #![auto] 0 <= _cpu_id < NUM_CPUS && _cpu_id != cpu_id ==> new.cpu_list@[_cpu_id as int] =~= old.cpu_list@[_cpu_id as int]
                                 &&
@@ -150,7 +150,7 @@ pub closed spec fn syscall_reply_and_receive_spec(old:Kernel, new:Kernel, cpu_id
             //if the syscall is not success, nothing will change, goes back to user level
             old == new
         }
-            
+
     }
 }
 

@@ -42,11 +42,11 @@ mod gdt;
 mod interrupt;
 mod kernel;
 mod logging;
+mod ring_buffer;
 mod scripts;
 mod syscalls;
 mod thread;
 mod utils;
-mod ring_buffer;
 
 use core::arch::asm;
 use core::sync::atomic::{AtomicUsize, Ordering};
@@ -102,7 +102,6 @@ fn main(boot_info: *const BootInfo) -> isize {
     //     let counter = THREAD_COUNTER.load(Ordering::SeqCst);
     //     log::debug!("Counter: {}", counter);
     // }
-
 
     //kernel::kernel_test();
     kernel::kernel_new();

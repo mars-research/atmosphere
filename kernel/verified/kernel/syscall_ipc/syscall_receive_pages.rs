@@ -23,13 +23,13 @@ pub closed spec fn syscall_receive_pages_wait_spec(old:Kernel, new:Kernel, cpu_i
         false
     }
     else{
-        let valid_thread = (cpu_id < NUM_CPUS && 
+        let valid_thread = (cpu_id < NUM_CPUS &&
             old.cpu_list@[cpu_id as int].get_is_idle() == false);
-        let valid_endpoint = endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS && 
+        let valid_endpoint = endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS &&
             old.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).endpoint_descriptors@[endpoint_index as int] != 0;
-            
 
-        if valid_thread && valid_endpoint 
+
+        if valid_thread && valid_endpoint
         {
             let endpoint_ptr = old.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).endpoint_descriptors@[endpoint_index as int];
             let endpoint_state = old.proc_man.get_endpoint(endpoint_ptr).queue_state;
@@ -47,7 +47,7 @@ pub closed spec fn syscall_receive_pages_wait_spec(old:Kernel, new:Kernel, cpu_i
                     &&
                     new.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).state == BLOCKED
                     &&
-                    new.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).endpoint_ptr == Some(endpoint_ptr) 
+                    new.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).endpoint_ptr == Some(endpoint_ptr)
                     &&
                     new.mmu_man =~= old.mmu_man
                     &&
@@ -109,7 +109,7 @@ pub closed spec fn syscall_receive_pages_wait_spec(old:Kernel, new:Kernel, cpu_i
                 }else{
                     let sender_ptr = old.proc_man.get_endpoint(endpoint_ptr).queue@[0];
                     let sender_ipc_payload = old.proc_man.get_thread(sender_ptr).ipc_payload;
-                    
+
                     let receiver_pcid = old.proc_man.get_proc(old.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).parent).pcid;
                     let sender_pcid = old.proc_man.get_proc(old.proc_man.get_thread(sender_ptr).parent).pcid;
 
@@ -136,7 +136,7 @@ pub closed spec fn syscall_receive_pages_wait_spec(old:Kernel, new:Kernel, cpu_i
                         forall|ioid:IOid, va:usize| #![auto] 0<=ioid<IOID_MAX && spec_va_valid(va) ==> new.mmu_man.get_iommutable_mapping_by_ioid(ioid)[va] =~= old.mmu_man.get_iommutable_mapping_by_ioid(ioid)[va]
 
                     }else if sender_ipc_payload.page_payload.unwrap().1 != range ||
-                                range >= usize::MAX/3 || 
+                                range >= usize::MAX/3 ||
                                 old.page_alloc.free_pages.len() < 3 * range
                     {
                         new.cpu_list@[cpu_id as int].get_current_thread() == Some(sender_ptr)
@@ -194,7 +194,7 @@ pub closed spec fn syscall_receive_pages_wait_spec(old:Kernel, new:Kernel, cpu_i
             //if the syscall is not success, nothing will change, goes back to user level
             old == new
         }
-            
+
     }
 }
 
@@ -322,7 +322,7 @@ impl Kernel {
 
                     return SyscallReturnStruct::new(IPC_TYPE_NOT_MATCH,new_pcid,new_cr3,new_thread_ptr);
                 }else if sender_ipc_payload.page_payload.unwrap().1 != range ||
-                         range >= usize::MAX/3 || 
+                         range >= usize::MAX/3 ||
                          self.page_alloc.free_pages.len() < 3 * range
                 {
                     self.proc_man.push_scheduler(current_thread_ptr, Some(PAGE_PAYLOAD_INVALID),pt_regs);
@@ -332,9 +332,9 @@ impl Kernel {
                     return SyscallReturnStruct::new(PAGE_PAYLOAD_INVALID,new_pcid,new_cr3,new_thread_ptr);
                 }else if self.kernel_page_sharing_helper(sender_pcid, receiver_pcid, perm_bits, sender_ipc_payload.page_payload.unwrap().0, va, range) == true{
 
-                    
+
                    // assert(kernel_page_sharing_spec_helper(*old(self),sender_pcid,receiver_pcid, va, receiver_ipc_payload.page_payload.unwrap().0, range));
-                   
+
                     self.proc_man.push_scheduler(current_thread_ptr, Some(SUCCESS),pt_regs);
                     let new_thread_ptr = self.proc_man.pop_endpoint_to_running(current_thread_ptr, endpoint_index,pt_regs);
                     self.cpu_list.set_current_thread(cpu_id,Some(new_thread_ptr));
@@ -351,7 +351,7 @@ impl Kernel {
                     self.cpu_list.set_current_thread(cpu_id,Some(new_thread_ptr));
                     return SyscallReturnStruct::new(PAGE_PAYLOAD_INVALID,new_pcid,new_cr3,new_thread_ptr);
                 }
-                
+
         }
     }
 }

@@ -23,13 +23,13 @@ use crate::kernel::*;
 //         false
 //     }
 //     else{
-//         let valid_thread = (cpu_id < NUM_CPUS && 
+//         let valid_thread = (cpu_id < NUM_CPUS &&
 //             old.cpu_list@[cpu_id as int].get_is_idle() == false);
-//         let valid_endpoint = endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS && 
+//         let valid_endpoint = endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS &&
 //             old.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).endpoint_descriptors@[endpoint_index as int] != 0;
-            
 
-//         if valid_thread && valid_endpoint 
+
+//         if valid_thread && valid_endpoint
 //         {
 //             let endpoint_ptr = old.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).endpoint_descriptors@[endpoint_index as int];
 //             let endpoint_state = old.proc_man.get_endpoint(endpoint_ptr).queue_state;
@@ -43,7 +43,7 @@ use crate::kernel::*;
 //                 }else{
 //                     let receiver_ptr = old.proc_man.get_endpoint(endpoint_ptr).queue@[0];
 //                     let receiver_ipc_payload = old.proc_man.get_thread(receiver_ptr).ipc_payload;
-                    
+
 //                     if scheduler_len == MAX_NUM_THREADS{
 //                         old == new
 //                     }else if receiver_ipc_payload.calling != false ||
@@ -52,7 +52,7 @@ use crate::kernel::*;
 //                     receiver_ipc_payload.endpoint_payload.is_some() ||
 //                     receiver_ipc_payload.pci_payload.is_some()
 //                     {
-                        
+
 //                         new.cpu_list@[cpu_id as int].get_current_thread() == Some(receiver_ptr)
 //                         &&
 //                         new.proc_man.get_thread_ptrs() =~= old.proc_man.get_thread_ptrs()
@@ -72,7 +72,7 @@ use crate::kernel::*;
 //             //if the syscall is not success, nothing will change, goes back to user level
 //             old == new
 //         }
-            
+
 //     }
 // }
 
@@ -159,11 +159,11 @@ impl Kernel {
                     self.proc_man.pop_endpoint_to_scheduler(current_thread_ptr,endpoint_index,Some(IPC_TYPE_NOT_MATCH));
                     return SyscallReturnStruct::new(IPC_TYPE_NOT_MATCH,pcid,cr3,current_thread_ptr);
                 }else if receiver_ipc_payload.page_payload.unwrap().1 != range ||
-                            range >= usize::MAX/3 || 
+                            range >= usize::MAX/3 ||
                             self.page_alloc.free_pages.len() < 3 * range
-                {              
+                {
                     self.proc_man.pop_endpoint_to_scheduler(current_thread_ptr,endpoint_index,Some(PAGE_PAYLOAD_INVALID));
-                    return SyscallReturnStruct::new(PAGE_PAYLOAD_INVALID,pcid,cr3,current_thread_ptr);     
+                    return SyscallReturnStruct::new(PAGE_PAYLOAD_INVALID,pcid,cr3,current_thread_ptr);
                 }else if self.kernel_page_sharing_helper(sender_pcid, new_pcid, perm_bits, va, receiver_ipc_payload.page_payload.unwrap().0, range) == true{
                     self.proc_man.pop_endpoint_to_scheduler(current_thread_ptr,endpoint_index,Some(SUCCESS));
                     self.kernel_map_pagetable_range_page_to_pagetable(sender_pcid, new_pcid, va, receiver_ipc_payload.page_payload.unwrap().0, perm_bits,range);
@@ -172,11 +172,11 @@ impl Kernel {
                 else {
                     // assert(kernel_page_sharing_spec_helper(*old(self),sender_pcid,receiver_pcid, va, receiver_ipc_payload.page_payload.unwrap().0, range) == false);
                     self.proc_man.pop_endpoint_to_scheduler(current_thread_ptr,endpoint_index,Some(PAGE_PAYLOAD_INVALID));
-                    return SyscallReturnStruct::new(PAGE_PAYLOAD_INVALID,pcid,cr3,current_thread_ptr);     
+                    return SyscallReturnStruct::new(PAGE_PAYLOAD_INVALID,pcid,cr3,current_thread_ptr);
                 }
- 
 
-                
+
+
         }
     }
 }

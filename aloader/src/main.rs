@@ -1,12 +1,7 @@
 //! The Atmosphere early loader.
 
 #![cfg_attr(not(test), no_std, no_main, feature(start))]
-#![feature(
-    alloc_error_handler,
-    strict_provenance,
-    abi_x86_interrupt,
-    asm_const,
-)]
+#![feature(alloc_error_handler, strict_provenance, abi_x86_interrupt, asm_const)]
 #![deny(
     asm_sub_register,
     deprecated,

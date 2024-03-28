@@ -22,7 +22,7 @@ pub closed spec fn syscall_reply_empty_spec(old:Kernel, new:Kernel, cpu_id:CPUID
         false
     }
     else{
-        let valid_thread = (cpu_id < NUM_CPUS && 
+        let valid_thread = (cpu_id < NUM_CPUS &&
             old.cpu_list@[cpu_id as int].get_is_idle() == false);
         let has_caller = old.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).caller.is_Some();
         let system_scheduler_has_space = old.proc_man.scheduler.len() != MAX_NUM_THREADS;
@@ -40,7 +40,7 @@ pub closed spec fn syscall_reply_empty_spec(old:Kernel, new:Kernel, cpu_id:CPUID
             //if the syscall is not success, nothing will change, goes back to user level
             old == new
         }
-            
+
     }
 }
 
@@ -87,7 +87,7 @@ impl Kernel {
         self.proc_man.weak_up_caller_and_schedule(caller_ptr, current_thread_ptr, pt_regs, Some(SUCCESS));
         self.cpu_list.set_current_thread(cpu_id,Some(caller_ptr));
         return SyscallReturnStruct::new(SUCCESS,new_pcid,new_cr3,caller_ptr);
-        
+
     }
 }
 }

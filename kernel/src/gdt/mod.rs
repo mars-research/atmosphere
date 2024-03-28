@@ -28,8 +28,8 @@ use x86::segmentation::{load_ds, load_es, load_ss, SegmentSelector};
 use x86::task::load_tr;
 use x86::Ring;
 
-use types::{AccessByte, SystemAccessByte, SystemDescriptorType};
 use crate::cpu::IstStack;
+use types::{AccessByte, SystemAccessByte, SystemDescriptorType};
 
 // GDT flags
 // const GDT_F_PAGE_SIZE: u8 = 1 << 7;

@@ -180,9 +180,7 @@ pub fn init_physical_memory_map(
     image_ranges: impl Iterator<Item = MemoryRange>,
 ) {
     let mut map = PHYSICAL_MEMORY_MAP.lock();
-    let filtered_regions = regions.filter(|(r, _)| {
-        r.base() < MAX_PHYSICAL_MEMORY as u64
-    });
+    let filtered_regions = regions.filter(|(r, _)| r.base() < MAX_PHYSICAL_MEMORY as u64);
     *map = MemoryMap::new(filtered_regions.map(|(r, t)| (r, BootMemoryType::Other(t))));
 
     map.relabel(MemoryRange::new(0, 1024 * 1024), BootMemoryType::Bios);

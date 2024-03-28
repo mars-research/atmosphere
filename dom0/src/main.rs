@@ -121,7 +121,11 @@ fn main() -> isize {
     }
     // test_null_syscall();
 
+    log::info!("Scanning pci devs");
     scan_pci_devs();
+
+    log::info!("Done Scanning");
+    loop {}
 
     let mut nvme_dev = unsafe {
         NvmeDevice::new(crate::pci::utils::PciBarAddr::new(
@@ -142,6 +146,11 @@ fn main() -> isize {
     loop {}
 }
 
+#[panic_handler]
 pub fn panic(_info: &PanicInfo) -> ! {
     loop {}
+}
+
+pub fn rdtsc() -> u64 {
+    unsafe { x86::time::rdtsc() }
 }

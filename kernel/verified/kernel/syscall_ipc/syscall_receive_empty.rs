@@ -23,13 +23,13 @@ pub closed spec fn syscall_receive_empty_wait_spec(old:Kernel, new:Kernel, cpu_i
         false
     }
     else{
-        let valid_thread = (cpu_id < NUM_CPUS && 
+        let valid_thread = (cpu_id < NUM_CPUS &&
             old.cpu_list@[cpu_id as int].get_is_idle() == false);
-        let valid_endpoint = endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS && 
+        let valid_endpoint = endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS &&
             old.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).endpoint_descriptors@[endpoint_index as int] != 0;
-            
 
-        if valid_thread && valid_endpoint 
+
+        if valid_thread && valid_endpoint
         {
             let endpoint_ptr = old.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).endpoint_descriptors@[endpoint_index as int];
             let endpoint_state = old.proc_man.get_endpoint(endpoint_ptr).queue_state;
@@ -60,7 +60,7 @@ pub closed spec fn syscall_receive_empty_wait_spec(old:Kernel, new:Kernel, cpu_i
                     &&
                     new.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).state == BLOCKED
                     &&
-                    new.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).endpoint_ptr == Some(endpoint_ptr)                    
+                    new.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).endpoint_ptr == Some(endpoint_ptr)
                     &&
                     forall|pcid:Pcid, va:usize| #![auto] 0<=pcid<PCID_MAX && spec_va_valid(va) ==> new.mmu_man.get_pagetable_mapping_by_pcid(pcid)[va] =~= old.mmu_man.get_pagetable_mapping_by_pcid(pcid)[va]
                     &&
@@ -70,7 +70,7 @@ pub closed spec fn syscall_receive_empty_wait_spec(old:Kernel, new:Kernel, cpu_i
                 if endpoint_len == 0 {
                     if scheduler_len == 0{
                         new.cpu_list@[cpu_id as int].get_is_idle() == true
-                        && 
+                        &&
                         forall|_cpu_id:CPUID| #![auto] 0 <= _cpu_id < NUM_CPUS && _cpu_id != cpu_id ==> new.cpu_list@[_cpu_id as int] =~= old.cpu_list@[_cpu_id as int]
                         &&
                         new.proc_man.get_thread_ptrs() =~= old.proc_man.get_thread_ptrs()
@@ -101,7 +101,7 @@ pub closed spec fn syscall_receive_empty_wait_spec(old:Kernel, new:Kernel, cpu_i
                 }else{
                     let sender_ptr = old.proc_man.get_endpoint(endpoint_ptr).queue@[0];
                     let sender_ipc_payload = old.proc_man.get_thread(sender_ptr).ipc_payload;
-                    
+
                     if scheduler_len == MAX_NUM_THREADS{
                         old == new
                     }else if sender_ipc_payload.calling != false ||
@@ -142,7 +142,7 @@ pub closed spec fn syscall_receive_empty_wait_spec(old:Kernel, new:Kernel, cpu_i
             //if the syscall is not success, nothing will change, goes back to user level
             old == new
         }
-            
+
     }
 }
 
@@ -276,9 +276,9 @@ impl Kernel {
 
                     return (SyscallReturnStruct::new(SUCCESS,new_pcid,new_cr3,new_thread_ptr),Some((pcid,cr3,current_thread_ptr)));
                 }
- 
 
-                
+
+
         }
     }
 }

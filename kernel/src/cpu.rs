@@ -121,9 +121,7 @@ impl<const SZ: usize> Stack<SZ> {
     }
 
     pub fn bottom(&self) -> *const u8 {
-        unsafe {
-            (self.0.as_ptr() as *const u8).add(SZ)
-        }
+        unsafe { (self.0.as_ptr() as *const u8).add(SZ) }
     }
 }
 

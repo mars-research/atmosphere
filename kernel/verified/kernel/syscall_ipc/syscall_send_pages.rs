@@ -331,7 +331,7 @@ impl Kernel {
                 }else if receiver_ipc_payload.page_payload.unwrap().1 != range ||
                          range >= usize::MAX/3 ||
                          self.page_alloc.free_pages.len() < 3 * range
-                {                   
+                {
                     self.proc_man.push_scheduler(current_thread_ptr, Some(PAGE_PAYLOAD_INVALID),pt_regs);
                     let new_thread_ptr = self.proc_man.pop_endpoint_to_running(current_thread_ptr, endpoint_index,pt_regs);
                     self.cpu_list.set_current_thread(cpu_id,Some(new_thread_ptr));

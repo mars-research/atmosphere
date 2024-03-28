@@ -69,24 +69,20 @@ pub unsafe fn init_cpu() {
 #[cfg(debug_assertions)]
 global_asm!(
     ".macro push_dummy_caller_saved",
-    "push 0",         // rax
-    "push 0",         // rdi
-    "push 0",         // rsi
-    "push 0",         // rdx
-    "push 0",         // rcx (taken by original rip)
-    "push 0",         // r8
-    "push 0",         // r9
-    "push 0",         // r10 (taken by original rsp)
-    "push 0",         // r11 (taken by original rflags across syscall)
+    "push 0", // rax
+    "push 0", // rdi
+    "push 0", // rsi
+    "push 0", // rdx
+    "push 0", // rcx (taken by original rip)
+    "push 0", // r8
+    "push 0", // r9
+    "push 0", // r10 (taken by original rsp)
+    "push 0", // r11 (taken by original rflags across syscall)
     ".endm",
 );
 
 #[cfg(not(debug_assertions))]
-global_asm!(
-    ".macro push_dummy_caller_saved",
-    "sub rsp, 9*8",
-    ".endm",
-);
+global_asm!(".macro push_dummy_caller_saved", "sub rsp, 9*8", ".endm",);
 
 // Syscall ABI
 //

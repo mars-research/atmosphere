@@ -1,5 +1,5 @@
-use vstd::prelude::*;
 use core::mem::MaybeUninit;
+use vstd::prelude::*;
 verus! {
 
 pub struct RegistersOption{
@@ -19,13 +19,13 @@ impl RegistersOption {
         &self.reg
     }
     pub fn is_some(&self) -> (ret:bool)
-        ensures 
+        ensures
             ret == self.is_Some()
     {
         self.exists
     }
     pub fn is_none(&self) -> (ret:bool)
-        ensures 
+        ensures
             ret == self.is_None()
     {
         self.exists == false
@@ -90,7 +90,7 @@ impl RegistersOption {
     {
         *dst = self.reg;
     }
-    
+
     pub fn set_to_none(&mut self)
         ensures
             self.is_None(),

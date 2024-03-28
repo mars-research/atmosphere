@@ -23,13 +23,13 @@ pub closed spec fn syscall_call_with_message_wait_spec(old:Kernel, new:Kernel, c
         false
     }
     else{
-        let valid_thread = (cpu_id < NUM_CPUS && 
+        let valid_thread = (cpu_id < NUM_CPUS &&
             old.cpu_list@[cpu_id as int].get_is_idle() == false);
-        let valid_endpoint = endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS && 
+        let valid_endpoint = endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS &&
             old.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).endpoint_descriptors@[endpoint_index as int] != 0;
-            
 
-        if valid_thread && valid_endpoint 
+
+        if valid_thread && valid_endpoint
         {
             let endpoint_ptr = old.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).endpoint_descriptors@[endpoint_index as int];
             let endpoint_state = old.proc_man.get_endpoint(endpoint_ptr).queue_state;
@@ -126,7 +126,7 @@ pub closed spec fn syscall_call_with_message_wait_spec(old:Kernel, new:Kernel, c
                         receiver_ipc_payload.endpoint_payload.is_some() ||
                         receiver_ipc_payload.pci_payload.is_some()
                         {
-                            
+
                             new.cpu_list@[cpu_id as int].get_current_thread() == Some(receiver_ptr)
                             &&
                             forall|_cpu_id:CPUID| #![auto] 0 <= _cpu_id < NUM_CPUS && _cpu_id != cpu_id ==> new.cpu_list@[_cpu_id as int] =~= old.cpu_list@[_cpu_id as int]
@@ -230,7 +230,7 @@ pub closed spec fn syscall_call_with_message_wait_spec(old:Kernel, new:Kernel, c
             //if the syscall is not success, nothing will change, goes back to user level
             old == new
         }
-            
+
     }
 }
 
@@ -405,10 +405,10 @@ impl Kernel {
                             return SyscallReturnStruct::new(SUCCESS,new_pcid,new_cr3,new_thread_ptr);
                         }
                     }
-                } 
- 
+                }
 
-                
+
+
         }
     }
 }

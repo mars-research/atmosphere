@@ -200,14 +200,22 @@ pub type PageFaultHandlerFunc =
 
 /// Invalid Opcode handler.
 unsafe extern "C" fn invalid_opcode(regs: &mut PtRegs) {
-    log::error!("CPU {}, Invalid Opcode: {:#x?}", crate::cpu::get_cpu_id(), regs);
+    log::error!(
+        "CPU {}, Invalid Opcode: {:#x?}",
+        crate::cpu::get_cpu_id(),
+        regs
+    );
     crate::debugger::breakpoint(2);
     spin_forever();
 }
 
 /// Double Fault handler.
 unsafe extern "C" fn double_fault(regs: &mut PtRegs) {
-    log::error!("CPU {}: Double Fault: {:#x?}", crate::cpu::get_cpu_id(), regs);
+    log::error!(
+        "CPU {}: Double Fault: {:#x?}",
+        crate::cpu::get_cpu_id(),
+        regs
+    );
     crate::debugger::breakpoint(2);
     spin_forever();
 }
@@ -248,7 +256,8 @@ unsafe extern "C" fn general_protection_fault(regs: &mut Registers) {
 unsafe extern "C" fn page_fault(regs: &mut Registers) {
     let address: u64;
     asm!("mov {}, cr2", out(reg) address);
-    log::info!("CPU {}: Page Fault (address {:#x}, error code {:?}): {:#x?}",
+    log::info!(
+        "CPU {}: Page Fault (address {:#x}, error code {:?}): {:#x?}",
         crate::cpu::get_cpu_id(),
         address,
         regs.error_code,
@@ -408,7 +417,8 @@ pub unsafe fn init() {
     idt.stack_segment_fault.set_handler_fn(stack_segment_fault);
     idt.general_protection_fault
         .set_handler_fn(wrap_interrupt_with_error_code!(general_protection_fault));
-    idt.page_fault.set_handler_fn(wrap_interrupt_with_error_code!(page_fault));
+    idt.page_fault
+        .set_handler_fn(wrap_interrupt_with_error_code!(page_fault));
 
     idt.interrupts[0].set_handler_fn(wrap_interrupt!(timer));
 

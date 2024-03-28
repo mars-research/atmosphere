@@ -18,7 +18,10 @@ use core::mem;
 use bit_field::BitField;
 use x86::{segmentation, Ring};
 
-use super::{HandlerFunc, HandlerFuncWithErrCode, PageFaultHandlerFunc, TrampolineHandlerFunc, IST_EXCEPTION, IST_IRQ};
+use super::{
+    HandlerFunc, HandlerFuncWithErrCode, PageFaultHandlerFunc, TrampolineHandlerFunc,
+    IST_EXCEPTION, IST_IRQ,
+};
 
 /// An X86-64 Interrupt Descriptor Table.
 #[derive(Clone)]

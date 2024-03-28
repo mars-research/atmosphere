@@ -248,7 +248,7 @@ impl Kernel {
                     return (SyscallReturnStruct::new(SCHEDULER_NO_SPACE,pcid,cr3,current_thread_ptr),Some((pcid,cr3,current_thread_ptr)));
                 }
                 let new_thread_ptr = self.proc_man.get_head_of_endpoint_by_endpoint_ptr(target_endpoint_ptr);
-                
+
                 let sender_ipc_payload = ipc_payload;
                 let receiver_ipc_payload = self.proc_man.get_ipc_payload_by_thread_ptr(new_thread_ptr);
 

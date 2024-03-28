@@ -22,7 +22,7 @@ pub closed spec fn syscall_reply_message_spec(old:Kernel, new:Kernel, cpu_id:CPU
         false
     }
     else{
-        let valid_thread = (cpu_id < NUM_CPUS && 
+        let valid_thread = (cpu_id < NUM_CPUS &&
             old.cpu_list@[cpu_id as int].get_is_idle() == false);
         let has_caller = old.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).caller.is_Some();
         let system_scheduler_has_space = old.proc_man.scheduler.len() != MAX_NUM_THREADS;
@@ -110,7 +110,7 @@ pub closed spec fn syscall_reply_message_spec(old:Kernel, new:Kernel, cpu_id:CPU
             //if the syscall is not success, nothing will change, goes back to user level
             old == new
         }
-            
+
     }
 }
 
@@ -195,7 +195,7 @@ impl Kernel {
                 }
             }
         }
-        
+
     }
 }
 }

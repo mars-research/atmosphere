@@ -23,13 +23,13 @@ pub closed spec fn syscall_receive_endpoint_wait_spec(old:Kernel, new:Kernel, cp
         false
     }
     else{
-        let valid_thread = (cpu_id < NUM_CPUS && 
+        let valid_thread = (cpu_id < NUM_CPUS &&
             old.cpu_list@[cpu_id as int].get_is_idle() == false);
-        let valid_endpoint = endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS && 
+        let valid_endpoint = endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS &&
             old.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).endpoint_descriptors@[endpoint_index as int] != 0;
-            
 
-        if valid_thread && valid_endpoint 
+
+        if valid_thread && valid_endpoint
         {
             let endpoint_ptr = old.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).endpoint_descriptors@[endpoint_index as int];
             let endpoint_state = old.proc_man.get_endpoint(endpoint_ptr).queue_state;
@@ -196,7 +196,7 @@ pub closed spec fn syscall_receive_endpoint_wait_spec(old:Kernel, new:Kernel, cp
             //if the syscall is not success, nothing will change, goes back to user level
             old == new
         }
-            
+
     }
 }
 
@@ -361,9 +361,9 @@ impl Kernel {
                         }
                     }
                 }
-                
+
             }
-        
+
         }
     }
 }

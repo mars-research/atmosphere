@@ -4,13 +4,13 @@ use core::mem;
 
 use x86::{segmentation, Ring};
 
+use crate::cpu;
 use crate::gdt::GlobalDescriptorTable;
 use crate::interrupt::{self, Cycles};
-use verified::trap::Registers;
-use core::arch::asm;
-use crate::cpu;
 use crate::kernel;
+use core::arch::asm;
 pub use verified::bridge::SwitchDecision;
+use verified::trap::Registers;
 
 const TIME_SLICE: Cycles = Cycles(1_000_000);
 
@@ -22,8 +22,14 @@ pub unsafe fn start_thread(code: u64, stack: u64, ring: Ring) {
     let mut regs = Registers::zeroed();
 
     let (cs, ss) = match ring {
-        Ring::Ring0 => (GlobalDescriptorTable::KERNEL_CS, GlobalDescriptorTable::KERNEL_SS),
-        Ring::Ring3 => (GlobalDescriptorTable::USER_CS, GlobalDescriptorTable::USER_SS),
+        Ring::Ring0 => (
+            GlobalDescriptorTable::KERNEL_CS,
+            GlobalDescriptorTable::KERNEL_SS,
+        ),
+        Ring::Ring3 => (
+            GlobalDescriptorTable::USER_CS,
+            GlobalDescriptorTable::USER_SS,
+        ),
         _ => panic!("Unsupported ring"),
     };
 
@@ -46,14 +52,14 @@ pub fn schedule(regs: &mut Registers) -> Option<Cycles> {
     // Some(TIME_SLICE)
 
     log::info!("hello from cpu 1 scheduler");
-    loop{
-        unsafe{
+    loop {
+        unsafe {
             let has_next_thread = kernel::sched_get_next_thread(regs);
-            if has_next_thread == false{
-                for i in 0..1000{
+            if has_next_thread == false {
+                for i in 0..1000 {
                     asm!("nop");
                 }
-            }else{
+            } else {
                 break;
             }
         }
