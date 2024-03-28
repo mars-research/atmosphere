@@ -132,7 +132,7 @@ impl Crate {
         let mut command = Command::new("cargo");
         command
             .args(&["build"])
-            .args(&["--message-format=json"])
+            .args(&["--message-format=json-render-diagnostics"])
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit())
             .current_dir(&self.crate_dir);
