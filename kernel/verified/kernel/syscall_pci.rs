@@ -61,7 +61,7 @@ pub closed spec fn syscall_register_pci_dev_spec(old:Kernel,new:Kernel,cpu_id:CP
     }
 }
 
-    pub fn syscall_register_pci_dev(&mut self, cpu_id:CPUID, pt_regs: PtRegs, bus:u8, dev:u8, fun:u8) -> (ret:SyscallReturnStruct)
+    pub fn syscall_register_pci_dev(&mut self, cpu_id:CPUID, bus:u8, dev:u8, fun:u8) -> (ret:SyscallReturnStruct)
         requires
             old(self).wf(),
         ensures
@@ -69,11 +69,11 @@ pub closed spec fn syscall_register_pci_dev_spec(old:Kernel,new:Kernel,cpu_id:CP
     {
         let (default_pcid, default_cr3) = self.mmu_man.get_reserved_pcid_and_cr3();
         if cpu_id >= NUM_CPUS{
-            return SyscallReturnStruct::new(CPU_ID_INVALID,default_pcid,default_cr3,pt_regs);
+            return SyscallReturnStruct::new(CPU_ID_INVALID,default_pcid,default_cr3,0);
         }
 
         if self.cpu_list.get(cpu_id).get_is_idle() {
-            return SyscallReturnStruct::new(NO_RUNNING_THREAD,default_pcid,default_cr3,pt_regs);
+            return SyscallReturnStruct::new(NO_RUNNING_THREAD,default_pcid,default_cr3,0);
         }
 
         assert(self.cpu_list[cpu_id as int].get_is_idle() == false);
@@ -86,26 +86,26 @@ pub closed spec fn syscall_register_pci_dev_spec(old:Kernel,new:Kernel,cpu_id:CP
         let cr3 = self.mmu_man.get_cr3_by_pcid(pcid);
 
         if dev >= 32 || fun >= 8 {
-            return SyscallReturnStruct::new(PCI_DEV_NUM_INVALID,pcid,cr3,pt_regs);
+            return SyscallReturnStruct::new(PCI_DEV_NUM_INVALID,pcid,cr3,current_thread_ptr);
         }
         let ioid_op = self.proc_man.get_ioid_by_thread_ptr(current_thread_ptr);
         if ioid_op.is_none(){
-            return SyscallReturnStruct::new(PROC_NO_IOMMUTABLE,pcid,cr3,pt_regs);
+            return SyscallReturnStruct::new(PROC_NO_IOMMUTABLE,pcid,cr3,current_thread_ptr);
         }
 
         let ioid = ioid_op.unwrap();
         if self.mmu_man.mmu_get_pci_dev_by_ioid(ioid,bus,dev,fun) == false
         {
-            return SyscallReturnStruct::new(PCI_DEV_NO_OWNERSHIP,pcid,cr3,pt_regs);
+            return SyscallReturnStruct::new(PCI_DEV_NO_OWNERSHIP,pcid,cr3,current_thread_ptr);
         }
 
         if self.mmu_man.get_pci_binding(bus,dev,fun).is_some()
         {
-            return SyscallReturnStruct::new(PCI_DEV_TAKEN,pcid,cr3,pt_regs);
+            return SyscallReturnStruct::new(PCI_DEV_TAKEN,pcid,cr3,current_thread_ptr);
         }
 
         self.mmu_man.mmu_register_pci_dev(ioid,bus,dev,fun);
-        return SyscallReturnStruct::new(SUCCESS,pcid,cr3,pt_regs);
+        return SyscallReturnStruct::new(SUCCESS,pcid,cr3,current_thread_ptr);
     }
 
 }

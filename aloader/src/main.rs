@@ -1,7 +1,12 @@
 //! The Atmosphere early loader.
 
 #![cfg_attr(not(test), no_std, no_main, feature(start))]
-#![feature(alloc_error_handler, strict_provenance, abi_x86_interrupt)]
+#![feature(
+    alloc_error_handler,
+    strict_provenance,
+    abi_x86_interrupt,
+    asm_const,
+)]
 #![deny(
     asm_sub_register,
     deprecated,
@@ -73,8 +78,13 @@ fn main(_argc: isize, _argv: *const *const u8) -> ! {
     log::info!("Switching to PML4 @ {:x?}", address_space.pml4());
     unsafe {
         asm!(
+            "mov {cr4}, cr4",
+            "or {cr4}, {cr4_pcide}",
+            "mov cr4, {cr4}",
             "mov cr3, {pml4}",
             pml4 = inout(reg) address_space.pml4() => _,
+            cr4 = out(reg) _,
+            cr4_pcide = const (1 << 17),
         );
     }
 

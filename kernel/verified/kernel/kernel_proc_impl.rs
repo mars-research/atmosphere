@@ -17,7 +17,7 @@ use crate::kernel::*;
 
 impl Kernel {
 
-    pub fn kernel_push_current_thread_to_endpoint(&mut self, cpu_id:CPUID, thread_ptr: ThreadPtr, endpoint_idx: EndpointIdx, ipc_payload: IPCPayLoad, pt_regs: PtRegs) 
+    pub fn kernel_push_current_thread_to_endpoint(&mut self, cpu_id:CPUID, thread_ptr: ThreadPtr, endpoint_idx: EndpointIdx, ipc_payload: IPCPayLoad, pt_regs: Registers) 
         requires
             old(self).wf(),
             0<=cpu_id<NUM_CPUS,
@@ -108,7 +108,7 @@ impl Kernel {
     }
 
 
-    // pub fn syscall_send_wait(&mut self, cpu_id:CPUID, pt_regs: PtRegs, endpoint_index: EndpointIdx)
+    // pub fn syscall_send_wait(&mut self, cpu_id:CPUID, pt_regs: Registers, endpoint_index: EndpointIdx)
     //     requires
     //         old(self).wf(),
     // {

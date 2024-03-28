@@ -97,7 +97,7 @@ impl Emulator for Qemu {
             ])
             .arg("-no-reboot")
             .arg("-no-shutdown")
-            .args(&["-d", "int"])
+            //.args(&["-d", "int"])
             .args(config.cpu_model.to_qemu()?);
 
         if config.enable_nvme {

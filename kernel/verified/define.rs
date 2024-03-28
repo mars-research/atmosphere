@@ -1,30 +1,30 @@
 use vstd::prelude::*;
 verus! {
 use vstd::ptr::*;
-use crate::trap::PtRegs;
+use crate::trap::Registers;
 
 #[derive(Debug)]
 pub struct SyscallReturnStruct{
     pub error_code: ErrorCodeType,
     pub pcid: Pcid,
     pub cr3: usize,
-    pub pt_regs: PtRegs,
+    pub thread_ptr:ThreadPtr ,
 }
 
 impl SyscallReturnStruct{
 
-    pub fn new(error_code:ErrorCodeType,pcid:Pcid,cr3:usize,pt_regs:PtRegs )->(ret:Self)
+    pub fn new(error_code:ErrorCodeType,pcid:Pcid,cr3:usize,thread_ptr:ThreadPtr )->(ret:Self)
         ensures
             ret.error_code == error_code,
             ret.pcid == pcid,
             ret.cr3 == cr3,
-            ret.pt_regs == pt_regs,
+            ret.thread_ptr == thread_ptr,
     {
         return Self{
             error_code:error_code,
             pcid:pcid,
             cr3:cr3,
-            pt_regs:pt_regs,
+            thread_ptr:thread_ptr,
         };
     }
 }
@@ -80,6 +80,7 @@ pub const IPC_TYPE_NOT_MATCH:ErrorCodeType = 36;
 pub const PCI_DEV_NUM_INVALID:ErrorCodeType = 37;
 pub const PCI_DEV_NO_OWNERSHIP:ErrorCodeType = 38;
 pub const PCI_DEV_TAKEN:ErrorCodeType = 39;
+pub const NEW_THREAD:ErrorCodeType = 40;
 
 pub type ThreadState = usize;
 pub const SCHEDULED:ThreadState = 1;
@@ -151,6 +152,7 @@ pub const READ:usize = 0x8000_0000_0000_0000u64 as usize;
 pub const READ_WRITE:usize = 0x8000_0000_0000_0002u64 as usize;
 pub const READ_EXECUTE:usize = 0x0000_0000_0000_0000u64 as usize;
 pub const READ_WRITE_EXECUTE:usize = 0x0000_0000_0000_0002u64 as usize;
+pub const PCID_ENABLE_MASK:usize = 0x8000_0000_0000_0000u64 as usize;
 
 pub const NUM_CPUS:usize = 32;
 pub const PAGE_ENTRY_PRESENT_MASK:u64 = 0x5; //Hack, force the verified pagetable to map everything as user.

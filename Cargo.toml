@@ -22,3 +22,6 @@ members = [
 ]
 
 exclude = ["test-pass"]
+
+[profile.release]
+debug = true

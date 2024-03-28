@@ -17,7 +17,7 @@ use crate::kernel::*;
 
 
 impl Kernel {
-    pub fn syscall_reply(&mut self, cpu_id:CPUID, pt_regs: PtRegs, ipc_payload:IPCPayLoad) -> (ret: SyscallReturnStruct)
+    pub fn syscall_reply(&mut self, cpu_id:CPUID, pt_regs: Registers, ipc_payload:IPCPayLoad) -> (ret: SyscallReturnStruct)
         requires
             old(self).wf(),
         ensures

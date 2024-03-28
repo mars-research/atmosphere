@@ -10,7 +10,7 @@ use crate::mars_array::MarsArray;
 use crate::pagetable::*;
 use crate::define::*;
 // use vstd::ptr::*;
-use crate::trap::PtRegs;
+use crate::trap::Registers;
 // use crate::iommutable::*;
 use crate::kernel::*;
 
@@ -78,7 +78,7 @@ impl Kernel{
 
     // #[verifier(external_body)]
     pub fn kernel_init(&mut self, boot_page_ptrs: &ArrayVec<(PageState,VAddr),NUM_PAGES>, mut boot_page_perms: Tracked<Map<PagePtr,PagePerm>>,
-                        dom0_pagetable: PageTable, kernel_pml4_entry: PageEntry, dom0_pt_regs: PtRegs, init_pci_map: PCIBitMap) -> (ret: isize)
+                        dom0_pagetable: PageTable, kernel_pml4_entry: PageEntry, dom0_pt_regs: Registers, init_pci_map: PCIBitMap) -> (ret: isize)
         requires
             old(self).proc_man.proc_ptrs.arr_seq@.len() == MAX_NUM_PROCS,
             old(self).proc_man.proc_perms@ =~= Map::empty(),
@@ -211,7 +211,7 @@ impl Kernel{
 
     }
 
-    fn kernel_init_helper(&mut self, dom0_pt_regs: PtRegs, init_pci_map: PCIBitMap) -> isize
+    fn kernel_init_helper(&mut self, dom0_pt_regs: Registers, init_pci_map: PCIBitMap) -> isize
         requires
             old(self).proc_man.wf(),
             old(self).mmu_man.wf(),

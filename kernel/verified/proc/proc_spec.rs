@@ -13,7 +13,7 @@ use crate::mars_staticlinkedlist::*;
 
 // use crate::setters::*;
 use crate::define::*;
-use crate::trap::PtRegs;
+use crate::trap::Registers;
 
 
 pub struct Process{
@@ -153,7 +153,8 @@ impl ProcessManager {
             self.get_thread_ptrs().contains(thread_ptr),
             0<=endpoint_index<MAX_NUM_ENDPOINT_DESCRIPTORS,
         ensures
-            ret =~= self.get_thread(thread_ptr).endpoint_descriptors@[endpoint_index as int]
+            ret =~= self.get_thread(thread_ptr).endpoint_descriptors@[endpoint_index as int],
+            ret != 0 ==> self.get_endpoint_ptrs().contains(ret),
 
     {
         assert(self.thread_perms@.dom().contains(thread_ptr));
@@ -173,19 +174,52 @@ impl ProcessManager {
 
     // #[verifier(when_used_as_spec(spec_get_pcid_by_thread_ptr))]
 
-    pub fn get_pt_regs_by_thread_ptr(&self, thread_ptr:ThreadPtr) -> (ret: Option<PtRegs>)
+    pub fn get_pt_regs_by_thread_ptr(&self, thread_ptr:ThreadPtr) -> (ret: Option<Registers>)
         requires
             self.wf(),
             self.get_thread_ptrs().contains(thread_ptr),
         ensures
-            ret =~= self.get_thread(thread_ptr).trap_frame,
+            ret.is_Some() ==> self.get_thread(thread_ptr).trap_frame.is_Some() && ret.unwrap() =~= *self.get_thread(thread_ptr).trap_frame.get_Some_0(),
+            ret.is_None() ==> self.get_thread(thread_ptr).trap_frame.is_None()
             // ret =~= self.get_pcid_by_thread_ptr(thread_ptr),
         {
             let tracked thread_perm = self.thread_perms.borrow().tracked_borrow(thread_ptr);
             let thread : &Thread = PPtr::<Thread>::from_usize(thread_ptr).borrow(Tracked(thread_perm));
-            let trap_frame = thread.trap_frame;
-            return trap_frame;
+            if thread.trap_frame.is_none(){
+                return None;
+            }else{
+                Some(*thread.trap_frame.unwrap())
+            }
         }
+
+    pub fn set_kernel_pt_regs_by_thread_ptr_fast(&self, thread_ptr:ThreadPtr, regs: &mut Registers)
+        requires
+            self.wf(),
+            self.get_thread_ptrs().contains(thread_ptr),
+            self.get_thread(thread_ptr).trap_frame.is_Some(),
+        ensures
+            *regs =~= *self.get_thread(thread_ptr).trap_frame.get_Some_0(),
+            // ret =~= self.get_pcid_by_thread_ptr(thread_ptr),
+        {
+            let tracked thread_perm = self.thread_perms.borrow().tracked_borrow(thread_ptr);
+            let thread : &Thread = PPtr::<Thread>::from_usize(thread_ptr).borrow(Tracked(thread_perm));
+            thread.trap_frame.set_dst_fast(regs);
+        }
+
+    pub fn set_kernel_pt_regs_by_thread_ptr(&self, thread_ptr:ThreadPtr, regs: &mut Registers)
+        requires
+            self.wf(),
+            self.get_thread_ptrs().contains(thread_ptr),
+            self.get_thread(thread_ptr).trap_frame.is_Some(),
+        ensures
+            *regs =~= *self.get_thread(thread_ptr).trap_frame.get_Some_0(),
+            // ret =~= self.get_pcid_by_thread_ptr(thread_ptr),
+        {
+            let tracked thread_perm = self.thread_perms.borrow().tracked_borrow(thread_ptr);
+            let thread : &Thread = PPtr::<Thread>::from_usize(thread_ptr).borrow(Tracked(thread_perm));
+            thread.trap_frame.set_dst(regs);
+        }
+
     pub fn get_pcid_by_thread_ptr(&self, thread_ptr:ThreadPtr) -> (ret: Pcid)
         requires
             self.wf(),

@@ -72,7 +72,7 @@ pub(super) async fn run(global: GlobalOpts) -> Result<()> {
     log::info!("Project: {:?}", project.root());
 
     let mut opts = BuildOptions::default();
-    opts.release = global.release;
+    opts.release = global.release || local.cargo_runner.is_some();
     opts.verbose = global.verbose;
 
     let kernel = if let Some(prebuilt) = local.cargo_runner {

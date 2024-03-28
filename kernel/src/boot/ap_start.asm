@@ -87,6 +87,11 @@ start64:
 	mov fs, ax
 	mov gs, ax
 
+	; Enable PCID
+	mov rax, cr4
+	or rax, 1 << 17
+	mov cr4, rax
+
 	; Load stack
 	lea rbx, ap_start16
 	sub rbx, 16

@@ -10,7 +10,7 @@ use crate::mars_array::MarsArray;
 use crate::pagetable::*;
 use crate::define::*;
 // use vstd::ptr::*;
-// use crate::trap::PtRegs;
+// use crate::trap::Registers;
 // use crate::iommutable::*;
 
 // use core::mem::MaybeUninit;

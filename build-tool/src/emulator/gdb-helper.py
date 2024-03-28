@@ -8,15 +8,9 @@ LOADED_BINARIES_LEN = 'aloader::debugger::LOADED_BINARIES_LEN'
 ON_BINARY_ADDED = 'aloader::debugger::on_binary_added'
 ON_READY = 'aloader::debugger::on_ready'
 
+KERNEL_BREAKPOINT = 'kernel::debugger::breakpoint'
+
 binaries_consumed = 0
-
-class DelayedExecute:
-    def __init__(self, command: str, to_string=False) -> None:
-        self.command: str = command
-        self.to_string = to_string
-
-    def __call__(self):
-        gdb.execute(self.command, to_string=self.to_string)
 
 def get_str(val):
     data_ptr = val['data_ptr']
@@ -58,7 +52,7 @@ def dump_loaded_binaries():
         else:
             print(f'{name} @ 0x{offset:x}: ???')
 
-class OnBinaryLoadedBreakpoint(gdb.Breakpoint):
+class OnBinaryAdded(gdb.Breakpoint):
     def __init__(self):
         super().__init__(ON_BINARY_ADDED)
 
@@ -73,5 +67,47 @@ class OnBinaryLoadedBreakpoint(gdb.Breakpoint):
 
         return False
 
-OnBinaryLoadedBreakpoint()
-gdb.execute(f'break {ON_READY}')
+OnBinaryAdded()
+
+class KernelBreakpoint(gdb.Breakpoint):
+    def __init__(self):
+        super().__init__(KERNEL_BREAKPOINT)
+
+    def stop(self):
+        global frame
+
+        frame = gdb.selected_frame()
+        if not frame:
+            print('No current frame')
+
+        frames_to_rewind = int(gdb.parse_and_eval('frames_to_rewind'))
+        print(f'Unwind {frames_to_rewind} frames')
+
+        for _ in range(frames_to_rewind):
+            caller = frame.older()
+            if caller:
+                frame = caller
+            else:
+                break
+
+        print(f'Found parent frame: {frame.function().name}')
+
+        def post():
+            frame.select()
+            gdb.execute('frame')
+
+        gdb.post_event(post)
+
+        return True
+
+class OnReady(gdb.Breakpoint):
+    def __init__(self):
+        super().__init__(ON_READY, temporary=True)
+
+    def stop(self):
+        def post():
+            KernelBreakpoint()
+        gdb.post_event(post)
+        return True
+
+OnReady()

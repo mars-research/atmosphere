@@ -137,18 +137,6 @@ impl AddressSpace {
             _ => panic!("Invalid level"),
         }
     }
-
-    /// Returns the size of the huge page at a level, supported by the platform.
-    fn huge_page_size(level: usize) -> Option<usize> {
-        // TODO: Check support
-        match level {
-            0 => None,
-            1 => Some(1 * 1024 * 1024), // 1 GiB
-            2 => Some(2 * 1024),        // 2 MiB
-            3 => None,                  // Regular 4 KiB page
-            _ => panic!("Invalid level"),
-        }
-    }
 }
 
 impl PageTable {
@@ -162,7 +150,7 @@ impl PageTable {
 
     unsafe fn write(&self, index: usize, value: Entry) {
         //log::info!("writing to 0x{:x?}", self.entry(index));
-        ptr::write_unaligned(self.entry(index), value)
+        ptr::write_volatile(self.entry(index), value)
     }
 
     const fn entry(&self, index: usize) -> *mut Entry {

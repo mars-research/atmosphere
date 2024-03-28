@@ -15,6 +15,7 @@ pub use map::MemoryMap;
 pub use paging::{AddressSpace, HUGE_PAGE_SIZE, PAGE_SIZE};
 pub use userspace::{UserspaceMapper, USERSPACE_BASE};
 
+pub const MAX_PHYSICAL_MEMORY: usize = 16 * 1024 * 1024 * 1024; // 16 GiB
 pub const BOOTSTRAP_SIZE: usize = 512 * 1024 * 1024; // 512 MiB
 pub const ALLOCATOR_SIZE: usize = 2 * 1024 * 1024 * 1024; // 2 GiB
 
@@ -179,7 +180,10 @@ pub fn init_physical_memory_map(
     image_ranges: impl Iterator<Item = MemoryRange>,
 ) {
     let mut map = PHYSICAL_MEMORY_MAP.lock();
-    *map = MemoryMap::new(regions.map(|(r, t)| (r, BootMemoryType::Other(t))));
+    let filtered_regions = regions.filter(|(r, _)| {
+        r.base() < MAX_PHYSICAL_MEMORY as u64
+    });
+    *map = MemoryMap::new(filtered_regions.map(|(r, t)| (r, BootMemoryType::Other(t))));
 
     map.relabel(MemoryRange::new(0, 1024 * 1024), BootMemoryType::Bios);
     map.relabel(loader_range, BootMemoryType::Loader);

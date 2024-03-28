@@ -18,11 +18,11 @@ use core::mem;
 use bit_field::BitField;
 use x86::{segmentation, Ring};
 
-use super::{HandlerFunc, HandlerFuncWithErrCode, PageFaultHandlerFunc};
+use super::{HandlerFunc, HandlerFuncWithErrCode, PageFaultHandlerFunc, TrampolineHandlerFunc, IST_EXCEPTION, IST_IRQ};
 
 /// An X86-64 Interrupt Descriptor Table.
 #[derive(Clone)]
-#[repr(align(8))]
+#[repr(align(4096))]
 #[repr(C)]
 pub struct Idt {
     /// Device-By-Zero (`#DE`).
@@ -35,7 +35,7 @@ pub struct Idt {
     pub non_maskable_interrupt: Entry<HandlerFunc>,
 
     /// Breakpoint (`#BP`)
-    pub breakpoint: Entry<HandlerFunc>,
+    pub breakpoint: Entry<TrampolineHandlerFunc>,
 
     /// Overflow (`#OF`)
     pub overflow: Entry<HandlerFunc>,
@@ -65,10 +65,10 @@ pub struct Idt {
     pub stack_segment_fault: Entry<HandlerFuncWithErrCode>,
 
     /// General Protection Fault (`#GP`)
-    pub general_protection_fault: Entry<HandlerFuncWithErrCode>,
+    pub general_protection_fault: Entry<TrampolineHandlerFunc>,
 
     /// Page Fault (`#PF`)
-    pub page_fault: Entry<PageFaultHandlerFunc>,
+    pub page_fault: Entry<TrampolineHandlerFunc>,
 
     /// Reserved
     exception_15: Entry<HandlerFunc>,
@@ -98,37 +98,37 @@ pub struct Idt {
     reserved_3: Entry<HandlerFunc>,
 
     /// Other interrupts
-    interrupts: [Entry<HandlerFunc>; 256 - 32],
+    pub interrupts: [Entry<TrampolineHandlerFunc>; 256 - 32],
 }
 
 impl Idt {
     pub const fn new() -> Self {
         Self {
-            divide_by_zero: Entry::missing(),
-            debug: Entry::missing(),
-            non_maskable_interrupt: Entry::missing(),
+            divide_by_zero: Entry::missing_exception(),
+            debug: Entry::missing_exception(),
+            non_maskable_interrupt: Entry::missing_exception(),
             breakpoint: Entry::missing(),
-            overflow: Entry::missing(),
-            bound_range_exceeded: Entry::missing(),
-            invalid_opcode: Entry::missing(),
-            device_not_available: Entry::missing(),
-            double_fault: Entry::missing(),
-            exception_9: Entry::missing(),
-            invalid_tss: Entry::missing(),
-            segment_not_present: Entry::missing(),
-            stack_segment_fault: Entry::missing(),
-            general_protection_fault: Entry::missing(),
-            page_fault: Entry::missing(),
-            exception_15: Entry::missing(),
-            x87_floating_point: Entry::missing(),
-            alignment_check: Entry::missing(),
-            machine_check: Entry::missing(),
-            simd_floating_point: Entry::missing(),
-            virtualization: Entry::missing(),
+            overflow: Entry::missing_exception(),
+            bound_range_exceeded: Entry::missing_exception(),
+            invalid_opcode: Entry::missing_exception(),
+            device_not_available: Entry::missing_exception(),
+            double_fault: Entry::missing_exception(),
+            exception_9: Entry::missing_exception(),
+            invalid_tss: Entry::missing_exception(),
+            segment_not_present: Entry::missing_exception(),
+            stack_segment_fault: Entry::missing_exception(),
+            general_protection_fault: Entry::missing_exception(),
+            page_fault: Entry::missing_exception(),
+            exception_15: Entry::missing_exception(),
+            x87_floating_point: Entry::missing_exception(),
+            alignment_check: Entry::missing_exception(),
+            machine_check: Entry::missing_exception(),
+            simd_floating_point: Entry::missing_exception(),
+            virtualization: Entry::missing_exception(),
             reserved_2: [Entry::missing(); 9],
-            security_exception: Entry::missing(),
+            security_exception: Entry::missing_exception(),
             reserved_3: Entry::missing(),
-            interrupts: [Entry::missing(); 256 - 32],
+            interrupts: [Entry::missing_irq(); 256 - 32],
         }
     }
 
@@ -149,7 +149,7 @@ impl Idt {
 
 /// An entry in an X86-64 Interrupt Descriptor Table.
 #[derive(Clone, Copy)]
-#[repr(C)]
+#[repr(C, packed)]
 pub struct Entry<F> {
     /// Bits 0 to 15 of the ISR entrypoint.
     entry_low: u16,
@@ -193,11 +193,25 @@ impl<F> Entry<F> {
         }
     }
 
+    const fn missing_exception() -> Self {
+        Self {
+            ist: IST_EXCEPTION as u8,
+            ..Self::missing()
+        }
+    }
+
+    const fn missing_irq() -> Self {
+        Self {
+            ist: IST_IRQ as u8,
+            ..Self::missing()
+        }
+    }
+
     /// Sets the handler address for the IDT entry and sets the present bit.
     ///
     /// For the code selector field, this function uses the code segment selector currently
     /// active in the CPU.
-    fn set_handler_addr(&mut self, addr: u64) {
+    fn set_handler_addr(&mut self, addr: u64) -> &mut Self {
         self.entry_low = addr as u16;
         self.entry_mid = (addr >> 16) as u16;
         self.entry_hi = (addr >> 32) as u32;
@@ -205,6 +219,13 @@ impl<F> Entry<F> {
         self.attributes.set_present(true);
         self.attributes.set_gate_type(GateType::Int32);
         self.selector = segmentation::cs().bits();
+        self
+    }
+
+    /// Sets the IST stack.
+    pub fn set_ist(&mut self, ist: u8) -> &mut Self {
+        self.ist = ist;
+        self
     }
 }
 
@@ -221,13 +242,14 @@ macro_rules! impl_set_handler_fn {
             /// further customization.
             #[allow(dead_code)]
             pub fn set_handler_fn(&mut self, handler: $h) {
-                self.set_handler_addr(handler as u64)
+                self.set_handler_addr(handler as u64);
             }
         }
     };
 }
 
 impl_set_handler_fn!(HandlerFunc);
+impl_set_handler_fn!(TrampolineHandlerFunc);
 impl_set_handler_fn!(HandlerFuncWithErrCode);
 impl_set_handler_fn!(PageFaultHandlerFunc);
 

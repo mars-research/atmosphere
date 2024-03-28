@@ -29,9 +29,7 @@ use x86::task::load_tr;
 use x86::Ring;
 
 use types::{AccessByte, SystemAccessByte, SystemDescriptorType};
-
-/// Size of an IST stack.
-const IST_STACK_SIZE: usize = 4096;
+use crate::cpu::IstStack;
 
 // GDT flags
 // const GDT_F_PAGE_SIZE: u8 = 1 << 7;
@@ -47,7 +45,8 @@ pub unsafe fn init_cpu() {
     // Initialize TSS
     let tss_addr = {
         for i in 0..min(cpu.ist.len(), 7) {
-            let ist_addr = &cpu.ist[i] as *const IstStack;
+            let ist_addr = cpu.ist[i].bottom();
+            //log::debug!("IST {}: {:?}", i + 1, ist_addr);
             cpu.tss.set_ist(i, ist_addr as u64);
         }
 
@@ -147,6 +146,11 @@ impl GlobalDescriptorTable {
     pub const USER_DATA_INDEX: u16 = 3;
     pub const USER_CODE_INDEX: u16 = 4;
     pub const TSS_INDEX: u16 = 5;
+
+    pub const USER_CS: u16 = SegmentSelector::new(Self::USER_CODE_INDEX, Ring::Ring3).bits();
+    pub const USER_SS: u16 = SegmentSelector::new(Self::USER_DATA_INDEX, Ring::Ring3).bits();
+    pub const KERNEL_CS: u16 = SegmentSelector::new(Self::KERNEL_CODE_INDEX, Ring::Ring0).bits();
+    pub const KERNEL_SS: u16 = SegmentSelector::new(Self::KERNEL_DATA_INDEX, Ring::Ring0).bits();
 
     /// Zero-initializes the GDT.
     ///
@@ -254,15 +258,5 @@ impl BigGdtEntry {
     pub fn access_bytes(&self) -> u32 {
         let flags = self.flags_limith & 0b11110000;
         (self.access_type as u32) | ((flags as u32) << 8)
-    }
-}
-
-/// An IST stack.
-#[repr(transparent)]
-pub struct IstStack([u8; IST_STACK_SIZE]);
-
-impl IstStack {
-    pub const fn new() -> Self {
-        Self([0u8; IST_STACK_SIZE])
     }
 }

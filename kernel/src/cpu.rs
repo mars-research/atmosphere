@@ -11,57 +11,83 @@ use core::arch::asm;
 use core::mem::MaybeUninit;
 use core::ptr;
 
-use x86::apic::xapic::XAPIC;
 use x86::msr;
 
-use crate::gdt::{GlobalDescriptorTable, IstStack, TaskStateSegment};
+use crate::gdt::{GlobalDescriptorTable, TaskStateSegment};
+use crate::interrupt::x86_xapic::XAPIC;
+use crate::thread::SwitchDecision;
+use verified::trap::Registers;
 
 const NEW_CPU: Cpu = Cpu::new();
 
 /// Per-processor data.
 static mut CPUS: [Cpu; 16] = [NEW_CPU; 16];
 
-/// Offset of GS where the pointer to `Cpu` is stored.
-const GS_SELF_PTR_OFFSET: usize = 0;
-
 /// Offset of GS where the CPU ID is located.
 const GS_CPU_ID_OFFSET: usize = 8;
 
-/// Returns a handle to the current CPU's data structure.
-pub fn get_current() -> &'static mut Cpu {
-    let address: u64;
+/// Size of an IST stack.
+const IST_STACK_SIZE: usize = 1 * 1024 * 1024; // 1 MiB
 
-    unsafe {
-        asm!(
-            "mov rax, gs:[{gs_offset}]",
-            gs_offset = const GS_SELF_PTR_OFFSET,
-            lateout("rax") address,
-        );
-    }
-
-    let address = address as *mut Cpu;
-
-    unsafe { &mut *address }
+macro_rules! read_current_cpu_offset {
+    ($offset:expr) => {{
+        let value: u64;
+        unsafe {
+            asm!(
+                "mov {result}, gs:[{offset}]",
+                offset = const $offset,
+                result = out(reg) value,
+            );
+        }
+        value
+    }}
 }
+
+macro_rules! read_current_cpu_field {
+    ($field:ident) => {
+        read_current_cpu_offset!(memoffset::offset_of!($crate::cpu::Cpu, $field))
+    };
+}
+
+macro_rules! get_current_cpu_field_ptr {
+    ($field:ident, $type:ty) => {{
+        let mut address: u64 = memoffset::offset_of!($crate::cpu::Cpu, $field) as u64;
+        #[allow(unused_unsafe)] // nested unsafe
+        unsafe {
+            asm!(
+                "add {result}, gs:{self_offset}",
+                self_offset = const memoffset::offset_of!($crate::cpu::Cpu, self_ptr),
+                result = inout(reg) address => address,
+                options(pure, readonly),
+            );
+        }
+        address as *mut $type
+    }}
+}
+pub(crate) use get_current_cpu_field_ptr;
 
 /// Per-processor data for a CPU.
 #[repr(C, align(4096))]
 pub struct Cpu {
-    // WARNING: If you change the position of `self_ptr`, you must also
-    // change `GS_SELF_PTR_OFFSET` above!
-
-    // WARNING: If you change the position of `self_ptr`, you must also
-    // change `GS_SELF_PTR_OFFSET` above!
     /// A pointer to ourselves.
     ///
     /// We do a `mov rax, gs:[GS_SELF_PTR_OFFSET]` to get our own address.
     /// We also want to be able to easily access other fields directly.
     pub self_ptr: *const Cpu,
 
+    /// The CPU ID.
+    ///
+    /// Currently it's the logical APIC ID.
     pub id: usize,
+
+    /// The state of the parked thread.
+    pub parked: Registers,
 
     /// State for the xAPIC driver.
     pub xapic: MaybeUninit<XAPIC>,
+
+    /// The context switch decision upon exiting the kernel.
+    pub switch_decision: SwitchDecision,
 
     /// The Global Descriptor Table.
     ///
@@ -73,6 +99,32 @@ pub struct Cpu {
 
     /// The Interrupt Stacks.
     pub ist: [IstStack; 7],
+
+    pub syscall_stack: IstStack,
+
+    /// The stack pointer for syscalls.
+    ///
+    /// We do not support nested syscalls.
+    pub syscall_sp: u64,
+}
+
+/// A stack.
+#[repr(transparent)]
+pub struct Stack<const SZ: usize>([u8; SZ]);
+
+/// An IST stack.
+pub type IstStack = Stack<IST_STACK_SIZE>;
+
+impl<const SZ: usize> Stack<SZ> {
+    pub const fn new() -> Self {
+        Self([0u8; SZ])
+    }
+
+    pub fn bottom(&self) -> *const u8 {
+        unsafe {
+            (self.0.as_ptr() as *const u8).add(SZ)
+        }
+    }
 }
 
 unsafe impl Send for Cpu {}
@@ -83,7 +135,9 @@ impl Cpu {
         Self {
             self_ptr: ptr::null(),
             id: 0,
+            parked: Registers::zeroed(),
             xapic: MaybeUninit::uninit(),
+            switch_decision: SwitchDecision::NoSwitching,
             gdt: GlobalDescriptorTable::empty(),
             tss: TaskStateSegment::new(),
             ist: [
@@ -95,8 +149,21 @@ impl Cpu {
                 IstStack::new(),
                 IstStack::new(),
             ],
+            syscall_stack: IstStack::new(),
+            syscall_sp: 0,
         }
     }
+}
+
+/// Returns a handle to the current CPU's data structure.
+pub fn get_current() -> &'static mut Cpu {
+    let address = read_current_cpu_field!(self_ptr) as *mut Cpu;
+    unsafe { &mut *address }
+}
+
+/// Returns the current CPU ID.
+pub fn get_cpu_id() -> usize {
+    read_current_cpu_field!(id) as usize
 }
 
 /// Initialize the CPU-local data structure.
@@ -106,25 +173,11 @@ pub unsafe fn init_cpu(cpu_id: usize) {
     let mut cpu = &mut CPUS[cpu_id];
     let address = cpu as *const Cpu;
 
-    log::info!("CPU{} @ {:?}", cpu_id, address);
+    log::debug!("CPU{} @ {:?}", cpu_id, address);
 
-    let self_ptr_ptr = &mut cpu.self_ptr as *mut *const Cpu;
     cpu.self_ptr = address;
     cpu.id = cpu_id;
+    cpu.syscall_sp = cpu.syscall_stack.bottom() as u64;
 
     msr::wrmsr(msr::IA32_GS_BASE, address as u64);
-}
-
-pub fn get_cpu_id() -> usize {
-    let cpu_id;
-
-    unsafe {
-        asm!(
-            "mov {result}, gs:{offset}",
-            offset = const GS_CPU_ID_OFFSET,
-            result = out(reg) cpu_id,
-        );
-    }
-
-    cpu_id
 }

@@ -1,5 +1,6 @@
 //! Debugger integration.
 
+use core::hint::black_box;
 use core::mem::MaybeUninit;
 
 #[used]
@@ -10,11 +11,15 @@ static mut LOADED_BINARIES_LEN: usize = 0;
 
 const UNINIT_BINARY: MaybeUninit<LoadedBinary> = MaybeUninit::zeroed();
 
-#[no_mangle]
-fn on_binary_added() {}
+#[inline(never)]
+fn on_binary_added() {
+    black_box(());
+}
 
-#[no_mangle]
-pub fn on_ready() {}
+#[inline(never)]
+pub fn on_ready() {
+    black_box(());
+}
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)] // Read by GDB

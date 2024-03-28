@@ -18,7 +18,7 @@ use crate::kernel::*;
 
 impl Kernel {
 
-    pub fn syscall_receive_wait(&mut self, cpu_id:CPUID, pt_regs: PtRegs, endpoint_index: EndpointIdx, ipc_payload:IPCPayLoad) -> (ret: SyscallReturnStruct)
+    pub fn syscall_receive_wait(&mut self, cpu_id:CPUID, pt_regs: Registers, endpoint_index: EndpointIdx, ipc_payload:IPCPayLoad) -> (ret: SyscallReturnStruct)
         requires
             old(self).wf(),
         ensures

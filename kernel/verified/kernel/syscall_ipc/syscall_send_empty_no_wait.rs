@@ -53,17 +53,17 @@ pub closed spec fn syscall_send_empty_no_wait_spec(old:Kernel, new:Kernel, cpu_i
                     receiver_ipc_payload.pci_payload.is_some()
                     {
 
-                        new.cpu_list@[cpu_id as int].get_current_thread() == Some(receiver_ptr)
+                        new.cpu_list@ =~= old.cpu_list@
                         &&
                         new.proc_man.get_thread_ptrs() =~= old.proc_man.get_thread_ptrs()
                         &&
-                        new.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).state == SCHEDULED
+                        new.proc_man.get_thread(receiver_ptr).state == SCHEDULED
                     }else{
-                        new.cpu_list@[cpu_id as int].get_current_thread() == Some(receiver_ptr)
+                        new.cpu_list@ =~= old.cpu_list@
                         &&
                         new.proc_man.get_thread_ptrs() =~= old.proc_man.get_thread_ptrs()
                         &&
-                        new.proc_man.get_thread(old.cpu_list@[cpu_id as int].get_current_thread().unwrap()).state == SCHEDULED
+                        new.proc_man.get_thread(receiver_ptr).state == SCHEDULED
                     }
 
                 }
@@ -78,7 +78,7 @@ pub closed spec fn syscall_send_empty_no_wait_spec(old:Kernel, new:Kernel, cpu_i
 
 
 impl Kernel {
-    pub fn syscall_send_empty_no_wait(&mut self, cpu_id:CPUID, pt_regs: PtRegs, endpoint_index: EndpointIdx) -> (ret: SyscallReturnStruct)
+    pub fn syscall_send_empty_no_wait(&mut self, cpu_id:CPUID, endpoint_index: EndpointIdx) -> (ret: SyscallReturnStruct)
         requires
             old(self).wf(),
         ensures
@@ -87,11 +87,11 @@ impl Kernel {
     {
         let (default_pcid, default_cr3) = self.mmu_man.get_reserved_pcid_and_cr3();
         if cpu_id >= NUM_CPUS{
-            return SyscallReturnStruct::new(CPU_ID_INVALID,default_pcid,default_cr3,pt_regs);
+            return SyscallReturnStruct::new(CPU_ID_INVALID,default_pcid,default_cr3,0);
         }
 
         if self.cpu_list.get(cpu_id).get_is_idle() {
-            return SyscallReturnStruct::new(CPU_NO_IDLE,default_pcid,default_cr3,pt_regs);
+            return SyscallReturnStruct::new(CPU_NO_IDLE,default_pcid,default_cr3,0);
         }
 
         assert(self.cpu_list[cpu_id as int].get_is_idle() == false);
@@ -104,17 +104,17 @@ impl Kernel {
 
         let ipc_payload = IPCPayLoad::new_to_none();
         if endpoint_index >= MAX_NUM_ENDPOINT_DESCRIPTORS{
-            return SyscallReturnStruct::new(ENDPOINT_INDEX_INVALID,pcid,cr3,pt_regs);
+            return SyscallReturnStruct::new(ENDPOINT_INDEX_INVALID,pcid,cr3,current_thread_ptr);
         }
 
         let target_endpoint_ptr = self.proc_man.get_thread_endpoint_ptr_by_endpoint_idx(current_thread_ptr, endpoint_index);
         if target_endpoint_ptr == 0 {
-            return SyscallReturnStruct::new(SHARED_ENDPOINT_NOT_EXIST,pcid,cr3,pt_regs);
+            return SyscallReturnStruct::new(SHARED_ENDPOINT_NOT_EXIST,pcid,cr3,current_thread_ptr);
         }
 
         if self.proc_man.get_endpoint_state_by_endpoint_ptr(target_endpoint_ptr) == SEND {
             //sender queue
-            return SyscallReturnStruct::new(NO_RECEIVER,pcid,cr3,pt_regs);
+            return SyscallReturnStruct::new(NO_RECEIVER,pcid,cr3,current_thread_ptr);
         }
         else{
             //receiver queue
@@ -123,15 +123,15 @@ impl Kernel {
 
                 // self.proc_man.proc_man_set_endpoint_queue_state_by_endpoint_ptr(target_endpoint_ptr, SEND);
                 // assert(self.wf());
-                return SyscallReturnStruct::new(NO_RECEIVER,pcid,cr3,pt_regs);
+                return SyscallReturnStruct::new(NO_RECEIVER,pcid,cr3,current_thread_ptr);
 
             }
                 // pop the receiver.
                 if self.proc_man.scheduler.len() == MAX_NUM_THREADS {
-                    return SyscallReturnStruct::new(SCHEDULER_NO_SPACE,pcid,cr3,pt_regs);
+                    return SyscallReturnStruct::new(SCHEDULER_NO_SPACE,pcid,cr3,current_thread_ptr);
                 }
 
-                let (new_thread_ptr,new_pt_regs) = self.proc_man.pop_endpoint_to_running(current_thread_ptr, endpoint_index);
+                let new_thread_ptr = self.proc_man.get_head_of_endpoint_by_endpoint_ptr(target_endpoint_ptr);
 
                 let sender_ipc_payload = ipc_payload;
                 let receiver_ipc_payload = self.proc_man.get_ipc_payload_by_thread_ptr(new_thread_ptr);
@@ -152,15 +152,11 @@ impl Kernel {
                     receiver_ipc_payload.endpoint_payload.is_some() ||
                     receiver_ipc_payload.pci_payload.is_some()
                 {
-                    self.proc_man.push_scheduler(current_thread_ptr, Some(IPC_TYPE_NOT_MATCH),pt_regs);
-                    self.cpu_list.set_current_thread(cpu_id,Some(new_thread_ptr));
-
-                    return SyscallReturnStruct::new(IPC_TYPE_NOT_MATCH,new_pcid,new_cr3,new_pt_regs);
+                    self.proc_man.pop_endpoint_to_scheduler(current_thread_ptr,endpoint_index,Some(IPC_TYPE_NOT_MATCH));
+                    return SyscallReturnStruct::new(IPC_TYPE_NOT_MATCH,pcid,cr3,current_thread_ptr);
                 }else{
-                    self.proc_man.push_scheduler(current_thread_ptr, Some(SUCCESS),pt_regs);
-                    self.cpu_list.set_current_thread(cpu_id,Some(new_thread_ptr));
-
-                    return SyscallReturnStruct::new(SUCCESS,new_pcid,new_cr3,new_pt_regs);
+                    self.proc_man.pop_endpoint_to_scheduler(current_thread_ptr,endpoint_index,Some(SUCCESS));
+                    return SyscallReturnStruct::new(SUCCESS,pcid,cr3,current_thread_ptr);
                 }
 
 

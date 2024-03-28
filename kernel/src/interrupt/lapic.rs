@@ -3,12 +3,14 @@
 //! We just use the xAPIC implementation in the x86 crate.
 
 use core::arch::asm;
+use core::mem::MaybeUninit;
 use core::slice;
 
-use x86::apic::xapic::XAPIC;
+use super::x86_xapic::XAPIC;
 use x86::apic::{ApicControl, ApicId};
 use x86::msr;
 
+use super::Cycles;
 use crate::boot::ap_start::StartTrampoline;
 use crate::{boot, cpu};
 
@@ -25,18 +27,39 @@ pub unsafe fn init() {
     let cpu = cpu::get_current();
 
     let apic_region = probe_apic();
-    log::info!("APIC region: {:?}", apic_region as *mut _ as *mut u8);
+    log::debug!("APIC base: {:?}", apic_region as *mut _ as *mut u8);
 
     let mut xapic = XAPIC::new(apic_region);
     xapic.attach();
+    xapic.tsc_enable(32);
 
     cpu.xapic.write(xapic);
 }
 
+/// Arms the timer interrupt.
+pub fn set_timer(cycles: Cycles) {
+    let xapic = unsafe {
+        (&mut *crate::cpu::get_current_cpu_field_ptr!(xapic, MaybeUninit<XAPIC>)).assume_init_mut()
+    };
+
+    // FIXME: Truncated
+    xapic.tsc_set_oneshot(cycles.0 as u32);
+}
+
+/// Acknowledges an interrupt.
+pub fn end_of_interrupt() {
+    let xapic = unsafe {
+        (&mut *crate::cpu::get_current_cpu_field_ptr!(xapic, MaybeUninit<XAPIC>)).assume_init_mut()
+    };
+
+    xapic.eoi();
+}
+
 /// Boots an application processor.
 pub unsafe fn boot_ap(cpu_id: u32, stack: u64, code: u64) {
-    let cpu = cpu::get_current();
-    let xapic = cpu.xapic.assume_init_mut();
+    let xapic = unsafe {
+        (&mut *crate::cpu::get_current_cpu_field_ptr!(xapic, MaybeUninit<XAPIC>)).assume_init_mut()
+    };
 
     let start_page = StartTrampoline::new(0x7000)
         .unwrap()
