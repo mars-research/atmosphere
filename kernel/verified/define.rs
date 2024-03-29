@@ -30,7 +30,7 @@ impl SyscallReturnStruct{
 }
 
 pub type ErrorCodeType = usize;
-
+pub type DynArrayPtr = usize;
 // NO_ERROR_CODE is used for timer interrupt or an ipc syscall when the current thread gives up the cpu and
 // scheduler picks a next thread to run. We do not need to return a syscall error code for a thread coming
 // from the scheduler.
