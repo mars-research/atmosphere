@@ -42,6 +42,7 @@ mod gdt;
 mod interrupt;
 mod kernel;
 mod logging;
+mod pci;
 mod ring_buffer;
 mod scripts;
 mod syscalls;
@@ -54,6 +55,8 @@ use core::{ffi::c_void, panic::PanicInfo};
 
 use astd::boot::{BootInfo, PhysicalMemoryType};
 use x86::Ring;
+
+use crate::pci::scan_pci_devs;
 
 static mut SHUTDOWN_ON_PANIC: bool = false;
 
@@ -105,6 +108,8 @@ fn main(boot_info: *const BootInfo) -> isize {
 
     //kernel::kernel_test();
     kernel::kernel_new();
+
+    pci::scan_pci_devs();
 
     log::info!("Command line: {}", boot::get_raw_command_line());
     #[cfg(debug_assertions)]

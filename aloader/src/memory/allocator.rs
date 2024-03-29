@@ -21,6 +21,7 @@ pub static mut BOOTSTRAP_ALLOCATOR: BumpAllocator = BumpAllocator {
     watermark: AtomicUsize::new(0),
 };
 
+#[global_allocator]
 pub static mut ALLOCATOR: BumpAllocator = BumpAllocator {
     base: 0 as *mut u8,
     size: 0,
