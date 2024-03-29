@@ -12,10 +12,8 @@
 )]
 #![deny(clippy::from_over_into, clippy::needless_question_mark)]
 #![deny(rustdoc::bare_urls, rustdoc::broken_intra_doc_links)]
-#![cfg_attr(
-    not(debug_assertions),
-    deny(dead_code, unused_imports, unused_mut, unused_variables)
-)]
+
+extern crate alloc;
 
 pub mod boot;
 pub mod console;
@@ -24,6 +22,7 @@ pub mod elf;
 pub mod logging;
 pub mod memory;
 
+use alloc::format;
 use core::arch::asm;
 use core::slice;
 
@@ -37,6 +36,8 @@ use elf::ElfHandle;
 use memory::{
     AddressSpace, BootMemoryType, PhysicalAllocator, UserspaceMapper, HUGE_PAGE_SIZE, PAGE_SIZE,
 };
+
+pub use log::info as println;
 
 const KERNEL_RESERVATION: usize = 1024 * 1024 * 1024; // 1 GiB
 const DOM0_RESERVATION: usize = 256 * 1024 * 1024; // 256 MiB

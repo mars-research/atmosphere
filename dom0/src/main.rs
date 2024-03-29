@@ -122,9 +122,11 @@ fn main() -> isize {
     // test_null_syscall();
 
     log::info!("Scanning pci devs");
+
     scan_pci_devs();
 
     log::info!("Done Scanning");
+
     loop {}
 
     let mut nvme_dev = unsafe {
