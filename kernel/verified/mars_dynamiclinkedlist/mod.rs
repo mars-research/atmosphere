@@ -1,8 +1,7 @@
 use vstd::prelude::*;
 verus! {
-use core::mem::MaybeUninit;
-
 use vstd::seq_lib::*;
+use vstd::set_lib::*;
 use crate::page_alloc::*;
 use vstd::ptr::*;
 use crate::define::*;
@@ -11,6 +10,16 @@ pub mod dyn_array_util;
 pub use dyn_array_util::*;
 
 pub const DYN_ARRAY_LEN:usize = 128;
+
+#[verifier(external_body)]
+pub proof fn usize_dyn_index_lemma()
+    ensures
+        forall|u:usize| #![auto] dyn_index_to_usize(&usize_to_dyn_index(u)) == u,
+        forall|u:usize,v:usize| #![auto] v != u ==> usize_to_dyn_index(u) =~= usize_to_dyn_index(v) == false,
+        forall|i:DynIndex| #![auto] usize_to_dyn_index(dyn_index_to_usize(&i)) == i,
+        forall|i:DynIndex,j:DynIndex| #![auto] i =~= j == false ==> dyn_index_to_usize(&i) != dyn_index_to_usize(&j),
+{
+}
 
 pub open spec fn spec_dyn_index_valid(i:usize) -> bool{
     0<=i<DYN_ARRAY_LEN
@@ -60,6 +69,16 @@ pub fn dyn_index_to_usize(u:&DynIndex) -> (ret:usize)
         ret == spec_dyn_index_to_usize(u),
 {
     u.ptr | u.index
+}
+
+pub fn dyn_ptr_index_to_usize(ptr: usize, index: usize) -> (ret:usize) 
+    requires 
+        page_ptr_valid(ptr),
+        dyn_index_valid(index),
+    ensures
+        ret == spec_dyn_index_to_usize(&DynIndex{ptr:ptr, index:index}),
+{
+    ptr | index
 }
 
 pub open spec fn spec_dyn_node_to_dny_resolve(node :&DynNode) -> DynNodeResolve
@@ -120,8 +139,6 @@ impl DynArray{
         self.value_set@.finite()
         &&
         self.free_set@.disjoint(self.value_set@)
-        &&
-        (self.free_set@ + self.value_set@).len() == DYN_ARRAY_LEN
         &&
         self.free_set@ + self.value_set@ =~= Set::new(|index: usize| {
             0<=index<DYN_ARRAY_LEN
@@ -274,6 +291,7 @@ impl DynLinkedlist{
         }
     }
 
+    #[verifier(inline)]
     pub open spec fn get_node_by_dyn_index(&self, dyn_index: DynIndex) -> DynNodeResolve
         recommends
             page_ptr_valid(dyn_index.ptr),
@@ -303,6 +321,18 @@ impl DynLinkedlist{
         self.len == self.value_list@.len()
         &&
         forall|i:int| #![auto] 0 <= i < self.value_list@.len() ==> self.free_list@.contains(self.value_list@[i]) == false 
+        &&
+        (
+            self.value_list@.len() != 0 ==> (
+                (self.array_ptrs@.contains(self.value_head.ptr))
+                &&
+                (dyn_index_valid(self.value_head.index))
+                &&
+                (self.array_ptrs@.contains(self.value_tail.ptr))
+                &&
+                (dyn_index_valid(self.value_tail.index))
+            )
+        )
     }
 
     pub open spec fn free_list_wf(&self) -> bool{
@@ -318,13 +348,25 @@ impl DynLinkedlist{
         &&
         (forall|i: int, j:int|  #![auto] i != j && 0 <= i < self.free_list@.len() && 0 <= j < self.free_list@.len() ==> (self.free_list@[i as int] =~= self.free_list@[j as int]) == false)
         &&
-        self.wf_free_head()
+        (self.wf_free_head())
         &&
-        self.wf_free_tail()
+        (self.wf_free_tail())
         &&
-        self.size - self.len == self.free_list@.len()
+        (self.size - self.len == self.free_list@.len())
         &&
-        forall|i:int| #![auto] 0 <= i < self.free_list@.len() ==> self.value_list@.contains(self.free_list@[i]) == false
+        (forall|i:int| #![auto] 0 <= i < self.free_list@.len() ==> self.value_list@.contains(self.free_list@[i]) == false)
+        &&
+        (
+            self.free_list@.len() != 0 ==> (
+                (self.array_ptrs@.contains(self.free_head.ptr))
+                &&
+                (dyn_index_valid(self.free_head.index))
+                &&
+                (self.array_ptrs@.contains(self.free_tail.ptr))
+                &&
+                (dyn_index_valid(self.free_tail.index))
+            )
+        )
     }
 
     pub open spec fn array_perms_wf(&self) -> bool{
@@ -359,6 +401,14 @@ impl DynLinkedlist{
         )
     }
 
+    pub open spec fn spec_seq_wf(&self) -> bool{
+        self.spec_seq@.len() == self.len()
+        &&
+        (forall|i: int| #![auto] 0 <= i < self.len() ==> self.spec_seq@[i] =~= self.get_node_by_dyn_index(self.value_list@[i]).value)
+        &&
+        (forall|i: int, j:int|  #![auto] i != j && 0 <= i < self.len() && 0 <= j < self.len() ==> (self.spec_seq@[i as int] =~= self.spec_seq@[j as int]) == false)
+    }
+
     pub fn grow(&mut self, new_array_ptr:usize, new_array_perm: Tracked<PointsTo<DynArray>>)
         requires
             new_array_ptr != 0,
@@ -374,6 +424,11 @@ impl DynLinkedlist{
             new_array_perm@@.value.get_Some_0().free_set@.is_empty(),
             new_array_perm@@.value.get_Some_0().value_set@.is_empty(),
             new_array_perm@@.value.get_Some_0().free_count == 0,
+        ensures
+            self.wf(),
+            self.spec_seq =~= old(self).spec_seq,
+            self.size == old(self).size + DYN_ARRAY_LEN,
+            self.len == old(self).len,
     {
         proof{
             self.array_ptrs@ = self.array_ptrs@.insert(new_array_ptr);
@@ -387,9 +442,14 @@ impl DynLinkedlist{
             assert(forall|i: int| #![auto] 0 <= i < self.value_list@.len() ==> old(self).prev_value_node_of(i) == self.prev_value_node_of(i));
         }
 
+        assert(forall|i:usize|#![auto] 0 <= i < DYN_ARRAY_LEN ==> self.value_list@.contains(DynIndex{ptr:new_array_ptr, index: i}) == false);
+        assert(forall|i:usize|#![auto] 0 <= i < DYN_ARRAY_LEN ==> self.free_list@.contains(DynIndex{ptr:new_array_ptr, index: i}) == false);
+
         let mut i = 0;
         while i != DYN_ARRAY_LEN
             invariant
+                0 <= i <= DYN_ARRAY_LEN,
+                self.len == old(self).len,
                 self.array_ptrs@.len() == old(self).array_ptrs@.len() + 1,
                 self.array_ptrs@ == old(self).array_ptrs@.insert(new_array_ptr),
                 self.array_ptrs@.contains(new_array_ptr),
@@ -397,21 +457,213 @@ impl DynLinkedlist{
                 self.array_perms@[new_array_ptr]@.value.get_Some_0().free_set@.finite(),
                 self.array_perms@[new_array_ptr]@.value.get_Some_0().value_set@.finite(),
                 self.array_perms@[new_array_ptr]@.value.get_Some_0().value_set@.is_empty(),
+                self.array_perms@[new_array_ptr]@.value.get_Some_0().value_set@.disjoint(self.array_perms@[new_array_ptr]@.value.get_Some_0().free_set@),
+                self.array_perms@[new_array_ptr]@.value.get_Some_0().free_set@.len() == i,
                 self.array_perms@[new_array_ptr]@.value.get_Some_0().free_set@ =~= Set::new(|index: usize| { 0<=index<i}),
                 self.array_perms@[new_array_ptr]@.value.get_Some_0().free_count == self.array_perms@[new_array_ptr]@.value.get_Some_0().free_set@.len(),
                 self.value_list_wf(),
                 self.free_list_wf(),
                 self.array_sets_wf(),
+                self.spec_seq_wf(),
+                self.value_list =~= old(self).value_list,
+                self.spec_seq =~= old(self).spec_seq,
                 self.array_ptrs@.finite(),
                 self.array_ptrs@.contains(0) == false,
                 self.array_ptrs@ =~= self.array_perms@.dom(),
-                self.size == old(self).array_ptrs@.len() * DYN_ARRAY_LEN + i,
+                old(self).size < usize::MAX - DYN_ARRAY_LEN,
+                self.size == old(self).size + i,
+                self.size == (self.array_ptrs@.len() - 1) * DYN_ARRAY_LEN + i,
+                self.array_ptrs@.finite(),
+                self.array_ptrs@.contains(0) == false,
+                self.array_ptrs@ =~= self.array_perms@.dom(),
                 (forall|array_ptr:DynArrayPtr| #![auto] self.array_ptrs@.contains(array_ptr) ==> page_ptr_valid(array_ptr)),
                 (forall|array_ptr:DynArrayPtr| #![auto] self.array_perms@.dom().contains(array_ptr) ==> self.array_perms@[array_ptr]@.pptr == array_ptr),
                 (forall|array_ptr:DynArrayPtr| #![auto] self.array_perms@.dom().contains(array_ptr) ==> self.array_perms@[array_ptr]@.value.is_Some()),
                 (forall|array_ptr:DynArrayPtr| #![auto] self.array_perms@.dom().contains(array_ptr) && array_ptr != new_array_ptr ==> self.array_perms@[array_ptr]@.value.get_Some_0().wf()),
+                (forall|j:usize|#![auto] 0 <= j < DYN_ARRAY_LEN ==> self.value_list@.contains(DynIndex{ptr:new_array_ptr, index: j}) == false),
+                (forall|j:usize|#![auto] i <= j < DYN_ARRAY_LEN ==> self.free_list@.contains(DynIndex{ptr:new_array_ptr, index: j}) == false),
+            ensures
+                i == DYN_ARRAY_LEN,
+                self.array_sets_wf(),
+                self.free_list_wf(),
+                self.value_list_wf(),
+                self.spec_seq_wf(),
+                self.array_perms@[new_array_ptr]@.value.get_Some_0().value_set@.is_empty(),
+                self.array_perms@[new_array_ptr]@.value.get_Some_0().free_set@.len() == DYN_ARRAY_LEN,
+                self.array_perms@[new_array_ptr]@.value.get_Some_0().free_set@ =~= Set::new(|index: usize| { 0<=index<DYN_ARRAY_LEN}),
+                self.array_perms@[new_array_ptr]@.value.get_Some_0().seq@.len() == DYN_ARRAY_LEN,
+                self.array_perms@[new_array_ptr]@.value.get_Some_0().free_set@.finite(),
+                self.array_perms@[new_array_ptr]@.value.get_Some_0().value_set@.finite(),
+                self.array_perms@[new_array_ptr]@.value.get_Some_0().free_set@.disjoint(self.array_perms@[new_array_ptr]@.value.get_Some_0().value_set@),
+                self.array_perms@[new_array_ptr]@.value.get_Some_0().free_set@ + self.array_perms@[new_array_ptr]@.value.get_Some_0().value_set@ =~= Set::new(|index: usize| {0<=index<DYN_ARRAY_LEN}),
+                self.array_perms@[new_array_ptr]@.value.get_Some_0().free_count == self.array_perms@[new_array_ptr]@.value.get_Some_0().free_set@.len(),
+                self.array_perms@[new_array_ptr]@.value.get_Some_0().wf(),
+                (forall|array_ptr:DynArrayPtr| #![auto] self.array_perms@.dom().contains(array_ptr) ==> self.array_perms@[array_ptr]@.value.get_Some_0().wf()),
+                self.array_perms_wf(),
+                self.wf(),
+                self.spec_seq =~= old(self).spec_seq,
+                self.size == old(self).size + DYN_ARRAY_LEN,
+                self.len == old(self).len,
         {
+            // let old_free_list = Ghost(self.free_list@);
+            let old_self = Ghost(*self);
+            proof{
+                lemma_seq_properties::<DynIndex>();
+                lemma_set_properties::<DynIndex>();
+                usize_dyn_index_lemma();
+            }
+            if self.size == self.len(){
+                assert(self.free_list@.len() == 0);
+                self.free_tail.ptr = new_array_ptr;
+                self.free_tail.index = i;
+                self.free_head.ptr = new_array_ptr;
+                self.free_head.index = i;
+
+                let mut new_array_perm =
+                    Tracked((self.array_perms.borrow_mut()).tracked_remove(new_array_ptr));
+                dyn_array_set_next(&PPtr::<DynArray>::from_usize(new_array_ptr), &mut new_array_perm, 0, 0,i);
+                dyn_array_set_prev(&PPtr::<DynArray>::from_usize(new_array_ptr), &mut new_array_perm, 0,0,i);
+                dyn_array_push_free(&PPtr::<DynArray>::from_usize(new_array_ptr), &mut new_array_perm, i);
+                proof{
+                    (self.array_perms.borrow_mut())
+                        .tracked_insert(new_array_ptr, new_array_perm.get());
+                }
+                proof{
+                    self.free_list@ = self.free_list@.push(DynIndex{ptr:new_array_ptr, index: i});
+                }
+    
+                self.size = self.size + 1;
+    
+                i = i + 1;
+
+                assert(forall|array_ptr:DynArrayPtr| #![auto] old_self@.array_perms@.dom().contains(array_ptr) && array_ptr != new_array_ptr ==> old_self@.array_perms@[array_ptr]@.value.get_Some_0().free_set =~= self.array_perms@[array_ptr]@.value.get_Some_0().free_set);
+                assert(forall|index:usize| #![auto] old_self@.array_perms@[new_array_ptr]@.value.get_Some_0().free_set@.contains(index) ==> self.array_perms@[new_array_ptr]@.value.get_Some_0().free_set@.contains(index));
+                assert(forall|array_ptr:DynArrayPtr, index:usize| #![auto] self.array_perms@.dom().contains(array_ptr) && self.array_perms@[array_ptr]@.value.get_Some_0().free_set@.contains(index) && array_ptr != new_array_ptr ==> (old_self@.array_perms@.dom().contains(array_ptr) && old_self@.array_perms@[array_ptr]@.value.get_Some_0().free_set@.contains(index)));
+                assert(forall|array_ptr:DynArrayPtr, index:usize| #![auto] old_self@.free_list@.contains(DynIndex{ptr:array_ptr,index:index}) ==> self.free_list@.contains(DynIndex{ptr:array_ptr,index:index}));
+                assert(forall|array_ptr:DynArrayPtr, index:usize| #![auto] self.array_perms@.dom().contains(array_ptr) && self.array_perms@[array_ptr]@.value.get_Some_0().free_set@.contains(index) && array_ptr != new_array_ptr ==> self.free_list@.contains(DynIndex{ptr:array_ptr,index:index}));
+                assert(forall|array_ptr:DynArrayPtr, index:usize| #![auto] self.array_perms@.dom().contains(array_ptr) && self.array_perms@[array_ptr]@.value.get_Some_0().free_set@.contains(index) ==> self.free_list@.contains(DynIndex{ptr:array_ptr,index:index}));
+                assert(forall|array_ptr:DynArrayPtr, index:usize| #![auto] self.array_perms@.dom().contains(array_ptr) && self.array_perms@[array_ptr]@.value.get_Some_0().value_set@.contains(index) ==> self.value_list@.contains(DynIndex{ptr:array_ptr,index:index}));
+
+                assert(forall|i: int| #![auto] 0 <= i < self.value_list@.len() ==> page_ptr_valid(self.value_list@[i as int].ptr));
+                assert(forall|i: int| #![auto] 0 <= i < self.value_list@.len() ==> self.array_ptrs@.contains(self.value_list@[i as int].ptr));
+                assert(forall|i: int| #![auto] 0 <= i < self.value_list@.len() ==> dyn_index_valid(self.value_list@[i as int].index));
+                assert(forall|i: int| #![auto] 0 <= i < self.value_list@.len() ==> self.get_node_by_dyn_index(self.value_list@[i as int]) =~= old_self@.get_node_by_dyn_index(self.value_list@[i as int]));
+                assert(forall|i: int| #![auto] 0 <= i < self.value_list@.len() ==> self.next_value_node_of(i) =~= old_self@.next_value_node_of(i));
+                assert(forall|i: int| #![auto] 0 <= i < self.value_list@.len() ==> self.prev_value_node_of(i) =~= old_self@.prev_value_node_of(i));
+                assert(forall|i: int| #![auto] 0 <= i < self.value_list@.len() ==> self.get_node_by_dyn_index(self.value_list@[i as int]).next == self.next_value_node_of(i));
+                assert(forall|i: int| #![auto] 0 <= i < self.value_list@.len() ==> self.get_node_by_dyn_index(self.value_list@[i as int]).prev == self.prev_value_node_of(i));
+                assert(forall|i: int, j:int| #![auto] i != j && 0 <= i < self.value_list@.len() && 0 <= j < self.value_list@.len() ==> (self.value_list@[i as int] =~= self.value_list@[j as int]) == false);
+                assert(self.wf_value_head());
+                assert(self.wf_value_tail());
+                assert(self.len == self.value_list@.len());
+                assert(forall|i:int| #![auto] 0 <= i < self.value_list@.len() ==> self.free_list@.contains(self.value_list@[i]) == false);
+
+                assert(forall|i: int| #![auto] 0 <= i < self.free_list@.len() ==> page_ptr_valid(self.free_list@[i as int].ptr));
+                assert(forall|i: int| #![auto] 0 <= i < self.free_list@.len() ==> self.array_ptrs@.contains(self.free_list@[i as int].ptr));
+                assert(forall|i: int| #![auto] 0 <= i < self.free_list@.len() ==> dyn_index_valid(self.free_list@[i as int].index));
+                assert(forall|i: int| #![auto] 0 <= i < self.free_list@.len() ==> self.get_node_by_dyn_index(self.free_list@[i as int]).next == self.next_free_node_of(i));
+                assert(forall|i: int| #![auto] 0 <= i < self.free_list@.len() ==> self.get_node_by_dyn_index(self.free_list@[i as int]).prev == self.prev_free_node_of(i));
+                assert(forall|i: int, j:int|  #![auto] i != j && 0 <= i < self.free_list@.len() && 0 <= j < self.free_list@.len() ==> (self.free_list@[i as int] =~= self.free_list@[j as int]) == false);
+                assert(self.wf_free_head());
+                assert(self.wf_free_tail());
+                assert(self.size - self.len == self.free_list@.len());
+                assert(forall|i:int| #![auto] 0 <= i < self.free_list@.len() ==> self.value_list@.contains(self.free_list@[i]) == false);
+                assert(self.free_list@.len() != 0 ==> ((self.array_ptrs@.contains(self.free_head.ptr))&&(dyn_index_valid(self.free_head.index))&&(self.array_ptrs@.contains(self.free_tail.ptr))&&(dyn_index_valid(self.free_tail.index))));
+            }else{
+                let free_tail_ptr = self.free_tail.ptr;
+                let free_tail_index = self.free_tail.index;
+
+                assert(self.value_list@.contains(self.free_tail) == false);
+                assert(self.value_list@.contains(DynIndex{ptr:new_array_ptr,index:i}) == false);
+                assert(self.free_list@[self.free_list@.len() - 1] =~= DynIndex{ptr:free_tail_ptr,index:free_tail_index});
+    
+                assert(self.array_ptrs@.contains(free_tail_ptr));
+                assert(self.array_perms@.dom().contains(free_tail_ptr));
+                let mut free_tail_array_perm =
+                    Tracked((self.array_perms.borrow_mut()).tracked_remove(free_tail_ptr));
+                assert(free_tail_array_perm@@.value.is_Some());
+                dyn_array_set_next(&PPtr::<DynArray>::from_usize(free_tail_ptr), &mut free_tail_array_perm, new_array_ptr,i,free_tail_index );
+                proof{
+                    (self.array_perms.borrow_mut())
+                        .tracked_insert(free_tail_ptr, free_tail_array_perm.get());
+                }
+    
+                let mut new_array_perm =
+                    Tracked((self.array_perms.borrow_mut()).tracked_remove(new_array_ptr));
+                dyn_array_set_next(&PPtr::<DynArray>::from_usize(new_array_ptr), &mut new_array_perm, 0, 0,i);
+                dyn_array_set_prev(&PPtr::<DynArray>::from_usize(new_array_ptr), &mut new_array_perm, free_tail_ptr,free_tail_index,i);
+                dyn_array_push_free(&PPtr::<DynArray>::from_usize(new_array_ptr), &mut new_array_perm, i);
+                proof{
+                    (self.array_perms.borrow_mut())
+                        .tracked_insert(new_array_ptr, new_array_perm.get());
+                }
+    
+                self.free_tail.ptr = new_array_ptr;
+                self.free_tail.index = i;
+
+                proof{
+                    self.free_list@ = self.free_list@.push(DynIndex{ptr:new_array_ptr, index: i});
+                }
+    
+                self.size = self.size + 1;
+    
+                i = i + 1;
+
+                assert(forall|i: int| #![auto] 0 <= i < self.free_list@.len() ==> self.array_perms@[self.free_list@[i].ptr]@.value.get_Some_0().free_set@.contains(self.free_list@[i].index));
+                assert(forall|i: int| #![auto] 0 <= i < self.value_list@.len() ==> self.array_perms@[self.value_list@[i].ptr]@.value.get_Some_0().value_set@.contains(self.value_list@[i].index));
+                assert(old_self@.free_list@ =~= self.free_list@.subrange(0, self.free_list@.len() - 1));
+                // assert(forall|array_ptr:DynArrayPtr, index:usize| #![auto] old_self@.array_perms@.dom().contains(array_ptr) && old_self@.array_perms@[array_ptr]@.value.get_Some_0().free_set@.contains(index) ==> 
+                //     old_self@.free_list@.contains(DynIndex{ptr:array_ptr,index:index})
+                // );
+                assert(old_self@.array_perms@.dom() =~= self.array_perms@.dom());
+
+                assert(forall|array_ptr:DynArrayPtr| #![auto] old_self@.array_perms@.dom().contains(array_ptr) && array_ptr != new_array_ptr ==> old_self@.array_perms@[array_ptr]@.value.get_Some_0().free_set =~= self.array_perms@[array_ptr]@.value.get_Some_0().free_set);
+                assert(forall|index:usize| #![auto] old_self@.array_perms@[new_array_ptr]@.value.get_Some_0().free_set@.contains(index) ==> self.array_perms@[new_array_ptr]@.value.get_Some_0().free_set@.contains(index));
+                assert(forall|array_ptr:DynArrayPtr, index:usize| #![auto] self.array_perms@.dom().contains(array_ptr) && self.array_perms@[array_ptr]@.value.get_Some_0().free_set@.contains(index) && array_ptr != new_array_ptr ==> (old_self@.array_perms@.dom().contains(array_ptr) && old_self@.array_perms@[array_ptr]@.value.get_Some_0().free_set@.contains(index)));
+                assert(forall|array_ptr:DynArrayPtr, index:usize| #![auto] old_self@.free_list@.contains(DynIndex{ptr:array_ptr,index:index}) ==> self.free_list@.contains(DynIndex{ptr:array_ptr,index:index}));
+                assert(forall|array_ptr:DynArrayPtr, index:usize| #![auto] self.array_perms@.dom().contains(array_ptr) && self.array_perms@[array_ptr]@.value.get_Some_0().free_set@.contains(index) && array_ptr != new_array_ptr ==> self.free_list@.contains(DynIndex{ptr:array_ptr,index:index}));
+                assert(forall|array_ptr:DynArrayPtr, index:usize| #![auto] self.array_perms@.dom().contains(array_ptr) && self.array_perms@[array_ptr]@.value.get_Some_0().free_set@.contains(index) ==> self.free_list@.contains(DynIndex{ptr:array_ptr,index:index}));
+                assert(forall|array_ptr:DynArrayPtr, index:usize| #![auto] self.array_perms@.dom().contains(array_ptr) && self.array_perms@[array_ptr]@.value.get_Some_0().value_set@.contains(index) ==> self.value_list@.contains(DynIndex{ptr:array_ptr,index:index}));
+
+                assert(forall|i: int| #![auto] 0 <= i < self.value_list@.len() ==> page_ptr_valid(self.value_list@[i as int].ptr));
+                assert(forall|i: int| #![auto] 0 <= i < self.value_list@.len() ==> self.array_ptrs@.contains(self.value_list@[i as int].ptr));
+                assert(forall|i: int| #![auto] 0 <= i < self.value_list@.len() ==> dyn_index_valid(self.value_list@[i as int].index));
+                assert(forall|i: int| #![auto] 0 <= i < self.value_list@.len() ==> self.get_node_by_dyn_index(self.value_list@[i as int]) =~= old_self@.get_node_by_dyn_index(self.value_list@[i as int]));
+                assert(forall|i: int| #![auto] 0 <= i < self.value_list@.len() ==> self.next_value_node_of(i) =~= old_self@.next_value_node_of(i));
+                assert(forall|i: int| #![auto] 0 <= i < self.value_list@.len() ==> self.prev_value_node_of(i) =~= old_self@.prev_value_node_of(i));
+                assert(forall|i: int| #![auto] 0 <= i < self.value_list@.len() ==> self.get_node_by_dyn_index(self.value_list@[i as int]).next == self.next_value_node_of(i));
+                assert(forall|i: int| #![auto] 0 <= i < self.value_list@.len() ==> self.get_node_by_dyn_index(self.value_list@[i as int]).prev == self.prev_value_node_of(i));
+                assert(forall|i: int, j:int| #![auto] i != j && 0 <= i < self.value_list@.len() && 0 <= j < self.value_list@.len() ==> (self.value_list@[i as int] =~= self.value_list@[j as int]) == false);
+                assert(self.wf_value_head());
+                assert(self.wf_value_tail());
+                assert(self.len == self.value_list@.len());
+                assert(forall|i:int| #![auto] 0 <= i < self.value_list@.len() ==> self.free_list@.contains(self.value_list@[i]) == false);
+
+                assert(forall|i: int| #![auto] 0 <= i < self.free_list@.len() ==> page_ptr_valid(self.free_list@[i as int].ptr));
+                assert(forall|i: int| #![auto] 0 <= i < self.free_list@.len() ==> self.array_ptrs@.contains(self.free_list@[i as int].ptr));
+                assert(forall|i: int| #![auto] 0 <= i < self.free_list@.len() ==> dyn_index_valid(self.free_list@[i as int].index));
+                assert(forall|i: int| #![auto] 0 <= i < self.free_list@.len() - 2 ==> self.get_node_by_dyn_index(self.free_list@[i as int]).next == old_self@.get_node_by_dyn_index(self.free_list@[i as int]).next);
+                assert(forall|i: int| #![auto] 0 <= i < self.free_list@.len() - 2 ==> self.next_free_node_of(i) == old_self@.next_free_node_of(i));
+                assert(forall|i: int| #![auto] 0 <= i < self.free_list@.len() - 2 ==> self.get_node_by_dyn_index(self.free_list@[i as int]).next == self.next_free_node_of(i));
+                assert(self.get_node_by_dyn_index(self.free_list@[self.free_list@.len() - 2 as int]).next == DynIndex{ptr:new_array_ptr, index: (i - 1usize) as usize});
+                assert(self.next_free_node_of(self.free_list@.len() - 2) == DynIndex{ptr:new_array_ptr, index: (i - 1usize) as usize});
+                assert(forall|i: int| #![auto] 0 <= i < self.free_list@.len() ==> self.get_node_by_dyn_index(self.free_list@[i as int]).next == self.next_free_node_of(i));
+
+                assert(forall|i: int| #![auto] 0 <= i < self.free_list@.len() - 1 ==> self.get_node_by_dyn_index(self.free_list@[i as int]).prev == old_self@.get_node_by_dyn_index(self.free_list@[i as int]).prev);
+                assert(forall|i: int| #![auto] 0 <= i < self.free_list@.len() - 1 ==> self.prev_free_node_of(i) == old_self@.prev_free_node_of(i));
+                assert(forall|i: int| #![auto] 0 <= i < self.free_list@.len() ==> self.get_node_by_dyn_index(self.free_list@[i as int]).prev == self.prev_free_node_of(i));
+                assert(forall|i: int, j:int|  #![auto] i != j && 0 <= i < self.free_list@.len() && 0 <= j < self.free_list@.len() ==> (self.free_list@[i as int] =~= self.free_list@[j as int]) == false);
+                assert(self.wf_free_head());
+                assert(self.wf_free_tail());
+                assert(self.size - self.len == self.free_list@.len());
+                assert(forall|i:int| #![auto] 0 <= i < self.free_list@.len() ==> self.value_list@.contains(self.free_list@[i]) == false);
+                assert(self.free_list@.len() != 0 ==> ((self.array_ptrs@.contains(self.free_head.ptr))&&(dyn_index_valid(self.free_head.index))&&(self.array_ptrs@.contains(self.free_tail.ptr))&&(dyn_index_valid(self.free_tail.index))));
+            }
         }
+    }
+
+    pub open spec fn view(&self) -> Seq<usize>{
+        self.spec_seq@
     }
 
     pub open spec fn wf(&self) -> bool {
@@ -422,6 +674,8 @@ impl DynLinkedlist{
         self.free_list_wf()
         &&
         self.value_list_wf()
+        &&
+        self.spec_seq_wf()
     }
 
     pub fn new() -> (ret: Self)
