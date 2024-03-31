@@ -220,6 +220,16 @@ impl DynLinkedlist{
         self.len
     }
 
+    pub closed spec fn node_ref_valid(&self, rf: usize) -> bool{
+        self.value_list@.contains(usize_to_dyn_index(rf))
+    }
+
+    pub closed spec fn node_ref_resolve(&self, rf: usize) -> usize
+        recommends self.node_ref_valid(rf)
+    {
+        self.get_node_by_dyn_index(usize_to_dyn_index(rf)).value
+    }
+
     pub open spec fn unique(&self) -> bool {
         forall|i:int, j:int| #![auto] i != j && 0 <= i < self.spec_seq@.len() && 0 <= j < self.spec_seq@.len()
             ==> self.spec_seq@[i] != self.spec_seq@[j]
@@ -431,7 +441,7 @@ impl DynLinkedlist{
         (forall|i: int, j:int|  #![auto] i != j && 0 <= i < self.len() && 0 <= j < self.len() ==> (self.spec_seq@[i as int] =~= self.spec_seq@[j as int]) == false)
     }
 
-    pub fn push(&mut self, new_value:usize)
+    pub fn push(&mut self, new_value:usize) -> (ret:usize)
         requires
             old(self).wf(),
             old(self)@.contains(new_value) == false,
@@ -442,6 +452,11 @@ impl DynLinkedlist{
             self@ =~= old(self)@.push(new_value),
             self.size() == old(self).size(),
             self.len() == old(self).len() + 1,
+            self.node_ref_valid(ret),
+            self.node_ref_resolve(ret) == new_value,
+            forall|rf:usize| old(self).node_ref_valid(rf) ==> self.node_ref_valid(rf),
+            forall|rf:usize| old(self).node_ref_valid(rf) ==> rf != ret,
+            forall|rf:usize| old(self).node_ref_valid(rf) ==> self.node_ref_resolve(rf) == old(self).node_ref_resolve(rf),
     {
         proof{
             lemma_seq_properties::<DynIndex>();
@@ -519,6 +534,8 @@ impl DynLinkedlist{
             assert(forall|i: int| #![auto] 0 <= i < self.value_list@.len() ==> self.get_node_by_dyn_index(self.value_list@[i as int]).prev == self.prev_value_node_of(i));
             assert(forall|i: int, j:int|  #![auto] i != j && 0 <= i < self.value_list@.len() && 0 <= j < self.value_list@.len() ==> (self.value_list@[i as int] =~= self.value_list@[j as int]) == false);
             assert(self.value_list_wf());
+
+            return dyn_ptr_index_to_usize(free_head_ptr, free_head_index);
         }else if self.len() != 0 {
             assert(self.free_list@.len() > 1);
 
@@ -619,6 +636,8 @@ impl DynLinkedlist{
             assert(forall|i: int| #![auto] 0 <= i < self.value_list@.len() ==> self.get_node_by_dyn_index(self.value_list@[i as int]).prev == self.prev_value_node_of(i));
             assert(forall|i: int, j:int|  #![auto] i != j && 0 <= i < self.value_list@.len() && 0 <= j < self.value_list@.len() ==> (self.value_list@[i as int] =~= self.value_list@[j as int]) == false);
             assert(self.value_list_wf());
+
+            return dyn_ptr_index_to_usize(free_tail_ptr, free_tail_index);
         }else{
             assert(self.free_list@.len() > 1);
             assert(self.value_list@.len() == 0);
@@ -701,6 +720,8 @@ impl DynLinkedlist{
             assert(forall|i:int| #![auto] 0 <= i < self.free_list@.len() ==> self.value_list@.contains(self.free_list@[i]) == false);
             assert(self.free_list_wf());
             assert(self.value_list_wf());
+
+            return dyn_ptr_index_to_usize(free_tail_ptr, free_tail_index);
         }
 
     }
@@ -725,6 +746,8 @@ impl DynLinkedlist{
             self.spec_seq =~= old(self).spec_seq,
             self.size == old(self).size + DYN_ARRAY_LEN,
             self.len == old(self).len,
+            forall|rf:usize| old(self).node_ref_valid(rf) ==> self.node_ref_valid(rf),
+            forall|rf:usize| old(self).node_ref_valid(rf) ==> self.node_ref_resolve(rf) == old(self).node_ref_resolve(rf),
     {
         proof{
             self.array_ptrs@ = self.array_ptrs@.insert(new_array_ptr);
@@ -778,6 +801,8 @@ impl DynLinkedlist{
                 (forall|array_ptr:DynArrayPtr| #![auto] self.array_perms@.dom().contains(array_ptr) && array_ptr != new_array_ptr ==> self.array_perms@[array_ptr]@.value.get_Some_0().wf()),
                 (forall|j:usize|#![auto] 0 <= j < DYN_ARRAY_LEN ==> self.value_list@.contains(DynIndex{ptr:new_array_ptr, index: j}) == false),
                 (forall|j:usize|#![auto] i <= j < DYN_ARRAY_LEN ==> self.free_list@.contains(DynIndex{ptr:new_array_ptr, index: j}) == false),
+                forall|rf:usize| old(self).node_ref_valid(rf) ==> self.node_ref_valid(rf),
+                forall|rf:usize| old(self).node_ref_valid(rf) ==> self.node_ref_resolve(rf) == old(self).node_ref_resolve(rf),
             ensures
                 i == DYN_ARRAY_LEN,
                 self.array_sets_wf(),
@@ -800,6 +825,8 @@ impl DynLinkedlist{
                 self.spec_seq =~= old(self).spec_seq,
                 self.size == old(self).size + DYN_ARRAY_LEN,
                 self.len == old(self).len,
+                forall|rf:usize| old(self).node_ref_valid(rf) ==> self.node_ref_valid(rf),
+                forall|rf:usize| old(self).node_ref_valid(rf) ==> self.node_ref_resolve(rf) == old(self).node_ref_resolve(rf),
         {
             // let old_free_list = Ghost(self.free_list@);
             let old_self = Ghost(*self);
