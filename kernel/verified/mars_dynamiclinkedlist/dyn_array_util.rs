@@ -24,6 +24,31 @@ pub fn dyn_array_set_free_count(pptr: &PPtr::<DynArray>, perm: &mut Tracked<Poin
 }
 
 #[verifier(external_body)]
+pub fn dyn_array_set_value(pptr: &PPtr::<DynArray>, perm: &mut Tracked<PointsTo<DynArray>>, new_value:usize, index:usize)
+    requires pptr.id() == old(perm)@@.pptr,
+                old(perm)@@.value.is_Some(),
+                dyn_index_valid(index),
+    ensures pptr.id() == perm@@.pptr,
+            perm@@.value.is_Some(),
+            perm@@.value.get_Some_0().free_count == old(perm)@@.value.get_Some_0().free_count,
+            perm@@.value.get_Some_0().ar == old(perm)@@.value.get_Some_0().ar,
+            perm@@.value.get_Some_0().seq == old(perm)@@.value.get_Some_0().seq,
+            perm@@.value.get_Some_0().free_set == old(perm)@@.value.get_Some_0().free_set,
+            perm@@.value.get_Some_0().value_set == old(perm)@@.value.get_Some_0().value_set,
+            perm@@.value.get_Some_0().seq@.len() == old(perm)@@.value.get_Some_0().seq@.len(),
+            forall|i:usize| #![auto] dyn_index_valid(i) && i != index ==> perm@@.value.get_Some_0()@[i as int].value == old(perm)@@.value.get_Some_0()@[i as int].value,
+            forall|i:usize| #![auto] dyn_index_valid(i) ==> perm@@.value.get_Some_0()@[i as int].prev == old(perm)@@.value.get_Some_0()@[i as int].prev,
+            forall|i:usize| #![auto] dyn_index_valid(i) ==> perm@@.value.get_Some_0()@[i as int].next == old(perm)@@.value.get_Some_0()@[i as int].next,
+            perm@@.value.get_Some_0()@[index as int].value == new_value,
+{
+    unsafe {
+        let uptr = pptr.to_usize() as *mut MaybeUninit<DynArray>;
+        (*uptr).assume_init_mut().ar[index].value = new_value;
+    }
+}
+
+
+#[verifier(external_body)]
 pub fn dyn_array_set_next(pptr: &PPtr::<DynArray>, perm: &mut Tracked<PointsTo<DynArray>>, next_ptr: usize, next_index: usize, index:usize)
     requires pptr.id() == old(perm)@@.pptr,
                 old(perm)@@.value.is_Some(),
@@ -92,6 +117,30 @@ pub fn dyn_array_push_free(pptr: &PPtr::<DynArray>, perm: &mut Tracked<PointsTo<
             (*uptr).assume_init_mut().free_set@ = (*uptr).assume_init_mut().free_set@.insert(free_index);
         }
         (*uptr).assume_init_mut().free_count = (*uptr).assume_init_mut().free_count + 1;
+    }
+}
+
+#[verifier(external_body)]
+pub fn dyn_array_pop_free_to_value(pptr: &PPtr::<DynArray>, perm: &mut Tracked<PointsTo<DynArray>>, free_index:usize)
+    requires pptr.id() == old(perm)@@.pptr,
+                old(perm)@@.value.is_Some(),
+                old(perm)@@.value.get_Some_0().free_set@.contains(free_index),
+                dyn_index_valid(free_index),
+    ensures pptr.id() == perm@@.pptr,
+            perm@@.value.is_Some(),
+            perm@@.value.get_Some_0().free_count == old(perm)@@.value.get_Some_0().free_count - 1,
+            perm@@.value.get_Some_0().ar == old(perm)@@.value.get_Some_0().ar,
+            perm@@.value.get_Some_0().seq == old(perm)@@.value.get_Some_0().seq,
+            perm@@.value.get_Some_0().free_set@ == old(perm)@@.value.get_Some_0().free_set@.remove(free_index),
+            perm@@.value.get_Some_0().value_set == old(perm)@@.value.get_Some_0().value_set@.insert(free_index),
+{
+    unsafe {
+        let uptr = pptr.to_usize() as *mut MaybeUninit<DynArray>;
+        proof{
+            (*uptr).assume_init_mut().free_set@ = (*uptr).assume_init_mut().free_set@.remove(free_index);
+            (*uptr).assume_init_mut().value_set@ = (*uptr).assume_init_mut().value_set@.insert(free_index);
+        }
+        (*uptr).assume_init_mut().free_count = (*uptr).assume_init_mut().free_count - 1;
     }
 }
 
