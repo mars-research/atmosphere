@@ -477,10 +477,13 @@ impl DynLinkedlist{
             forall|_rf:usize| old(self).node_ref_valid(_rf) && _rf != rf ==> self.node_ref_valid(_rf),
             forall|_rf:usize| old(self).node_ref_valid(_rf) && _rf != rf ==> self.node_ref_resolve(_rf) == old(self).node_ref_resolve(_rf),
             self.node_ref_valid(rf) == false,
+            forall|value:usize| #![auto] old(self).node_ref_resolve(rf) != value ==> old(self)@.contains(value) == self@.contains(value),
+            self@.contains(old(self).node_ref_resolve(rf)) == false,
     {
         proof{
             lemma_seq_properties::<DynIndex>();
             lemma_set_properties::<DynIndex>();
+            lemma_seq_properties::<usize>();
             usize_dyn_index_lemma();
         }
         assert(self.value_list@.len() > 0);
@@ -817,6 +820,11 @@ impl DynLinkedlist{
             assert(self.value_list_wf());
             assert(self.wf());
 
+            // assert(old(self).node_ref_resolve(rf) == old(self)@[rf_value_list_index@]);
+            // assert(forall|value:usize| #![auto] old(self).node_ref_resolve(rf) != value && old(self)@.contains(value) == false ==> self@.contains(value) == false);
+            // assert(forall|value:usize| #![auto] old(self).node_ref_resolve(rf) != value && old(self)@.contains(value) ==> self@.contains(value));
+            // assert(forall|value:usize| #![auto] old(self).node_ref_resolve(rf) != value ==> old(self)@.contains(value) == self@.contains(value));
+
             return;
         }else{
             assert(self.value_list@.len() > 1);
@@ -970,10 +978,13 @@ impl DynLinkedlist{
             forall|rf:usize| old(self).node_ref_valid(rf) && rf != dyn_index_to_usize(&old(self).value_list@[0]) ==> self.node_ref_valid(rf),
             forall|rf:usize| old(self).node_ref_valid(rf) && rf != dyn_index_to_usize(&old(self).value_list@[0]) ==> self.node_ref_resolve(rf) == old(self).node_ref_resolve(rf),
             self.node_ref_valid(dyn_index_to_usize(&old(self).value_list@[0])) == false,
+            forall|value:usize| #![auto] value != ret ==> old(self)@.contains(value) == self@.contains(value),
+            self@.contains(ret) == false,
     {
         proof{
             lemma_seq_properties::<DynIndex>();
             lemma_set_properties::<DynIndex>();
+            lemma_seq_properties::<usize>();
             usize_dyn_index_lemma();
         }
         if self.len() == self.size() {
@@ -1069,6 +1080,14 @@ impl DynLinkedlist{
             assert(forall|i:int| #![auto] 0 <= i < self.value_list@.len() ==> self.free_list@.contains(self.value_list@[i]) == false );
             assert(self.value_list_wf());
 
+            assert(self@ =~= old(self)@.subrange(1, old(self)@.len() as int));
+            assert(ret == old(self)@[0]);
+            // assert((forall|i: int, j:int|  #![auto] i != j && 0 <= i < old(self).len() && 0 <= j < old(self).len() ==> (old(self).spec_seq@[i as int] =~= old(self).spec_seq@[j as int]) == false));
+            // assert((forall|i: int, j:int|  #![auto] i != j && 0 <= i < self.len() && 0 <= j < self.len() ==> (self.spec_seq@[i as int] =~= self.spec_seq@[j as int]) == false));
+            assert(forall|i:int|#![auto] 0 <= i < self@.len() ==> self@[i] == old(self)@[i + 1]);
+            assert(forall|value:usize|  #![auto] old(self)@.contains(value) && ret != value ==> self@.contains(value));
+            assert(forall|value:usize|  #![auto] old(self)@.contains(value) == false  ==> self@.contains(value) == false);
+
             return ret;
         }else if self.len() == 1{
             assert(self.free_list@.len() > 1);
@@ -1157,6 +1176,14 @@ impl DynLinkedlist{
             assert(forall|i:int| #![auto] 0 <= i < self.free_list@.len() ==> self.value_list@.contains(self.free_list@[i]) == false);
             assert(self.free_list_wf());
             assert(self.value_list_wf());
+
+            assert(self@ =~= old(self)@.subrange(1, old(self)@.len() as int));
+            assert(ret == old(self)@[0]);
+            // assert((forall|i: int, j:int|  #![auto] i != j && 0 <= i < old(self).len() && 0 <= j < old(self).len() ==> (old(self).spec_seq@[i as int] =~= old(self).spec_seq@[j as int]) == false));
+            // assert((forall|i: int, j:int|  #![auto] i != j && 0 <= i < self.len() && 0 <= j < self.len() ==> (self.spec_seq@[i as int] =~= self.spec_seq@[j as int]) == false));
+            assert(forall|i:int|#![auto] 0 <= i < self@.len() ==> self@[i] == old(self)@[i + 1]);
+            assert(forall|value:usize|  #![auto] old(self)@.contains(value) && ret != value ==> self@.contains(value));
+            assert(forall|value:usize|  #![auto] old(self)@.contains(value) == false  ==> self@.contains(value) == false);
 
             return ret;
         }else{
@@ -1281,6 +1308,14 @@ impl DynLinkedlist{
             assert(self.len == self.value_list@.len());
             assert(forall|i:int| #![auto] 0 <= i < self.value_list@.len() ==> self.free_list@.contains(self.value_list@[i]) == false );
             assert(self.value_list_wf());
+
+            assert(self@ =~= old(self)@.subrange(1, old(self)@.len() as int));
+            assert(ret == old(self)@[0]);
+            // assert((forall|i: int, j:int|  #![auto] i != j && 0 <= i < old(self).len() && 0 <= j < old(self).len() ==> (old(self).spec_seq@[i as int] =~= old(self).spec_seq@[j as int]) == false));
+            // assert((forall|i: int, j:int|  #![auto] i != j && 0 <= i < self.len() && 0 <= j < self.len() ==> (self.spec_seq@[i as int] =~= self.spec_seq@[j as int]) == false));
+            assert(forall|i:int|#![auto] 0 <= i < self@.len() ==> self@[i] == old(self)@[i + 1]);
+            assert(forall|value:usize|  #![auto] old(self)@.contains(value) && ret != value ==> self@.contains(value));
+            assert(forall|value:usize|  #![auto] old(self)@.contains(value) == false  ==> self@.contains(value) == false);
 
             return ret;
         }
@@ -1831,6 +1866,7 @@ impl DynLinkedlist{
         }
     }
 
+    #[verifier(inline)]
     pub open spec fn view(&self) -> Seq<usize>{
         self.spec_seq@
     }
