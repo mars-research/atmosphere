@@ -144,4 +144,28 @@ pub fn dyn_array_pop_free_to_value(pptr: &PPtr::<DynArray>, perm: &mut Tracked<P
     }
 }
 
+#[verifier(external_body)]
+pub fn dyn_array_pop_value_to_free(pptr: &PPtr::<DynArray>, perm: &mut Tracked<PointsTo<DynArray>>, value_index:usize)
+    requires pptr.id() == old(perm)@@.pptr,
+                old(perm)@@.value.is_Some(),
+                old(perm)@@.value.get_Some_0().value_set@.contains(value_index),
+                dyn_index_valid(value_index),
+    ensures pptr.id() == perm@@.pptr,
+            perm@@.value.is_Some(),
+            perm@@.value.get_Some_0().free_count == old(perm)@@.value.get_Some_0().free_count + 1,
+            perm@@.value.get_Some_0().ar == old(perm)@@.value.get_Some_0().ar,
+            perm@@.value.get_Some_0().seq == old(perm)@@.value.get_Some_0().seq,
+            perm@@.value.get_Some_0().value_set@ == old(perm)@@.value.get_Some_0().value_set@.remove(value_index),
+            perm@@.value.get_Some_0().free_set == old(perm)@@.value.get_Some_0().free_set@.insert(value_index),
+{
+    unsafe {
+        let uptr = pptr.to_usize() as *mut MaybeUninit<DynArray>;
+        proof{
+            (*uptr).assume_init_mut().free_set@ = (*uptr).assume_init_mut().free_set@.insert(value_index);
+            (*uptr).assume_init_mut().value_set@ = (*uptr).assume_init_mut().value_set@.remove(value_index);
+        }
+        (*uptr).assume_init_mut().free_count = (*uptr).assume_init_mut().free_count + 1;
+    }
+}
+
 }
