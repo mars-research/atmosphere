@@ -168,6 +168,40 @@ impl Kernel{
 }
 
 impl Kernel {
+    pub proof fn container_thread_inv_1(&self)
+        requires
+            self.wf()
+        ensures
+            forall|c_ptr:ContainerPtr, t_ptr:ThreadPtr|
+                #![auto]
+                self.container_dom().contains(c_ptr)
+                &&
+                self.thread_dom().contains(t_ptr)
+                &&
+                self.get_container(c_ptr).owned_threads@.contains(t_ptr) == false
+                ==>
+                self.get_thread(t_ptr).owning_container != c_ptr
+    {
+        self.proc_man.container_thread_inv_1();
+    }
+
+    pub proof fn proc_thread_inv_1(&self)
+        requires
+            self.wf()
+        ensures
+            forall|p_ptr:ProcPtr, t_ptr:ThreadPtr|
+                #![auto]
+                self.proc_dom().contains(p_ptr)
+                &&
+                self.thread_dom().contains(t_ptr)
+                &&
+                self.get_proc(p_ptr).owned_threads@.contains(t_ptr) == false
+                ==>
+                self.get_thread(t_ptr).owning_proc != p_ptr
+    {
+        self.proc_man.proc_thread_inv_1();
+    }
+
     pub proof fn process_inv(&self)
         requires
             self.wf()
@@ -182,6 +216,78 @@ impl Kernel {
         self.proc_man.process_inv();
     }
     
+    pub proof fn container_inv(&self)
+        requires
+            self.wf()
+        ensures
+            forall|c_ptr:ContainerPtr|
+                #![trigger self.container_dom().contains(c_ptr)]
+                #![trigger self.get_container(c_ptr).owned_cpus.wf()]
+                #![trigger self.get_container(c_ptr).scheduler.wf()]
+                #![trigger self.get_container(c_ptr).owned_endpoints.wf()]
+                self.container_dom().contains(c_ptr)
+                ==>
+                self.get_container(c_ptr).owned_cpus.wf()
+                &&
+                self.get_container(c_ptr).scheduler.wf()
+                &&
+                self.get_container(c_ptr).owned_endpoints.wf(),
+            forall|c_ptr:ContainerPtr, p_ptr:ProcPtr|
+                #![auto]
+                self.container_dom().contains(c_ptr)
+                &&
+                self.get_container(c_ptr).owned_procs@.contains(p_ptr)
+                ==>
+                self.proc_dom().contains(p_ptr),
+            forall|c_ptr:ContainerPtr, t_ptr:ThreadPtr|
+                #![auto]
+                self.container_dom().contains(c_ptr)
+                &&
+                self.get_container(c_ptr).owned_threads@.contains(t_ptr)
+                ==>
+                self.thread_dom().contains(t_ptr),
+    {
+        self.proc_man.container_inv();
+    }
+
+        pub proof fn thread_inv(&self)
+        requires
+            self.wf()
+        ensures
+            forall|t_ptr:ThreadPtr|
+                #![trigger self.thread_dom().contains(t_ptr)]
+                #![trigger self.get_thread(t_ptr).owning_container]
+                #![trigger self.get_thread(t_ptr).owning_proc]
+                self.thread_dom().contains(t_ptr)
+                ==>
+                self.container_dom().contains(self.get_thread(t_ptr).owning_container)
+                &&
+                self.proc_dom().contains(self.get_thread(t_ptr).owning_proc)
+                &&
+                self.get_thread(t_ptr).endpoint_descriptors.wf()
+                &&
+                (self.get_thread(t_ptr).ipc_payload.get_payload_as_va_range().is_Some() ==> self.get_thread(t_ptr).ipc_payload.get_payload_as_va_range().unwrap().wf())
+                &&
+                (
+                    forall|i:int| #![auto] 
+                        0 <= i < MAX_NUM_ENDPOINT_DESCRIPTORS && self.get_thread(t_ptr).endpoint_descriptors@[i].is_Some() 
+                        ==> 
+                        self.endpoint_dom().contains(self.get_thread(t_ptr).endpoint_descriptors@[i].unwrap())
+                )
+                &&
+                self.get_proc(self.get_thread(t_ptr).owning_proc).owning_container == self.get_thread(t_ptr).owning_container
+                &&
+                (
+                    self.get_thread(t_ptr).state == ThreadState::BLOCKED 
+                    ==>
+                    self.get_thread(t_ptr).blocking_endpoint_ptr.is_Some()
+                    &&
+                    self.endpoint_dom().contains(self.get_thread(t_ptr).blocking_endpoint_ptr.unwrap())
+                )
+    {
+        self.proc_man.thread_inv();
+    }
+
     // @TODO: prove this
     #[verifier(external_body)]
     pub proof fn fold_change_lemma(&self, old:Kernel, mod_c_ptr:ContainerPtr)

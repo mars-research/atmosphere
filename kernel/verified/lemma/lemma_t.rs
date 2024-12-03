@@ -39,6 +39,8 @@ pub proof fn set_insert_lemma<A>()
     ensures
         forall|s1:Set<A>, x:A, y:A|
             x != y ==> ( s1.insert(x).contains(y) == s1.contains(y) ),
+        forall|s1:Set<A>, x:A, y:A|
+            s1.contains(y) ==> s1.insert(x).contains(y),
         forall|s1:Set<A>, x:A|
             s1.contains(x) ==> (s1.insert(x) == s1)
 {}

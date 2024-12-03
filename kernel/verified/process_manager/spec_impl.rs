@@ -839,6 +839,36 @@ impl ProcessManager{
 
 //proofs
 impl ProcessManager{
+    pub proof fn container_thread_inv_1(&self)
+        requires
+            self.wf()
+        ensures
+            forall|c_ptr:ContainerPtr, t_ptr:ThreadPtr|
+                #![auto]
+                self.container_dom().contains(c_ptr)
+                &&
+                self.thread_dom().contains(t_ptr)
+                &&
+                self.get_container(c_ptr).owned_threads@.contains(t_ptr) == false
+                ==>
+                self.get_thread(t_ptr).owning_container != c_ptr
+    {}
+
+    pub proof fn proc_thread_inv_1(&self)
+        requires
+            self.wf()
+        ensures
+            forall|p_ptr:ProcPtr, t_ptr:ThreadPtr|
+                #![auto]
+                self.proc_dom().contains(p_ptr)
+                &&
+                self.thread_dom().contains(t_ptr)
+                &&
+                self.get_proc(p_ptr).owned_threads@.contains(t_ptr) == false
+                ==>
+                self.get_thread(t_ptr).owning_proc != p_ptr
+    {}
+
     pub proof fn thread_inv(&self)
         requires
             self.wf()
@@ -865,6 +895,14 @@ impl ProcessManager{
                 )
                 &&
                 self.get_proc(self.get_thread(t_ptr).owning_proc).owning_container == self.get_thread(t_ptr).owning_container
+                &&
+                (
+                    self.get_thread(t_ptr).state == ThreadState::BLOCKED 
+                    ==>
+                    self.get_thread(t_ptr).blocking_endpoint_ptr.is_Some()
+                    &&
+                    self.endpoint_dom().contains(self.get_thread(t_ptr).blocking_endpoint_ptr.unwrap())
+                )
     {}
     pub proof fn process_inv(&self)
         requires
@@ -892,7 +930,21 @@ impl ProcessManager{
                 &&
                 self.get_container(c_ptr).scheduler.wf()
                 &&
-                self.get_container(c_ptr).owned_endpoints.wf()
+                self.get_container(c_ptr).owned_endpoints.wf(),
+            forall|c_ptr:ContainerPtr, p_ptr:ProcPtr|
+                #![auto]
+                self.container_dom().contains(c_ptr)
+                &&
+                self.get_container(c_ptr).owned_procs@.contains(p_ptr)
+                ==>
+                self.proc_dom().contains(p_ptr),
+            forall|c_ptr:ContainerPtr, t_ptr:ThreadPtr|
+                #![auto]
+                self.container_dom().contains(c_ptr)
+                &&
+                self.get_container(c_ptr).owned_threads@.contains(t_ptr)
+                ==>
+                self.thread_dom().contains(t_ptr),
     {}
     pub proof fn endpoint_inv(&self)
         requires 
@@ -1278,7 +1330,9 @@ impl ProcessManager{
                 #![trigger self.get_container(container_ptr)]
                 self.container_dom().contains(container_ptr) && container_ptr != self.get_thread(thread_ptr).owning_container
                 ==> 
-                self.get_container(container_ptr) =~= old(self).get_container(container_ptr),
+                self.get_container(container_ptr) =~= old(self).get_container(container_ptr)
+                &&
+                self.get_container(container_ptr).owned_threads@.contains(ret) == false,
             forall|t_ptr:ThreadPtr| 
                 #![trigger old(self).get_thread(t_ptr)]
                 old(self).thread_dom().contains(t_ptr)
@@ -1290,12 +1344,13 @@ impl ProcessManager{
                 ==> 
                 old(self).get_endpoint(e_ptr) =~= self.get_endpoint(e_ptr),
             self.get_proc(proc_ptr).owned_threads@ == old(self).get_proc(proc_ptr).owned_threads@.push(ret),
-            self.get_container(self.get_thread(thread_ptr).owning_container).owned_procs@ =~= old(self).get_container(self.get_thread(thread_ptr).owning_container).owned_procs@,
+            self.get_container(self.get_thread(thread_ptr).owning_container).owned_procs =~= old(self).get_container(self.get_thread(thread_ptr).owning_container).owned_procs,
             self.get_container(self.get_thread(thread_ptr).owning_container).owned_endpoints@ =~= old(self).get_container(self.get_thread(thread_ptr).owning_container).owned_endpoints@,
             self.get_container(self.get_thread(thread_ptr).owning_container).owned_threads@ =~= old(self).get_container(self.get_thread(thread_ptr).owning_container).owned_threads@.insert(ret),
             self.get_thread(ret).owning_container == old(self).get_thread(thread_ptr).owning_container,
             self.get_thread(ret).endpoint_descriptors@ =~= Seq::new(MAX_NUM_ENDPOINT_DESCRIPTORS as nat,|i: int| {None}).update(0, Some(old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap())),
             self.get_endpoint(old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap()).owning_threads@ =~= old(self).get_endpoint(old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap()).owning_threads@.insert(ret),
+            self.get_endpoint(old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap()).queue_state =~= old(self).get_endpoint(old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap()).queue_state,
     {
         let container_ptr = self.get_proc(proc_ptr).owning_container;
         let old_mem_quota =  self.get_container(container_ptr).mem_quota;

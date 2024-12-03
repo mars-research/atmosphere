@@ -38,73 +38,85 @@ pub open spec fn syscall_new_thread_with_endpoint_spec(old:Kernel, new:Kernel, t
 
     let target_proc_ptr = old.get_thread(thread_id).owning_proc;
     let target_container_ptr = old.get_thread(thread_id).owning_container;
-    let target_endpoint_ptr = old.get_endpoint_ptr_by_endpoint_idx(thread_id, endpoint_index).unwrap();
-    let new_thread_ptr = ret.get_return_vaule_usize().unwrap();
 
-    &&&
-    syscall_new_thread_with_endpoint_requirement(old, thread_id, endpoint_index) == false ==> new =~= old
-    &&&
-    syscall_new_thread_with_endpoint_requirement(old, thread_id, endpoint_index) == true ==>
+    if syscall_new_thread_with_endpoint_requirement(old, thread_id, endpoint_index) == false {
+        new =~= old
+    }
+    else{
+        let target_endpoint_ptr = old.get_endpoint_ptr_by_endpoint_idx(thread_id, endpoint_index).unwrap();
+        let new_thread_ptr = ret.get_return_vaule_usize().unwrap();
+        
+        &&&
+        ret.get_return_vaule_usize().is_Some()
+        &&&
         // things that did not change
         old.proc_dom() =~= new.proc_dom()
-        &&
+        &&&
         old.container_dom() =~= new.container_dom()
-        &&
+        &&&
         old.endpoint_dom() =~= new.endpoint_dom()
-        &&
+        &&&
         forall|t_ptr:ThreadPtr| 
             #![trigger new.get_thread(t_ptr)]
             old.thread_dom().contains(t_ptr)
             ==>
             new.get_thread(t_ptr) =~= old.get_thread(t_ptr)
-        &&
+        &&&
         forall|proc_ptr:ProcPtr| 
             #![trigger new.get_proc(proc_ptr)]
             new.proc_dom().contains(proc_ptr) && proc_ptr != target_proc_ptr
             ==>
             new.get_proc(proc_ptr) =~= old.get_proc(proc_ptr)
-        &&
+        &&&
         forall|c:ContainerPtr| 
-            #![trigger new.get_container_owned_pages(c)]
+            #![trigger new.get_container(c)]
             new.container_dom().contains(c) && c != target_container_ptr
             ==>
             old.get_container(c) =~= new.get_container(c)
-        &&
+            &&
+            new.get_container(c).owned_threads@.contains(new_thread_ptr) == false
+        &&&
         forall|e_ptr:EndpointPtr| 
             #![trigger new.get_endpoint(e_ptr)]
             new.endpoint_dom().contains(e_ptr) && e_ptr != target_endpoint_ptr
             ==> 
             old.get_endpoint(e_ptr) =~= new.get_endpoint(e_ptr)
-        &&
+        &&&
         forall|c:ContainerPtr| 
             #![trigger new.get_container_owned_pages(c)]
             new.container_dom().contains(c) ==> 
             old.get_container_owned_pages(c) =~= new.get_container_owned_pages(c)
-        &&
+        &&&
         forall|proc_ptr:ProcPtr| 
             #![trigger new.get_address_space(proc_ptr)]
+            #![trigger old.get_address_space(proc_ptr)]
             new.proc_dom().contains(proc_ptr)
             ==>
             new.get_address_space(proc_ptr) =~= old.get_address_space(proc_ptr)
-        &&
+        &&&
         new.get_physical_page_mapping() =~= old.get_physical_page_mapping()        
-        &&
+        &&&
         new.get_container(target_container_ptr).owned_endpoints@ =~= old.get_container(target_container_ptr).owned_endpoints@
+        &&&
+        new.get_container(target_container_ptr).owned_procs =~= old.get_container(target_container_ptr).owned_procs
         // things that changed
-        &&
+        &&&
         old.thread_dom().insert(new_thread_ptr) =~= new.thread_dom()
-        &&
+        &&&
         new.get_proc(target_proc_ptr).owned_threads@ =~= old.get_proc(target_proc_ptr).owned_threads@.push(new_thread_ptr)
-        &&
+        &&&
         new.get_container(target_container_ptr).owned_threads@ =~= old.get_container(target_container_ptr).owned_threads@.insert(new_thread_ptr)
-        &&
+        &&&
         new.get_container(target_container_ptr).mem_quota as int == old.get_container(target_container_ptr).mem_quota - 1
-        &&
+        &&&
         new.get_thread(new_thread_ptr).owning_container == target_container_ptr
-        &&
+        &&&
         new.get_thread(new_thread_ptr).endpoint_descriptors@ =~= Seq::new(MAX_NUM_ENDPOINT_DESCRIPTORS as nat,|i: int| {None}).update(0, Some(target_endpoint_ptr))
-        &&
+        &&&
         new.get_endpoint(target_endpoint_ptr).owning_threads@ =~= old.get_endpoint(target_endpoint_ptr).owning_threads@.insert(new_thread_ptr)
+        &&&
+        new.get_endpoint(target_endpoint_ptr).queue_state =~= old.get_endpoint(target_endpoint_ptr).queue_state
+    }
 }
 
 impl Kernel{
