@@ -945,6 +945,17 @@ impl ProcessManager{
                 self.get_container(c_ptr).owned_threads@.contains(t_ptr)
                 ==>
                 self.thread_dom().contains(t_ptr),
+            forall|c_ptr_i:ContainerPtr, c_ptr_j:ContainerPtr, t_ptr:ThreadPtr|
+                #![auto]
+                c_ptr_i != c_ptr_j 
+                && 
+                self.container_dom().contains(c_ptr_i)
+                &&
+                self.container_dom().contains(c_ptr_j)
+                &&
+                self.get_container(c_ptr_i).owned_threads@.contains(t_ptr)
+                ==>
+                self.get_container(c_ptr_j).owned_threads@.contains(t_ptr) == false
     {}
     pub proof fn endpoint_inv(&self)
         requires 

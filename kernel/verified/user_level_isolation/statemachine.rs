@@ -100,6 +100,35 @@ use crate::lemma::lemma_t::*;
                 self.kernel_state@.get_thread(b_t_ptr).endpoint_descriptors@[b_index].is_Some()
                 ==>
                 self.kernel_state@.get_thread(a_t_ptr).endpoint_descriptors@[a_index].unwrap() != self.kernel_state@.get_thread(b_t_ptr).endpoint_descriptors@[b_index].unwrap()
+
+            &&&
+            forall|t_ptr: ThreadPtr, index:int, outside_t_ptr: ThreadPtr, outside_index:int|
+                #![auto]
+                (
+                    self.kernel_state@.get_container(self.containers.a_c_ptr).owned_threads@.contains(t_ptr)
+                    ||
+                    self.kernel_state@.get_container(self.containers.b_c_ptr).owned_threads@.contains(t_ptr)
+                )
+                &&
+                (
+                    self.kernel_state@.thread_dom().contains(outside_t_ptr)
+                    &&
+                    self.kernel_state@.get_container(self.containers.a_c_ptr).owned_threads@.contains(outside_t_ptr) == false
+                    &&
+                    self.kernel_state@.get_container(self.containers.b_c_ptr).owned_threads@.contains(outside_t_ptr) == false
+                    &&
+                    self.kernel_state@.get_container(self.containers.v_c_ptr).owned_threads@.contains(outside_t_ptr) == false
+                )
+                &&
+                0 <= index < MAX_NUM_ENDPOINT_DESCRIPTORS
+                &&
+                0 <= outside_index < MAX_NUM_ENDPOINT_DESCRIPTORS
+                &&
+                self.kernel_state@.get_thread(t_ptr).endpoint_descriptors@[index].is_Some()
+                &&
+                self.kernel_state@.get_thread(outside_t_ptr).endpoint_descriptors@[outside_index].is_Some()
+                ==>
+                self.kernel_state@.get_thread(t_ptr).endpoint_descriptors@[index].unwrap() != self.kernel_state@.get_thread(outside_t_ptr).endpoint_descriptors@[outside_index].unwrap()
         }
 
         pub open spec fn v_endpoint_inv(&self) -> bool{
@@ -230,8 +259,7 @@ use crate::lemma::lemma_t::*;
                 assert(new.v_address_space_inv());
                 assert(new.a_b_container_inv());
                 assert(new.memory_inv());
-                assert(new.endpoint_inv()) by {
-                };
+                assert(new.endpoint_inv());
                 assert(new.v_endpoint_inv());
                 assert(new.inv());
             }
