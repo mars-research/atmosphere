@@ -106,8 +106,8 @@ use crate::lemma::lemma_t::*;
             &&&
             forall|a_sub_c_ptr:ContainerPtr, a_t_ptr: ThreadPtr, a_index:int,  b_sub_c_ptr:ContainerPtr, b_t_ptr: ThreadPtr, b_index:int|
             #![trigger 
-                self.kernel_state@.get_container(a_sub_c_ptr).owned_threads, 
-                self.kernel_state@.get_container(b_sub_c_ptr).owned_threads,
+                self.kernel_state@.get_container(a_sub_c_ptr), 
+                self.kernel_state@.get_container(b_sub_c_ptr),
                 self.kernel_state@.get_thread(a_t_ptr),
                 self.kernel_state@.get_thread(b_t_ptr),
                 self.kernel_state@.get_thread(a_t_ptr).endpoint_descriptors@[a_index],
@@ -161,6 +161,8 @@ use crate::lemma::lemma_t::*;
                 self.kernel_state@.get_container(sub_c_ptr).owned_threads@.contains(t_ptr)
                 &&
                 self.kernel_state@.container_dom().contains(outside_c_ptr)
+                &&
+                outside_c_ptr != self.containers.v_c_ptr
                 &&
                 self.kernel_state@.get_container(self.containers.a_c_ptr).subtree_set@.contains(outside_c_ptr) == false
                 &&
