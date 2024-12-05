@@ -226,10 +226,65 @@ impl Kernel {
             self.container_dom().contains(c_ptr)
                 ==>
                 self.get_container(c_ptr).subtree_set@.subset_of(self.container_dom())
+                &&
+                self.get_container(c_ptr).subtree_set@.contains(c_ptr) == false
     {   
         self.proc_man.container_subtree_inv();
     }
+
+    pub proof fn container_subtree_disjoint_inv(&self)
+    requires
+        self.wf()
+    ensures
+        forall|c_ptr_i:ContainerPtr, c_ptr_j:ContainerPtr|
+            #![trigger  self.get_container(c_ptr_i).subtree_set@.insert(c_ptr_i), self.get_container(c_ptr_j).subtree_set@.insert(c_ptr_j)]
+            self.container_dom().contains(c_ptr_i)
+            &&
+            self.container_dom().contains(c_ptr_j)
+            &&
+            c_ptr_i != c_ptr_j
+            &&
+            self.get_container(c_ptr_i).depth == self.get_container(c_ptr_j).depth
+            ==>
+            self.get_container(c_ptr_i).subtree_set@.insert(c_ptr_i).disjoint(self.get_container(c_ptr_j).subtree_set@.insert(c_ptr_j))
+    {   
+        admit();
+    }
+
+    pub proof fn container_owned_procs_disjoint_inv(&self)
+        requires
+            self.wf()
+        ensures
+            forall|c_ptr_i:ContainerPtr, c_ptr_j:ContainerPtr|
+                #![trigger  self.get_container(c_ptr_i).owned_procs, self.get_container(c_ptr_j).owned_procs]
+                self.container_dom().contains(c_ptr_i)
+                &&
+                self.container_dom().contains(c_ptr_j)
+                &&
+                c_ptr_i != c_ptr_j
+                ==>
+                self.get_container(c_ptr_i).owned_procs@.disjoint(self.get_container(c_ptr_j).owned_procs@)
+    {   
+        admit();
+    }
     
+    
+    pub proof fn container_owned_threads_disjoint_inv(&self)
+        requires
+            self.wf()
+        ensures
+            forall|c_ptr_i:ContainerPtr, c_ptr_j:ContainerPtr|
+                #![trigger  self.get_container(c_ptr_i).owned_threads, self.get_container(c_ptr_j).owned_threads]
+                self.container_dom().contains(c_ptr_i)
+                &&
+                self.container_dom().contains(c_ptr_j)
+                &&
+                c_ptr_i != c_ptr_j
+                ==>
+                self.get_container(c_ptr_i).owned_threads@.disjoint(self.get_container(c_ptr_j).owned_threads@)
+    {   
+        admit();
+    }
     pub proof fn container_inv(&self)
         requires
             self.wf()

@@ -105,6 +105,8 @@ impl Kernel{
             self.get_container(old(self).get_proc(target_proc_ptr).owning_container).mem_used =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).mem_used,
             self.get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_cpus =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_cpus,
             self.get_container(old(self).get_proc(target_proc_ptr).owning_container).scheduler =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).scheduler,
+            self.get_container(old(self).get_proc(target_proc_ptr).owning_container).subtree_set =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).subtree_set,
+            self.get_container(old(self).get_proc(target_proc_ptr).owning_container).depth =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).depth,
             self.get_container(old(self).get_proc(target_proc_ptr).owning_container).mem_quota as int =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).mem_quota - 1,
             self.get_address_space(target_proc_ptr) =~= old(self).get_address_space(target_proc_ptr).insert(target_va,ret),
             old(self).page_alloc.page_is_mapped(ret.addr) == false,
@@ -214,6 +216,8 @@ impl Kernel{
             self.get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_cpus =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_cpus,
             self.get_container(old(self).get_proc(target_proc_ptr).owning_container).scheduler =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).scheduler,
             self.get_container(old(self).get_proc(target_proc_ptr).owning_container).mem_quota as int =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).mem_quota - ret.0,
+            self.get_container(old(self).get_proc(target_proc_ptr).owning_container).subtree_set =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).subtree_set,
+            self.get_container(old(self).get_proc(target_proc_ptr).owning_container).depth =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).depth,
             self.get_address_space(target_proc_ptr).dom() =~= old(self).get_address_space(target_proc_ptr).dom().insert(target_va),
             self.get_address_space(target_proc_ptr) =~= old(self).get_address_space(target_proc_ptr).insert(target_va,ret.1),
             old(self).page_alloc.page_is_mapped(ret.1.addr) == false,
@@ -295,13 +299,25 @@ impl Kernel{
             self.get_num_of_free_pages() == old(self).get_num_of_free_pages() - ret.0,
             self.get_container_quota(self.get_proc(target_proc_ptr).owning_container) == old(self).get_container_quota(self.get_proc(target_proc_ptr).owning_container) - ret.0,
             forall|va:VAddr|
+                #![trigger self.get_address_space(target_proc_ptr).dom().contains(va)]
                 #![trigger self.get_address_space(target_proc_ptr)[va]]
                 // #![trigger va_4k_valid(va)]
                 // va_4k_valid(va) 
                 // && 
                 va_range@.contains(va) == false
                 ==>
+                self.get_address_space(target_proc_ptr).dom().contains(va) == old(self).get_address_space(target_proc_ptr).dom().contains(va)
+                &&
                 self.get_address_space(target_proc_ptr)[va] == old(self).get_address_space(target_proc_ptr)[va],
+
+            forall|va:VAddr|
+                #![trigger self.get_address_space(target_proc_ptr).dom().contains(va)]
+                // #![trigger va_4k_valid(va)]
+                // va_4k_valid(va) 
+                // && 
+                va_range@.contains(va)
+                ==>
+                self.get_address_space(target_proc_ptr).dom().contains(va),
             self.page_mapping@.dom() == old(self).page_mapping@.dom() + ret.1@.to_set(),
             forall|page_ptr:PagePtr|
                 #![trigger self.page_mapping@[page_ptr]]
@@ -323,6 +339,8 @@ impl Kernel{
             self.get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_procs =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_procs,
             self.get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_threads =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_threads,
             self.get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_endpoints =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_endpoints,
+            self.get_container(old(self).get_proc(target_proc_ptr).owning_container).subtree_set =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).subtree_set,
+            self.get_container(old(self).get_proc(target_proc_ptr).owning_container).depth =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).depth,
     {
         let mut num_page = 0;
         let mut page_diff: Ghost<Seq<PagePtr>> = Ghost(Seq::empty());
@@ -387,12 +405,15 @@ impl Kernel{
                 self.get_num_of_free_pages() == old(self).get_num_of_free_pages() - num_page,
                 self.get_container_quota(self.get_proc(target_proc_ptr).owning_container) == old(self).get_container_quota(self.get_proc(target_proc_ptr).owning_container) - num_page,
                 forall|va:VAddr|
+                    #![trigger self.get_address_space(target_proc_ptr).dom().contains(va)]
                     #![trigger self.get_address_space(target_proc_ptr)[va]]
                     // #![trigger va_4k_valid(va)]
                     // va_4k_valid(va) 
                     // && 
-                    va_range@.subrange(0, i as int).contains(va) == false
+                    va_range@.contains(va) == false
                     ==>
+                    self.get_address_space(target_proc_ptr).dom().contains(va) == old(self).get_address_space(target_proc_ptr).dom().contains(va)
+                    &&
                     self.get_address_space(target_proc_ptr)[va] == old(self).get_address_space(target_proc_ptr)[va],
                 self.page_mapping@.dom() == old(self).page_mapping@.dom() + page_diff@.to_set(),
                 forall|page_ptr:PagePtr|
@@ -411,10 +432,14 @@ impl Kernel{
                     #![auto] 
                     0<=j<i 
                     ==> 
+                    self.get_address_space(target_proc_ptr).dom().contains(va_range@[j as int])
+                    &&
                     self.get_address_space(target_proc_ptr)[va_range@[j as int]].addr == page_diff@[j as int],
                 self.get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_procs =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_procs,
                 self.get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_threads =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_threads,
                 self.get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_endpoints =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_endpoints,
+                self.get_container(old(self).get_proc(target_proc_ptr).owning_container).subtree_set =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).subtree_set,
+                self.get_container(old(self).get_proc(target_proc_ptr).owning_container).depth =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).depth,
         {
             proof{
                 seq_push_lemma::<PagePtr>();

@@ -269,8 +269,10 @@ verus! {
                     #![trigger self.container_dom().contains(c_ptr)]
                     #![trigger self.get_container(c_ptr)]
                     self.container_dom().contains(c_ptr)
-                        ==>
-                        self.get_container(c_ptr).subtree_set@.subset_of(self.container_dom())
+                    ==>
+                    self.get_container(c_ptr).subtree_set@.subset_of(self.container_dom())
+                    &&
+                    self.get_container(c_ptr).subtree_set@.contains(c_ptr) == false
         {
         }
 

@@ -924,8 +924,10 @@ impl ProcessManager{
                 #![trigger self.container_dom().contains(c_ptr)]
                 #![trigger self.get_container(c_ptr)]
                 self.container_dom().contains(c_ptr)
-                    ==>
-                    self.get_container(c_ptr).subtree_set@.subset_of(self.container_dom())
+                ==>
+                self.get_container(c_ptr).subtree_set@.subset_of(self.container_dom())
+                &&
+                self.get_container(c_ptr).subtree_set@.contains(c_ptr) == false
     {
         self.container_tree.container_subtree_inv();
     }
@@ -1373,6 +1375,7 @@ impl ProcessManager{
             self.get_container(self.get_thread(thread_ptr).owning_container).owned_procs =~= old(self).get_container(self.get_thread(thread_ptr).owning_container).owned_procs,
             self.get_container(self.get_thread(thread_ptr).owning_container).owned_endpoints@ =~= old(self).get_container(self.get_thread(thread_ptr).owning_container).owned_endpoints@,
             self.get_container(self.get_thread(thread_ptr).owning_container).subtree_set =~= old(self).get_container(self.get_thread(thread_ptr).owning_container).subtree_set,
+            self.get_container(self.get_thread(thread_ptr).owning_container).depth =~= old(self).get_container(self.get_thread(thread_ptr).owning_container).depth,
             self.get_container(self.get_thread(thread_ptr).owning_container).owned_threads@ =~= old(self).get_container(self.get_thread(thread_ptr).owning_container).owned_threads@.insert(ret),
             self.get_thread(ret).owning_container == old(self).get_thread(thread_ptr).owning_container,
             self.get_thread(ret).endpoint_descriptors@ =~= Seq::new(MAX_NUM_ENDPOINT_DESCRIPTORS as nat,|i: int| {None}).update(0, Some(old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap())),

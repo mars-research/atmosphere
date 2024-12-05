@@ -65,6 +65,8 @@ use crate::lemma::lemma_t::*;
             self.kernel_state@.container_dom().contains(self.containers.a_c_ptr)
             &&&
             self.kernel_state@.container_dom().contains(self.containers.b_c_ptr)
+            &&&
+            self.kernel_state@.get_container(self.containers.a_c_ptr).depth == self.kernel_state@.get_container(self.containers.b_c_ptr).depth 
         }
 
         //major isolation invariant
@@ -79,17 +81,9 @@ use crate::lemma::lemma_t::*;
                 self.kernel_state@.get_address_space(a_p_ptr)[a_va],
                 self.kernel_state@.get_address_space(b_p_ptr)[b_va],
             ]
-                (
-                    self.kernel_state@.get_container(self.containers.a_c_ptr).subtree_set@.contains(a_sub_c_ptr)
-                    || 
-                    a_sub_c_ptr == self.containers.a_c_ptr
-                )
+                self.kernel_state@.get_container(self.containers.a_c_ptr).subtree_set@.insert(self.containers.a_c_ptr).contains(a_sub_c_ptr)
                 &&
-                (
-                    self.kernel_state@.get_container(self.containers.b_c_ptr).subtree_set@.contains(b_sub_c_ptr)
-                    ||
-                    b_sub_c_ptr == self.containers.b_c_ptr
-                )
+                self.kernel_state@.get_container(self.containers.b_c_ptr).subtree_set@.insert(self.containers.b_c_ptr).contains(b_sub_c_ptr)
                 &&
                 self.kernel_state@.get_container(a_sub_c_ptr).owned_procs@.contains(a_p_ptr)
                 &&
@@ -113,17 +107,9 @@ use crate::lemma::lemma_t::*;
                 self.kernel_state@.get_thread(a_t_ptr).endpoint_descriptors@[a_index],
                 self.kernel_state@.get_thread(b_t_ptr).endpoint_descriptors@[b_index],
             ]
-                (
-                    self.kernel_state@.get_container(self.containers.a_c_ptr).subtree_set@.contains(a_sub_c_ptr)
-                    || 
-                    a_sub_c_ptr == self.containers.a_c_ptr
-                )
+                self.kernel_state@.get_container(self.containers.a_c_ptr).subtree_set@.insert(self.containers.a_c_ptr).contains(a_sub_c_ptr)
                 &&
-                (
-                    self.kernel_state@.get_container(self.containers.b_c_ptr).subtree_set@.contains(b_sub_c_ptr)
-                    ||
-                    b_sub_c_ptr == self.containers.b_c_ptr
-                )
+                self.kernel_state@.get_container(self.containers.b_c_ptr).subtree_set@.insert(self.containers.b_c_ptr).contains(b_sub_c_ptr)
                 &&
                 self.kernel_state@.get_container(a_sub_c_ptr).owned_threads@.contains(a_t_ptr)
                 &&
@@ -149,13 +135,9 @@ use crate::lemma::lemma_t::*;
                 self.kernel_state@.get_thread(outside_t_ptr).endpoint_descriptors@[outside_index]
                 ]
                 (
-                    self.kernel_state@.get_container(self.containers.a_c_ptr).subtree_set@.contains(sub_c_ptr)
+                    self.kernel_state@.get_container(self.containers.a_c_ptr).subtree_set@.insert(self.containers.a_c_ptr).contains(sub_c_ptr)
                     || 
-                    sub_c_ptr == self.containers.a_c_ptr
-                    || 
-                    self.kernel_state@.get_container(self.containers.b_c_ptr).subtree_set@.contains(sub_c_ptr)
-                    ||
-                    sub_c_ptr == self.containers.b_c_ptr
+                    self.kernel_state@.get_container(self.containers.b_c_ptr).subtree_set@.insert(self.containers.b_c_ptr).contains(sub_c_ptr)
                 )
                 &&
                 self.kernel_state@.get_container(sub_c_ptr).owned_threads@.contains(t_ptr)
@@ -252,16 +234,12 @@ use crate::lemma::lemma_t::*;
             false
         }
 
-        pub open spec fn v_step_mmap(&self) -> bool{
+        pub open spec fn v_step_mmap(&self, va_range:VaRange4K) -> bool{
             false
         }
 
-        pub open spec fn v_step_new_thread_with_endpoint(&self, thread_ptr:ThreadPtr, endpoint_index: EndpointIdx) -> bool{
-            if self.containers.v_t_ptr == thread_ptr{
-                false
-            }else{
-                true
-            }
+        pub open spec fn v_step_new_thread_with_endpoint(&self, endpoint_index: EndpointIdx) -> bool{
+            false
         }
     }
 
@@ -274,7 +252,7 @@ use crate::lemma::lemma_t::*;
                 new.kernel_state@.wf(),
                 syscall_new_thread_with_endpoint_spec(old.kernel_state@, new.kernel_state@, thread_ptr, endpoint_index, ret),
                 old.containers =~= new.containers,
-                old.v_step_new_thread_with_endpoint(thread_ptr, endpoint_index),
+                old.containers.v_t_ptr == thread_ptr ==> old.v_step_new_thread_with_endpoint(endpoint_index),
                 old.inv(),
             ensures
                 new.inv(),
@@ -287,11 +265,15 @@ use crate::lemma::lemma_t::*;
             old.kernel_state@.container_inv();
             old.kernel_state@.thread_inv();
             old.kernel_state@.container_subtree_inv();
+            old.kernel_state@.container_subtree_disjoint_inv();
+            old.kernel_state@.container_owned_threads_disjoint_inv();
             new.kernel_state@.container_thread_inv_1();
             new.kernel_state@.proc_thread_inv_1();
             new.kernel_state@.container_inv();
             new.kernel_state@.thread_inv();
             new.kernel_state@.container_subtree_inv();
+            new.kernel_state@.container_subtree_disjoint_inv();
+            new.kernel_state@.container_owned_threads_disjoint_inv();
             seq_push_lemma::<ProcPtr>();
             set_insert_lemma::<ThreadPtr>();
             assert(old.kernel_state@.get_container(old.containers.v_c_ptr).owned_procs@.contains(old.containers.v_p_ptr));
@@ -315,6 +297,92 @@ use crate::lemma::lemma_t::*;
                 assert(new.v_address_space_inv());
                 assert(new.a_b_container_inv());
                 assert(new.memory_inv());
+                assert(new.endpoint_inv()) by {
+                };
+                assert(new.v_endpoint_inv());
+                assert(new.inv());
+            }
+        }
+
+        pub proof fn mmap_preserve_inv(old: IsolationStateMachine, new: IsolationStateMachine, thread_ptr:ThreadPtr, va_range: VaRange4K, ret: SyscallReturnStruct)
+            requires
+                old.kernel_state@.thread_dom().contains(thread_ptr),
+                va_range.wf(),
+                va_range.len * 4 < usize::MAX,
+                old.kernel_state@.wf(),
+                new.kernel_state@.wf(),
+                syscall_mmap_spec(old.kernel_state@, new.kernel_state@, thread_ptr, va_range, ret),
+                old.containers =~= new.containers,
+                old.containers.v_t_ptr == thread_ptr ==> old.v_step_mmap(va_range),
+                old.inv(),
+            ensures
+                // new.inv(),
+        {
+            old.kernel_state@.container_thread_inv_1();
+            old.kernel_state@.proc_thread_inv_1();
+            old.kernel_state@.container_inv();
+            old.kernel_state@.thread_inv();
+            old.kernel_state@.container_subtree_inv();
+            old.kernel_state@.container_subtree_disjoint_inv();
+            old.kernel_state@.container_owned_procs_disjoint_inv();
+            new.kernel_state@.container_thread_inv_1();
+            new.kernel_state@.proc_thread_inv_1();
+            new.kernel_state@.container_inv();
+            new.kernel_state@.thread_inv();
+            new.kernel_state@.container_subtree_inv();
+            new.kernel_state@.container_subtree_disjoint_inv();
+            new.kernel_state@.container_owned_procs_disjoint_inv();
+            seq_push_lemma::<ProcPtr>();
+            set_insert_lemma::<ThreadPtr>();
+
+            let proc_ptr = old.kernel_state@.get_thread(thread_ptr).owning_proc;
+            let container_ptr = old.kernel_state@.get_thread(thread_ptr).owning_container;
+            assert(old.kernel_state@.get_container(old.containers.v_c_ptr).owned_procs@.contains(old.containers.v_p_ptr));
+            assert(old.kernel_state@.get_container(old.containers.v_c_ptr).owned_threads@.contains(old.containers.v_t_ptr));
+            assert(old.kernel_state@.get_container(old.containers.v_c_ptr).owned_threads@.contains(thread_ptr) == false);
+            assert(old.kernel_state@.get_proc(old.containers.v_p_ptr).owned_threads@.contains(thread_ptr) == false);
+            assert(thread_ptr != old.containers.v_t_ptr);
+            assert(proc_ptr != old.containers.v_p_ptr);
+            assert(container_ptr != old.containers.v_c_ptr);
+
+
+            if syscall_mmap_requirement(old.kernel_state@, thread_ptr, va_range) == false {
+                assert(new.kernel_state@ =~= old.kernel_state@);
+                assert(new.inv());
+            }
+            else{
+                assert(new.v_container_inv()) by {
+                    assert(new.kernel_state@.container_dom().contains(new.containers.v_c_ptr));
+                    assert(new.kernel_state@.get_container(new.containers.v_c_ptr).owned_procs@ =~= Seq::<ProcPtr>::empty().push(new.containers.v_p_ptr));
+                    assert(new.kernel_state@.get_container(new.containers.v_c_ptr).owned_threads@ =~= Set::<ThreadPtr>::empty().insert(new.containers.v_t_ptr));
+                    assert(new.kernel_state@.get_proc(new.containers.v_p_ptr).owned_threads@ =~= Seq::<ThreadPtr>::empty().push(new.containers.v_t_ptr));
+                    assert(new.kernel_state@.get_thread(new.containers.v_t_ptr).owning_container == new.containers.v_c_ptr);
+                    assert(new.kernel_state@.get_thread(new.containers.v_t_ptr).owning_proc == new.containers.v_p_ptr);
+                    assert(new.kernel_state@.get_proc(new.containers.v_p_ptr).owning_container == new.containers.v_c_ptr);
+                };
+                assert(new.v_address_space_inv());
+                assert(new.a_b_container_inv());
+                assert(new.memory_inv()) by {
+
+                    assert(
+                        forall|a_sub_c_ptr:ContainerPtr, a_p_ptr: ProcPtr, b_p_ptr: ProcPtr, b_sub_c_ptr:ContainerPtr,|
+                    #![trigger 
+                        new.kernel_state@.get_container(a_sub_c_ptr), 
+                        new.kernel_state@.get_container(b_sub_c_ptr),
+                        new.kernel_state@.get_container(a_sub_c_ptr).owned_procs@.contains(a_p_ptr),
+                        new.kernel_state@.get_container(b_sub_c_ptr).owned_procs@.contains(b_p_ptr),
+                    ]
+                        new.kernel_state@.get_container(new.containers.a_c_ptr).subtree_set@.insert(new.containers.a_c_ptr).contains(a_sub_c_ptr)
+                        &&
+                        new.kernel_state@.get_container(new.containers.b_c_ptr).subtree_set@.insert(new.containers.b_c_ptr).contains(b_sub_c_ptr)
+                        &&
+                        new.kernel_state@.get_container(a_sub_c_ptr).owned_procs@.contains(a_p_ptr)
+                        &&
+                        new.kernel_state@.get_container(b_sub_c_ptr).owned_procs@.contains(b_p_ptr)
+                        ==>
+                        b_p_ptr != a_p_ptr
+                    );
+                };
                 assert(new.endpoint_inv());
                 assert(new.v_endpoint_inv());
                 assert(new.inv());

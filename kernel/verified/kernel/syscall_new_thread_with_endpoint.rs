@@ -102,6 +102,8 @@ pub open spec fn syscall_new_thread_with_endpoint_spec(old:Kernel, new:Kernel, t
         new.get_container(target_container_ptr).owned_procs =~= old.get_container(target_container_ptr).owned_procs
         &&&
         new.get_container(target_container_ptr).subtree_set =~= old.get_container(target_container_ptr).subtree_set
+        &&&
+        new.get_container(target_container_ptr).depth =~= old.get_container(target_container_ptr).depth
         // things that changed
         &&&
         old.thread_dom().insert(new_thread_ptr) =~= new.thread_dom()

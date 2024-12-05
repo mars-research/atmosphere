@@ -100,7 +100,9 @@ pub fn create_entry(&mut self, proc_ptr:ProcPtr, va:VAddr) -> (ret: (usize, Page
         self.get_container(old(self).get_proc(proc_ptr).owning_container).mem_used =~= old(self).get_container(old(self).get_proc(proc_ptr).owning_container).mem_used,
         self.get_container(old(self).get_proc(proc_ptr).owning_container).owned_cpus =~= old(self).get_container(old(self).get_proc(proc_ptr).owning_container).owned_cpus,
         self.get_container(old(self).get_proc(proc_ptr).owning_container).scheduler =~= old(self).get_container(old(self).get_proc(proc_ptr).owning_container).scheduler,
+        self.get_container(old(self).get_proc(proc_ptr).owning_container).depth =~= old(self).get_container(old(self).get_proc(proc_ptr).owning_container).depth,
         self.get_container(old(self).get_proc(proc_ptr).owning_container).mem_quota as int =~= old(self).get_container(old(self).get_proc(proc_ptr).owning_container).mem_quota - ret.0,
+        self.get_container(old(self).get_proc(proc_ptr).owning_container).subtree_set =~= old(self).get_container(old(self).get_proc(proc_ptr).owning_container).subtree_set,
         self.mem_man.get_pagetable_by_pcid(self.get_proc(proc_ptr).pcid).unwrap().spec_resolve_mapping_l2(spec_va2index(va).0, spec_va2index(va).1, spec_va2index(va).2).is_Some(),
         self.mem_man.get_pagetable_by_pcid(self.get_proc(proc_ptr).pcid).unwrap().spec_resolve_mapping_l2(spec_va2index(va).0, spec_va2index(va).1, spec_va2index(va).2).unwrap().addr == ret.1,
         forall|p:PagePtr|

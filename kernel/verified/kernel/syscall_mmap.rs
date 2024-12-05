@@ -32,86 +32,114 @@ pub open spec fn syscall_mmap_spec(old:Kernel, new:Kernel, thread_id: ThreadPtr,
     let proc_ptr = old.get_thread(thread_id).owning_proc;
     let container_ptr = old.get_thread(thread_id).owning_container;
     let mmapped_physcial_pages_seq = ret.get_return_vaule_seq_usize().unwrap();
-    &&&
-    syscall_mmap_requirement(old, thread_id, va_range) == false ==> new =~= old
-    &&&
-    syscall_mmap_requirement(old, thread_id, va_range) == true ==>
+    if  syscall_mmap_requirement(old, thread_id, va_range) == false {
+        new =~= old
+    }
+    else{
         // things that did not change
+        &&&
         old.thread_dom() =~= new.thread_dom()
-        &&
+        &&&
         old.proc_dom() =~= new.proc_dom()
-        &&
+        &&&
         old.container_dom() =~= new.container_dom()
-        &&
+        &&&
         old.endpoint_dom() =~= new.endpoint_dom()
-        &&
+        &&&
         forall|t_ptr:ThreadPtr| 
             #![trigger new.get_thread(t_ptr)]
+            #![trigger old.get_thread(t_ptr)]
             old.thread_dom().contains(t_ptr)
             ==>
             new.get_thread(t_ptr) =~= old.get_thread(t_ptr)
-        &&
+        &&&
         forall|proc_ptr:ProcPtr| 
             #![trigger new.get_proc(proc_ptr)]
-            new.proc_dom().contains(proc_ptr) && proc_ptr != proc_ptr
+            new.proc_dom().contains(proc_ptr)
             ==>
             new.get_proc(proc_ptr) =~= old.get_proc(proc_ptr)
-        &&
+        &&&
         forall|c:ContainerPtr| 
-            #![trigger new.get_container_owned_pages(c)]
+            #![trigger new.get_container(c)]
             new.container_dom().contains(c) && c != container_ptr
             ==>
             old.get_container(c) =~= new.get_container(c)
-        &&
+        &&&
         forall|e_ptr:EndpointPtr| 
             #![trigger new.get_endpoint(e_ptr)]
             new.endpoint_dom().contains(e_ptr)
             ==> 
             old.get_endpoint(e_ptr) =~= new.get_endpoint(e_ptr)
-        &&
+        &&&
         forall|c:ContainerPtr| 
             #![trigger new.get_container_owned_pages(c)]
             new.container_dom().contains(c) && c != container_ptr
             ==> 
             old.get_container_owned_pages(c) =~= new.get_container_owned_pages(c)
-        &&
+        &&&
         forall|p_ptr:ProcPtr| 
             #![trigger new.get_address_space(p_ptr)]
             new.proc_dom().contains(p_ptr) && p_ptr != proc_ptr
             ==>
             new.get_address_space(p_ptr) =~= old.get_address_space(p_ptr)
-        &&
+        &&&
         forall|page_ptr:PagePtr|
             #![trigger new.get_physical_page_mapping()[page_ptr]]
             old.get_physical_page_mapping().dom().contains(page_ptr)
             ==> 
             old.get_physical_page_mapping()[page_ptr] == new.get_physical_page_mapping()[page_ptr]
-        &&
+        &&&
         forall|va:VAddr| 
-            #![auto]
+            #![trigger new.get_address_space(proc_ptr).dom().contains(va)]
+            #![trigger new.get_address_space(proc_ptr)[va]]
             va_range@.contains(va) == false
             ==>
+            new.get_address_space(proc_ptr).dom().contains(va) == old.get_address_space(proc_ptr).dom().contains(va)
+            &&
             new.get_address_space(proc_ptr)[va] =~= old.get_address_space(proc_ptr)[va]
-        &&
+        &&&
         new.get_container(container_ptr).owned_threads@ =~= old.get_container(container_ptr).owned_threads@
-        &&
+        &&&
         new.get_container(container_ptr).owned_procs@ =~= old.get_container(container_ptr).owned_procs@
-        &&
+        &&&
         new.get_container(container_ptr).owned_endpoints@ =~= old.get_container(container_ptr).owned_endpoints@
+        &&&
+        new.get_container(container_ptr).subtree_set =~= old.get_container(container_ptr).subtree_set
+        &&&
+        new.get_container(container_ptr).depth =~= old.get_container(container_ptr).depth
         //Things that changed
-        &&
-        mmapped_physcial_pages_seq.contains(page_ptr) ==> old.get_physical_page_mapping().dom().contains(page_ptr) == false
-        &&
+        &&&
+        forall|page_ptr:PagePtr| 
+            #![auto]
+            mmapped_physcial_pages_seq.contains(page_ptr) ==> old.get_physical_page_mapping().dom().contains(page_ptr) == false
+        &&&
         new.get_physical_page_mapping().dom() =~= old.get_physical_page_mapping().dom() + mmapped_physcial_pages_seq.to_set()
-        &&
+        &&&
         forall|i:usize| #![auto] 0<=i<va_range.len ==>
             new.get_physical_page_mapping()[mmapped_physcial_pages_seq[i as int]] == Set::empty().insert((proc_ptr, va_range@[i as int]))
-        &&
+        &&&
         forall|i:usize| 
             #![auto] 
             0<=i<va_range.len 
             ==> 
             new.get_address_space(proc_ptr)[va_range@[i as int]].addr == mmapped_physcial_pages_seq[i as int]
+        &&&
+        forall|new_va:VAddr, p_ptr:ProcPtr, va:VAddr| 
+            #![trigger old.get_address_space(p_ptr), old.get_address_space(p_ptr)[va].addr, new.get_address_space(proc_ptr)[new_va].addr] 
+            va_range@.contains(new_va) 
+            &&
+            old.proc_dom().contains(p_ptr)
+            &&
+            old.get_address_space(p_ptr).dom().contains(va)
+            ==> 
+            new.get_address_space(proc_ptr)[new_va].addr != old.get_address_space(p_ptr)[va].addr
+        &&&
+        forall|new_va:VAddr| 
+            #![trigger new.get_address_space(proc_ptr).dom().contains(new_va)] 
+            va_range@.contains(new_va) 
+            ==> 
+            new.get_address_space(proc_ptr).dom().contains(new_va)
+        }
 }
 
 impl Kernel{
@@ -155,6 +183,37 @@ pub fn syscall_mmap(&mut self, thread_ptr: ThreadPtr, va_range: VaRange4K) ->  (
     
     assert(forall|j:usize| #![auto] 0<=j<seq_pages@.len() ==> old(self).page_alloc.mapped_pages_4k().contains(seq_pages@[j as int]) == false);
     assert(forall|page_ptr:PagePtr| #![auto] seq_pages@.contains(page_ptr) ==> old(self).get_physical_page_mapping().dom().contains(page_ptr) == false);
+
+    assert(
+        forall|i:usize| 
+            #![auto] 
+            0<=i<va_range.len 
+            ==> 
+            old(self).page_alloc.page_is_mapped(self.get_address_space(proc_ptr)[va_range@[i as int]].addr) == false 
+    );
+
+    assert(
+        forall|p_ptr:ProcPtr, va:VAddr| 
+            #![auto] 
+            old(self).proc_dom().contains(p_ptr)
+            &&
+            old(self).get_address_space(p_ptr).dom().contains(va)
+            ==> 
+            old(self).page_alloc.page_is_mapped(old(self).get_address_space(p_ptr)[va].addr) == true
+    );
+
+    assert(
+        forall|i:usize, p_ptr:ProcPtr, va:VAddr| 
+            #![auto] 
+            0<=i<va_range.len 
+            &&
+            old(self).proc_dom().contains(p_ptr)
+            &&
+            old(self).get_address_space(p_ptr).dom().contains(va)
+            ==> 
+            self.get_address_space(proc_ptr)[va_range@[i as int]].addr != old(self).get_address_space(p_ptr)[va].addr
+    );
+
     return SyscallReturnStruct::NoSwitchNew(RetValueType::SuccessSeqUsize{value: seq_pages});
 }
 
