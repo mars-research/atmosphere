@@ -94,6 +94,43 @@ use crate::lemma::lemma_t::*;
                 self.kernel_state@.get_address_space(b_p_ptr).dom().contains(b_va)
                 ==>
                 self.kernel_state@.get_address_space(a_p_ptr)[a_va].addr != self.kernel_state@.get_address_space(b_p_ptr)[b_va].addr
+            &&&
+            forall|sub_c_ptr:ContainerPtr, p_ptr:ProcPtr, va:VAddr, outside_c_ptr:ContainerPtr, outside_p_ptr: ProcPtr, outside_va:VAddr|
+            #![trigger 
+                self.kernel_state@.get_container(sub_c_ptr),
+                self.kernel_state@.get_container(outside_c_ptr),
+                self.kernel_state@.get_address_space(p_ptr),
+                self.kernel_state@.get_address_space(outside_p_ptr),
+                self.kernel_state@.get_address_space(p_ptr)[va],
+                self.kernel_state@.get_address_space(outside_p_ptr)[outside_va],
+                ]
+                (
+                    self.kernel_state@.get_container(self.containers.a_c_ptr).subtree_set@.insert(self.containers.a_c_ptr).contains(sub_c_ptr)
+                    || 
+                    self.kernel_state@.get_container(self.containers.b_c_ptr).subtree_set@.insert(self.containers.b_c_ptr).contains(sub_c_ptr)
+                )
+                &&
+                self.kernel_state@.get_container(sub_c_ptr).owned_procs@.contains(p_ptr)
+                &&
+                self.kernel_state@.container_dom().contains(outside_c_ptr)
+                &&
+                outside_c_ptr != self.containers.v_c_ptr
+                &&
+                self.kernel_state@.get_container(self.containers.a_c_ptr).subtree_set@.contains(outside_c_ptr) == false
+                &&
+                outside_c_ptr != self.containers.a_c_ptr
+                && 
+                self.kernel_state@.get_container(self.containers.b_c_ptr).subtree_set@.contains(outside_c_ptr) == false
+                &&
+                outside_c_ptr != self.containers.b_c_ptr
+                &&
+                self.kernel_state@.get_container(outside_c_ptr).owned_procs@.contains(outside_p_ptr)
+                &&
+                self.kernel_state@.get_address_space(p_ptr).dom().contains(va)
+                &&
+                self.kernel_state@.get_address_space(outside_p_ptr).dom().contains(outside_va)
+                ==>
+                self.kernel_state@.get_address_space(p_ptr)[va].addr != self.kernel_state@.get_address_space(outside_p_ptr)[outside_va].addr
         }
 
         pub open spec fn endpoint_inv(&self) -> bool{
