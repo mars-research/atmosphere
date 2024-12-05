@@ -451,6 +451,71 @@ verus! {
                     ==>
                     self.get_container(c_ptr).children.wf(),
         {}
+
+        pub proof fn container_subtree_disjoint_inv(&self)
+            requires
+                self.wf()
+            ensures
+                forall|c_ptr_i:ContainerPtr, c_ptr_j:ContainerPtr|
+                    #![trigger  self.get_container(c_ptr_i), self.get_container(c_ptr_j)]
+                    #![trigger  self.get_container(c_ptr_i).subtree_set@.insert(c_ptr_i), self.get_container(c_ptr_j).subtree_set@.insert(c_ptr_j)]
+                    self.container_dom().contains(c_ptr_i)
+                    &&
+                    self.container_dom().contains(c_ptr_j)
+                    &&
+                    c_ptr_i != c_ptr_j
+                    &&
+                    self.get_container(c_ptr_i).depth == self.get_container(c_ptr_j).depth
+                    ==>
+                    self.get_container(c_ptr_i).subtree_set@.disjoint(self.get_container(c_ptr_j).subtree_set@)
+                    &&
+                    self.get_container(c_ptr_i).subtree_set@.contains(c_ptr_j) == false
+                    &&
+                    self.get_container(c_ptr_j).subtree_set@.contains(c_ptr_i) == false
+                    &&
+                    self.get_container(c_ptr_i).subtree_set@.insert(c_ptr_i).disjoint(self.get_container(c_ptr_j).subtree_set@.insert(c_ptr_j))
+        {   
+            assert(
+                forall|c_ptr_i:ContainerPtr, c_ptr_j:ContainerPtr|
+                #![trigger  self.get_container(c_ptr_i).subtree_set, self.get_container(c_ptr_j).subtree_set]
+                self.container_dom().contains(c_ptr_i)
+                &&
+                self.container_dom().contains(c_ptr_j)
+                &&
+                c_ptr_i != c_ptr_j
+                &&
+                self.get_container(c_ptr_i).depth == self.get_container(c_ptr_j).depth
+                ==>
+                c_ptr_i != self.root_container
+                &&
+                c_ptr_j != self.root_container
+                &&
+                self.get_container(c_ptr_i).depth != 0
+                &&
+                self.get_container(c_ptr_j).depth != 0
+            );
+
+            assert(
+                forall|c_ptr_i:ContainerPtr, c_ptr_j:ContainerPtr, sub_c_ptr_i:ContainerPtr, sub_c_ptr_j:ContainerPtr|
+                #![trigger  self.get_container(c_ptr_i).subtree_set@.contains(sub_c_ptr_i), self.get_container(c_ptr_j).subtree_set@.contains(sub_c_ptr_j)]
+                self.container_dom().contains(c_ptr_i)
+                &&
+                self.container_dom().contains(c_ptr_j)
+                &&
+                c_ptr_i != c_ptr_j
+                &&
+                self.get_container(c_ptr_i).depth == self.get_container(c_ptr_j).depth
+                &&
+                self.get_container(c_ptr_i).subtree_set@.contains(sub_c_ptr_i)
+                &&
+                self.get_container(c_ptr_j).subtree_set@.contains(sub_c_ptr_j)
+                ==>
+                self.get_container(sub_c_ptr_i).uppertree_seq@[self.get_container(c_ptr_i).depth as int] == c_ptr_i
+                &&
+                self.get_container(sub_c_ptr_j).uppertree_seq@[self.get_container(c_ptr_j).depth as int] == c_ptr_j
+            );
+
+        }
     }
 
     //exec

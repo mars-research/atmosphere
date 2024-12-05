@@ -993,6 +993,86 @@ impl ProcessManager{
                 self.get_thread(self.get_endpoint(e_ptr).queue@[i]).state == ThreadState::BLOCKED,
     {}
 
+    pub proof fn container_owned_procs_disjoint_inv(&self)
+        requires
+            self.wf()
+        ensures
+            forall|c_ptr_i:ContainerPtr, c_ptr_j:ContainerPtr|
+                #![trigger  self.get_container(c_ptr_i).owned_procs, self.get_container(c_ptr_j).owned_procs]
+                self.container_dom().contains(c_ptr_i)
+                &&
+                self.container_dom().contains(c_ptr_j)
+                &&
+                c_ptr_i != c_ptr_j
+                ==>
+                self.get_container(c_ptr_i).owned_procs@.disjoint(self.get_container(c_ptr_j).owned_procs@)
+    {   
+        assert(
+            forall|c_ptr_i:ContainerPtr, i:int, c_ptr_j:ContainerPtr, j:int|
+                #![auto]
+                self.container_dom().contains(c_ptr_i)
+                &&
+                self.container_dom().contains(c_ptr_j)
+                &&
+                c_ptr_i != c_ptr_j
+                &&
+                0 <= i < self.get_container(c_ptr_i).owned_procs@.len()
+                &&
+                0 <= j < self.get_container(c_ptr_j).owned_procs@.len()
+                ==>
+                self.get_container(c_ptr_i).owned_procs@.contains(self.get_container(c_ptr_i).owned_procs@[i])
+                &&
+                self.get_container(c_ptr_j).owned_procs@.contains(self.get_container(c_ptr_j).owned_procs@[j])
+                &&
+                self.get_proc(self.get_container(c_ptr_i).owned_procs@[i]).owning_container == c_ptr_i
+                &&
+                self.get_proc(self.get_container(c_ptr_j).owned_procs@[j]).owning_container == c_ptr_j
+        );
+    }
+
+    pub proof fn container_owned_threads_disjoint_inv(&self)
+        requires
+            self.wf()
+        ensures
+            forall|c_ptr_i:ContainerPtr, c_ptr_j:ContainerPtr|
+                #![trigger  self.get_container(c_ptr_i).owned_threads, self.get_container(c_ptr_j).owned_threads]
+                self.container_dom().contains(c_ptr_i)
+                &&
+                self.container_dom().contains(c_ptr_j)
+                &&
+                c_ptr_i != c_ptr_j
+                ==>
+                self.get_container(c_ptr_i).owned_threads@.disjoint(self.get_container(c_ptr_j).owned_threads@)
+    {   
+    }
+
+    pub proof fn container_subtree_disjoint_inv(&self)
+        requires
+            self.wf()
+        ensures
+            forall|c_ptr_i:ContainerPtr, c_ptr_j:ContainerPtr|
+            #![trigger  self.get_container(c_ptr_i), self.get_container(c_ptr_j)]
+            #![trigger  self.get_container(c_ptr_i).subtree_set@.insert(c_ptr_i), self.get_container(c_ptr_j).subtree_set@.insert(c_ptr_j)]
+                self.container_dom().contains(c_ptr_i)
+                &&
+                self.container_dom().contains(c_ptr_j)
+                &&
+                c_ptr_i != c_ptr_j
+                &&
+                self.get_container(c_ptr_i).depth == self.get_container(c_ptr_j).depth
+                ==>
+                self.get_container(c_ptr_i).subtree_set@.disjoint(self.get_container(c_ptr_j).subtree_set@)
+                &&
+                self.get_container(c_ptr_i).subtree_set@.contains(c_ptr_j) == false
+                &&
+                self.get_container(c_ptr_j).subtree_set@.contains(c_ptr_i) == false
+                &&
+                self.get_container(c_ptr_i).subtree_set@.insert(c_ptr_i).disjoint(self.get_container(c_ptr_j).subtree_set@.insert(c_ptr_j))
+    {
+        self.container_tree.container_subtree_disjoint_inv();   
+    }
+        
+
     pub proof fn cpu_inv(&self)
         requires 
             self.wf(),

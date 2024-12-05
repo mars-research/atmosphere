@@ -248,7 +248,7 @@ impl Kernel {
             ==>
             self.get_container(c_ptr_i).subtree_set@.insert(c_ptr_i).disjoint(self.get_container(c_ptr_j).subtree_set@.insert(c_ptr_j))
     {   
-        admit();
+        self.proc_man.container_subtree_disjoint_inv();
     }
 
     pub proof fn container_owned_procs_disjoint_inv(&self)
@@ -265,7 +265,7 @@ impl Kernel {
                 ==>
                 self.get_container(c_ptr_i).owned_procs@.disjoint(self.get_container(c_ptr_j).owned_procs@)
     {   
-        admit();
+        self.proc_man.container_owned_procs_disjoint_inv();
     }
     
     
@@ -283,7 +283,7 @@ impl Kernel {
                 ==>
                 self.get_container(c_ptr_i).owned_threads@.disjoint(self.get_container(c_ptr_j).owned_threads@)
     {   
-        admit();
+        self.proc_man.container_owned_threads_disjoint_inv();
     }
     pub proof fn container_inv(&self)
         requires
