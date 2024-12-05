@@ -104,11 +104,30 @@ use crate::lemma::lemma_t::*;
 
         pub open spec fn endpoint_inv(&self) -> bool{
             &&&
-            forall|a_t_ptr: ThreadPtr, a_index:int, b_t_ptr: ThreadPtr, b_index:int|
-                #![auto]
-                self.kernel_state@.get_container(self.containers.a_c_ptr).owned_threads@.contains(a_t_ptr)
+            forall|a_sub_c_ptr:ContainerPtr, a_t_ptr: ThreadPtr, a_index:int,  b_sub_c_ptr:ContainerPtr, b_t_ptr: ThreadPtr, b_index:int|
+            #![trigger 
+                self.kernel_state@.get_container(a_sub_c_ptr).owned_threads, 
+                self.kernel_state@.get_container(b_sub_c_ptr).owned_threads,
+                self.kernel_state@.get_thread(a_t_ptr),
+                self.kernel_state@.get_thread(b_t_ptr),
+                self.kernel_state@.get_thread(a_t_ptr).endpoint_descriptors@[a_index],
+                self.kernel_state@.get_thread(b_t_ptr).endpoint_descriptors@[b_index],
+            ]
+                (
+                    self.kernel_state@.get_container(self.containers.a_c_ptr).subtree_set@.contains(a_sub_c_ptr)
+                    || 
+                    a_sub_c_ptr == self.containers.a_c_ptr
+                )
                 &&
-                self.kernel_state@.get_container(self.containers.b_c_ptr).owned_threads@.contains(b_t_ptr)
+                (
+                    self.kernel_state@.get_container(self.containers.b_c_ptr).subtree_set@.contains(b_sub_c_ptr)
+                    ||
+                    b_sub_c_ptr == self.containers.b_c_ptr
+                )
+                &&
+                self.kernel_state@.get_container(a_sub_c_ptr).owned_threads@.contains(a_t_ptr)
+                &&
+                self.kernel_state@.get_container(b_sub_c_ptr).owned_threads@.contains(b_t_ptr)
                 &&
                 0 <= a_index < MAX_NUM_ENDPOINT_DESCRIPTORS
                 &&
@@ -119,25 +138,39 @@ use crate::lemma::lemma_t::*;
                 self.kernel_state@.get_thread(b_t_ptr).endpoint_descriptors@[b_index].is_Some()
                 ==>
                 self.kernel_state@.get_thread(a_t_ptr).endpoint_descriptors@[a_index].unwrap() != self.kernel_state@.get_thread(b_t_ptr).endpoint_descriptors@[b_index].unwrap()
-
             &&&
-            forall|t_ptr: ThreadPtr, index:int, outside_t_ptr: ThreadPtr, outside_index:int|
-                #![auto]
+            forall|sub_c_ptr:ContainerPtr, t_ptr: ThreadPtr, index:int, outside_c_ptr:ContainerPtr, outside_t_ptr: ThreadPtr, outside_index:int|
+            #![trigger 
+                self.kernel_state@.get_container(sub_c_ptr),
+                self.kernel_state@.get_container(outside_c_ptr),
+                self.kernel_state@.get_thread(t_ptr),
+                self.kernel_state@.get_thread(outside_t_ptr),
+                self.kernel_state@.get_thread(t_ptr).endpoint_descriptors@[index],
+                self.kernel_state@.get_thread(outside_t_ptr).endpoint_descriptors@[outside_index]
+                ]
                 (
-                    self.kernel_state@.get_container(self.containers.a_c_ptr).owned_threads@.contains(t_ptr)
+                    self.kernel_state@.get_container(self.containers.a_c_ptr).subtree_set@.contains(sub_c_ptr)
+                    || 
+                    sub_c_ptr == self.containers.a_c_ptr
+                    || 
+                    self.kernel_state@.get_container(self.containers.b_c_ptr).subtree_set@.contains(sub_c_ptr)
                     ||
-                    self.kernel_state@.get_container(self.containers.b_c_ptr).owned_threads@.contains(t_ptr)
+                    sub_c_ptr == self.containers.b_c_ptr
                 )
                 &&
-                (
-                    self.kernel_state@.thread_dom().contains(outside_t_ptr)
-                    &&
-                    self.kernel_state@.get_container(self.containers.a_c_ptr).owned_threads@.contains(outside_t_ptr) == false
-                    &&
-                    self.kernel_state@.get_container(self.containers.b_c_ptr).owned_threads@.contains(outside_t_ptr) == false
-                    &&
-                    self.kernel_state@.get_container(self.containers.v_c_ptr).owned_threads@.contains(outside_t_ptr) == false
-                )
+                self.kernel_state@.get_container(sub_c_ptr).owned_threads@.contains(t_ptr)
+                &&
+                self.kernel_state@.container_dom().contains(outside_c_ptr)
+                &&
+                self.kernel_state@.get_container(self.containers.a_c_ptr).subtree_set@.contains(outside_c_ptr) == false
+                &&
+                outside_c_ptr != self.containers.a_c_ptr
+                && 
+                self.kernel_state@.get_container(self.containers.b_c_ptr).subtree_set@.contains(outside_c_ptr) == false
+                &&
+                outside_c_ptr != self.containers.b_c_ptr
+                &&
+                self.kernel_state@.get_container(outside_c_ptr).owned_threads@.contains(outside_t_ptr)
                 &&
                 0 <= index < MAX_NUM_ENDPOINT_DESCRIPTORS
                 &&
