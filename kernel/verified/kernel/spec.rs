@@ -215,6 +215,20 @@ impl Kernel {
     {
         self.proc_man.process_inv();
     }
+
+    pub proof fn container_subtree_inv(&self)
+    requires
+        self.wf()
+    ensures
+        forall|c_ptr:ContainerPtr|
+            #![trigger self.container_dom().contains(c_ptr)]
+            #![trigger self.get_container(c_ptr)]
+            self.container_dom().contains(c_ptr)
+                ==>
+                self.get_container(c_ptr).subtree_set@.subset_of(self.container_dom())
+    {   
+        self.proc_man.container_subtree_inv();
+    }
     
     pub proof fn container_inv(&self)
         requires

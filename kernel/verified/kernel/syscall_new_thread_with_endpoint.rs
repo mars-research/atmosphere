@@ -70,6 +70,7 @@ pub open spec fn syscall_new_thread_with_endpoint_spec(old:Kernel, new:Kernel, t
         &&&
         forall|c:ContainerPtr| 
             #![trigger new.get_container(c)]
+            #![trigger old.get_container(c)]
             new.container_dom().contains(c) && c != target_container_ptr
             ==>
             old.get_container(c) =~= new.get_container(c)
@@ -99,6 +100,8 @@ pub open spec fn syscall_new_thread_with_endpoint_spec(old:Kernel, new:Kernel, t
         new.get_container(target_container_ptr).owned_endpoints@ =~= old.get_container(target_container_ptr).owned_endpoints@
         &&&
         new.get_container(target_container_ptr).owned_procs =~= old.get_container(target_container_ptr).owned_procs
+        &&&
+        new.get_container(target_container_ptr).subtree_set =~= old.get_container(target_container_ptr).subtree_set
         // things that changed
         &&&
         old.thread_dom().insert(new_thread_ptr) =~= new.thread_dom()

@@ -260,6 +260,20 @@ verus! {
 
     //proof
     impl ContainerTree{
+
+        pub proof fn container_subtree_inv(&self)
+            requires
+                self.wf()
+            ensures
+                forall|c_ptr:ContainerPtr|
+                    #![trigger self.container_dom().contains(c_ptr)]
+                    #![trigger self.get_container(c_ptr)]
+                    self.container_dom().contains(c_ptr)
+                        ==>
+                        self.get_container(c_ptr).subtree_set@.subset_of(self.container_dom())
+        {
+        }
+
         pub proof fn same_or_deeper_depth_imply_none_ancestor(&self, a_ptr:ContainerPtr, child_ptr:ContainerPtr)
             requires
                 self.wf(),

@@ -70,11 +70,30 @@ use crate::lemma::lemma_t::*;
         //major isolation invariant
         pub open spec fn memory_inv(&self) -> bool{
             &&&
-            forall|a_p_ptr: ProcPtr, b_p_ptr: ProcPtr, a_va:VAddr, b_va:VAddr|
-            #![auto]
-                self.kernel_state@.get_container(self.containers.a_c_ptr).owned_procs@.contains(a_p_ptr)
+            forall|a_sub_c_ptr:ContainerPtr, a_p_ptr: ProcPtr, b_p_ptr: ProcPtr, b_sub_c_ptr:ContainerPtr, a_va:VAddr, b_va:VAddr|
+            #![trigger 
+                self.kernel_state@.get_container(a_sub_c_ptr), 
+                self.kernel_state@.get_container(b_sub_c_ptr),
+                self.kernel_state@.get_address_space(a_p_ptr),
+                self.kernel_state@.get_address_space(b_p_ptr),
+                self.kernel_state@.get_address_space(a_p_ptr)[a_va],
+                self.kernel_state@.get_address_space(b_p_ptr)[b_va],
+            ]
+                (
+                    self.kernel_state@.get_container(self.containers.a_c_ptr).subtree_set@.contains(a_sub_c_ptr)
+                    || 
+                    a_sub_c_ptr == self.containers.a_c_ptr
+                )
                 &&
-                self.kernel_state@.get_container(self.containers.b_c_ptr).owned_procs@.contains(b_p_ptr)
+                (
+                    self.kernel_state@.get_container(self.containers.b_c_ptr).subtree_set@.contains(b_sub_c_ptr)
+                    ||
+                    b_sub_c_ptr == self.containers.b_c_ptr
+                )
+                &&
+                self.kernel_state@.get_container(a_sub_c_ptr).owned_procs@.contains(a_p_ptr)
+                &&
+                self.kernel_state@.get_container(b_sub_c_ptr).owned_procs@.contains(b_p_ptr)
                 &&
                 self.kernel_state@.get_address_space(a_p_ptr).dom().contains(a_va)
                 &&
@@ -232,10 +251,12 @@ use crate::lemma::lemma_t::*;
             old.kernel_state@.proc_thread_inv_1();
             old.kernel_state@.container_inv();
             old.kernel_state@.thread_inv();
+            old.kernel_state@.container_subtree_inv();
             new.kernel_state@.container_thread_inv_1();
             new.kernel_state@.proc_thread_inv_1();
             new.kernel_state@.container_inv();
             new.kernel_state@.thread_inv();
+            new.kernel_state@.container_subtree_inv();
             seq_push_lemma::<ProcPtr>();
             set_insert_lemma::<ThreadPtr>();
             assert(old.kernel_state@.get_container(old.containers.v_c_ptr).owned_procs@.contains(old.containers.v_p_ptr));
