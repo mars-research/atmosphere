@@ -237,11 +237,59 @@ use crate::lemma::lemma_t::*;
             self.endpoint_inv()
             &&&
             self.v_endpoint_inv()
-
         }
     }
 
 
+    pub open spec fn non_interference_A(old:IsolationStateMachine, new:IsolationStateMachine) -> bool{
+        &&&
+        old.containers =~= new.containers 
+        &&&
+        old.kernel_state@.container_dom().contains(old.containers.a_c_ptr)
+        &&&
+        new.kernel_state@.container_dom().contains(old.containers.b_c_ptr)
+        &&&
+        old.kernel_state@.get_container(old.containers.a_c_ptr).subtree_set =~= 
+            new.kernel_state@.get_container(old.containers.a_c_ptr).subtree_set
+        &&&
+        forall|a_sub_c_ptr:ContainerPtr| 
+            #![trigger old.kernel_state@.get_container(a_sub_c_ptr)]
+            old.kernel_state@.get_container(old.containers.a_c_ptr).subtree_set@.insert(old.containers.a_c_ptr).contains(a_sub_c_ptr)
+            ==>
+            old.kernel_state@.get_container(a_sub_c_ptr) =~= new.kernel_state@.get_container(a_sub_c_ptr)
+        &&&
+        forall|a_sub_c_ptr:ContainerPtr, a_c_ptr:ProcPtr| 
+            #![trigger old.kernel_state@.get_container(a_sub_c_ptr), old.kernel_state@.get_address_space(a_c_ptr)]
+            old.kernel_state@.get_container(old.containers.a_c_ptr).subtree_set@.insert(old.containers.a_c_ptr).contains(a_sub_c_ptr)
+            &&
+            old.kernel_state@.get_container(a_sub_c_ptr).owned_procs@.contains(a_c_ptr)
+            ==>
+            old.kernel_state@.get_proc(a_c_ptr) =~= new.kernel_state@.get_proc(a_c_ptr)
+            &&
+            old.kernel_state@.get_address_space(a_c_ptr) =~= new.kernel_state@.get_address_space(a_c_ptr)
+        &&&
+        forall|a_sub_c_ptr:ContainerPtr, a_t_ptr:ThreadPtr| 
+            #![trigger old.kernel_state@.get_container(a_sub_c_ptr), old.kernel_state@.get_thread(a_t_ptr) ]
+            old.kernel_state@.get_container(old.containers.a_c_ptr).subtree_set@.insert(old.containers.a_c_ptr).contains(a_sub_c_ptr)
+            &&
+            old.kernel_state@.get_container(a_sub_c_ptr).owned_threads@.contains(a_t_ptr)
+            ==>
+            old.kernel_state@.get_thread(a_t_ptr) =~= new.kernel_state@.get_thread(a_t_ptr)
+        &&&
+        forall|a_sub_c_ptr:ContainerPtr, a_t_ptr:ThreadPtr, i:int| 
+            #![trigger old.kernel_state@.get_container(a_sub_c_ptr), old.kernel_state@.get_thread(a_t_ptr).endpoint_descriptors@[i]]
+            old.kernel_state@.get_container(old.containers.a_c_ptr).subtree_set@.insert(old.containers.a_c_ptr).contains(a_sub_c_ptr)
+            &&
+            old.kernel_state@.get_container(a_sub_c_ptr).owned_threads@.contains(a_t_ptr)
+            &&
+            0 <= i < MAX_NUM_ENDPOINT_DESCRIPTORS
+            &&
+            old.kernel_state@.get_thread(a_t_ptr).endpoint_descriptors@[i].is_Some()
+            ==>
+            old.kernel_state@.get_endpoint(old.kernel_state@.get_thread(a_t_ptr).endpoint_descriptors@[i].unwrap()) 
+                =~=
+                new.kernel_state@.get_endpoint(old.kernel_state@.get_thread(a_t_ptr).endpoint_descriptors@[i].unwrap()) 
+    }
 
     impl IsolationStateMachine{
         pub open spec fn v_step_receive_page(&self, blocking_endpoint_index: EndpointIdx, va_range:VaRange4K) -> bool{
@@ -278,10 +326,11 @@ use crate::lemma::lemma_t::*;
         pub open spec fn v_step_new_thread_with_endpoint(&self, endpoint_index: EndpointIdx) -> bool{
             false
         }
+
     }
 
     impl IsolationStateMachine{
-        pub proof fn new_thread_preserve_inv(old: IsolationStateMachine, new: IsolationStateMachine, thread_ptr:ThreadPtr, endpoint_index: EndpointIdx, ret: SyscallReturnStruct)
+        pub proof fn new_thread_from_B_preserve_non_interference_A(old: IsolationStateMachine, new: IsolationStateMachine, thread_ptr:ThreadPtr, endpoint_index: EndpointIdx, ret: SyscallReturnStruct)
             requires
                 old.kernel_state@.thread_dom().contains(thread_ptr),
                 0 <= endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS,
@@ -291,18 +340,17 @@ use crate::lemma::lemma_t::*;
                 old.containers =~= new.containers,
                 old.containers.v_t_ptr == thread_ptr ==> old.v_step_new_thread_with_endpoint(endpoint_index),
                 old.inv(),
-            ensures
-                new.inv(),
+                old.kernel_state@.get_container(old.containers.b_c_ptr).subtree_set@.insert(old.containers.b_c_ptr).contains(old.kernel_state@.get_thread(thread_ptr).owning_container)
         {
             let target_proc_ptr = old.kernel_state@.get_thread(thread_ptr).owning_proc;
             let target_container_ptr = old.kernel_state@.get_thread(thread_ptr).owning_container;
-
             old.kernel_state@.container_thread_inv_1();
             old.kernel_state@.proc_thread_inv_1();
             old.kernel_state@.container_inv();
             old.kernel_state@.thread_inv();
             old.kernel_state@.container_subtree_inv();
             old.kernel_state@.container_subtree_disjoint_inv();
+            old.kernel_state@.container_owned_procs_disjoint_inv();
             old.kernel_state@.container_owned_threads_disjoint_inv();
             new.kernel_state@.container_thread_inv_1();
             new.kernel_state@.proc_thread_inv_1();
@@ -310,38 +358,36 @@ use crate::lemma::lemma_t::*;
             new.kernel_state@.thread_inv();
             new.kernel_state@.container_subtree_inv();
             new.kernel_state@.container_subtree_disjoint_inv();
+            new.kernel_state@.container_owned_procs_disjoint_inv();
             new.kernel_state@.container_owned_threads_disjoint_inv();
             seq_push_lemma::<ProcPtr>();
             set_insert_lemma::<ThreadPtr>();
-            assert(old.kernel_state@.get_container(old.containers.v_c_ptr).owned_procs@.contains(old.containers.v_p_ptr));
-            assert(old.kernel_state@.get_container(old.containers.v_c_ptr).owned_threads@.contains(old.containers.v_t_ptr));
-            assert(old.kernel_state@.get_container(old.containers.v_c_ptr).owned_threads@.contains(thread_ptr) == false);
-            assert(old.kernel_state@.get_proc(old.containers.v_p_ptr).owned_threads@.contains(thread_ptr) == false);
-            assert(thread_ptr != old.containers.v_t_ptr);
-            assert(target_proc_ptr != old.containers.v_p_ptr);
-            assert(target_container_ptr != old.containers.v_c_ptr);
 
-
-            if syscall_new_thread_with_endpoint_requirement(old.kernel_state@, thread_ptr, endpoint_index) == false {
-                assert(new.kernel_state@ =~= old.kernel_state@);
-                assert(new.inv());
-            }else{
-                let target_endpoint_ptr = old.kernel_state@.get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap();
-                let new_thread_ptr = ret.get_return_vaule_usize().unwrap();
-                assert(new.kernel_state@.thread_dom().contains(new.containers.v_t_ptr));
-                assert(ret.get_return_vaule_usize().is_Some());
-                assert(new.v_container_inv());
-                assert(new.v_address_space_inv());
-                assert(new.a_b_container_inv());
-                assert(new.memory_inv());
-                assert(new.endpoint_inv()) by {
-                };
-                assert(new.v_endpoint_inv());
-                assert(new.inv());
-            }
+            assert(
+                forall|a_sub_c_ptr:ContainerPtr| 
+                    #![trigger old.kernel_state@.get_container(a_sub_c_ptr)]
+                    old.kernel_state@.get_container(old.containers.a_c_ptr).subtree_set@.insert(old.containers.a_c_ptr).contains(a_sub_c_ptr)
+                    ==>
+                    old.kernel_state@.get_container(a_sub_c_ptr).owned_threads@.contains(thread_ptr) == false
+            );
+            assert(
+                forall|a_sub_c_ptr:ContainerPtr| 
+                    #![trigger old.kernel_state@.get_container(a_sub_c_ptr)]
+                    old.kernel_state@.get_container(old.containers.a_c_ptr).subtree_set@.insert(old.containers.a_c_ptr).contains(a_sub_c_ptr)
+                    ==>
+                    old.kernel_state@.get_container(a_sub_c_ptr).owned_procs@.contains(target_proc_ptr) == false
+            );
+            assert(non_interference_A(old,new));
+            // assert(old.kernel_state@.get_container(old.containers.v_c_ptr).owned_procs@.contains(old.containers.v_p_ptr));
+            // assert(old.kernel_state@.get_container(old.containers.v_c_ptr).owned_threads@.contains(old.containers.v_t_ptr));
+            // assert(old.kernel_state@.get_container(old.containers.v_c_ptr).owned_threads@.contains(thread_ptr) == false);
+            // assert(old.kernel_state@.get_proc(old.containers.v_p_ptr).owned_threads@.contains(thread_ptr) == false);
+            // assert(thread_ptr != old.containers.v_t_ptr);
+            // assert(target_proc_ptr != old.containers.v_p_ptr);
+            // assert(target_container_ptr != old.containers.v_c_ptr);
         }
 
-        pub proof fn mmap_preserve_inv(old: IsolationStateMachine, new: IsolationStateMachine, thread_ptr:ThreadPtr, va_range: VaRange4K, ret: SyscallReturnStruct)
+        pub proof fn mmap_from_B_preserve_non_interference_A(old: IsolationStateMachine, new: IsolationStateMachine, thread_ptr:ThreadPtr, va_range: VaRange4K, ret: SyscallReturnStruct)
             requires
                 old.kernel_state@.thread_dom().contains(thread_ptr),
                 va_range.wf(),
@@ -352,79 +398,197 @@ use crate::lemma::lemma_t::*;
                 old.containers =~= new.containers,
                 old.containers.v_t_ptr == thread_ptr ==> old.v_step_mmap(va_range),
                 old.inv(),
-            ensures
-                // new.inv(),
-        {
-            old.kernel_state@.container_thread_inv_1();
-            old.kernel_state@.proc_thread_inv_1();
-            old.kernel_state@.container_inv();
-            old.kernel_state@.thread_inv();
-            old.kernel_state@.container_subtree_inv();
-            old.kernel_state@.container_subtree_disjoint_inv();
-            old.kernel_state@.container_owned_procs_disjoint_inv();
-            new.kernel_state@.container_thread_inv_1();
-            new.kernel_state@.proc_thread_inv_1();
-            new.kernel_state@.container_inv();
-            new.kernel_state@.thread_inv();
-            new.kernel_state@.container_subtree_inv();
-            new.kernel_state@.container_subtree_disjoint_inv();
-            new.kernel_state@.container_owned_procs_disjoint_inv();
-            seq_push_lemma::<ProcPtr>();
-            set_insert_lemma::<ThreadPtr>();
+                old.kernel_state@.get_container(old.containers.b_c_ptr).subtree_set@.insert(old.containers.b_c_ptr).contains(old.kernel_state@.get_thread(thread_ptr).owning_container)
+    {
+        let target_proc_ptr = old.kernel_state@.get_thread(thread_ptr).owning_proc;
+        let target_container_ptr = old.kernel_state@.get_thread(thread_ptr).owning_container;
+        old.kernel_state@.container_thread_inv_1();
+        old.kernel_state@.proc_thread_inv_1();
+        old.kernel_state@.container_inv();
+        old.kernel_state@.thread_inv();
+        old.kernel_state@.container_subtree_inv();
+        old.kernel_state@.container_subtree_disjoint_inv();
+        old.kernel_state@.container_owned_procs_disjoint_inv();
+        old.kernel_state@.container_owned_threads_disjoint_inv();
+        new.kernel_state@.container_thread_inv_1();
+        new.kernel_state@.proc_thread_inv_1();
+        new.kernel_state@.container_inv();
+        new.kernel_state@.thread_inv();
+        new.kernel_state@.container_subtree_inv();
+        new.kernel_state@.container_subtree_disjoint_inv();
+        new.kernel_state@.container_owned_procs_disjoint_inv();
+        new.kernel_state@.container_owned_threads_disjoint_inv();
+        seq_push_lemma::<ProcPtr>();
+        set_insert_lemma::<ThreadPtr>();
 
-            let proc_ptr = old.kernel_state@.get_thread(thread_ptr).owning_proc;
-            let container_ptr = old.kernel_state@.get_thread(thread_ptr).owning_container;
-            assert(old.kernel_state@.get_container(old.containers.v_c_ptr).owned_procs@.contains(old.containers.v_p_ptr));
-            assert(old.kernel_state@.get_container(old.containers.v_c_ptr).owned_threads@.contains(old.containers.v_t_ptr));
-            assert(old.kernel_state@.get_container(old.containers.v_c_ptr).owned_threads@.contains(thread_ptr) == false);
-            assert(old.kernel_state@.get_proc(old.containers.v_p_ptr).owned_threads@.contains(thread_ptr) == false);
-            assert(thread_ptr != old.containers.v_t_ptr);
-            assert(proc_ptr != old.containers.v_p_ptr);
-            assert(container_ptr != old.containers.v_c_ptr);
+        assert(
+            forall|a_sub_c_ptr:ContainerPtr| 
+                #![trigger old.kernel_state@.get_container(a_sub_c_ptr)]
+                old.kernel_state@.get_container(old.containers.a_c_ptr).subtree_set@.insert(old.containers.a_c_ptr).contains(a_sub_c_ptr)
+                ==>
+                old.kernel_state@.get_container(a_sub_c_ptr).owned_threads@.contains(thread_ptr) == false
+        );
+        assert(
+            forall|a_sub_c_ptr:ContainerPtr| 
+                #![trigger old.kernel_state@.get_container(a_sub_c_ptr)]
+                old.kernel_state@.get_container(old.containers.a_c_ptr).subtree_set@.insert(old.containers.a_c_ptr).contains(a_sub_c_ptr)
+                ==>
+                old.kernel_state@.get_container(a_sub_c_ptr).owned_procs@.contains(target_proc_ptr) == false
+        );
+        assert(non_interference_A(old,new));
+        // assert(old.kernel_state@.get_container(old.containers.v_c_ptr).owned_procs@.contains(old.containers.v_p_ptr));
+        // assert(old.kernel_state@.get_container(old.containers.v_c_ptr).owned_threads@.contains(old.containers.v_t_ptr));
+        // assert(old.kernel_state@.get_container(old.containers.v_c_ptr).owned_threads@.contains(thread_ptr) == false);
+        // assert(old.kernel_state@.get_proc(old.containers.v_p_ptr).owned_threads@.contains(thread_ptr) == false);
+        // assert(thread_ptr != old.containers.v_t_ptr);
+        // assert(target_proc_ptr != old.containers.v_p_ptr);
+        // assert(target_container_ptr != old.containers.v_c_ptr);
+    }
+
+        // pub proof fn new_thread_preserve_inv(old: IsolationStateMachine, new: IsolationStateMachine, thread_ptr:ThreadPtr, endpoint_index: EndpointIdx, ret: SyscallReturnStruct)
+        //     requires
+        //         old.kernel_state@.thread_dom().contains(thread_ptr),
+        //         0 <= endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS,
+        //         old.kernel_state@.wf(),
+        //         new.kernel_state@.wf(),
+        //         syscall_new_thread_with_endpoint_spec(old.kernel_state@, new.kernel_state@, thread_ptr, endpoint_index, ret),
+        //         old.containers =~= new.containers,
+        //         old.containers.v_t_ptr == thread_ptr ==> old.v_step_new_thread_with_endpoint(endpoint_index),
+        //         old.inv(),
+        //     ensures
+        //         new.inv(),
+        // {
+        //     let target_proc_ptr = old.kernel_state@.get_thread(thread_ptr).owning_proc;
+        //     let target_container_ptr = old.kernel_state@.get_thread(thread_ptr).owning_container;
+
+        //     old.kernel_state@.container_thread_inv_1();
+        //     old.kernel_state@.proc_thread_inv_1();
+        //     old.kernel_state@.container_inv();
+        //     old.kernel_state@.thread_inv();
+        //     old.kernel_state@.container_subtree_inv();
+        //     old.kernel_state@.container_subtree_disjoint_inv();
+        //     old.kernel_state@.container_owned_threads_disjoint_inv();
+        //     new.kernel_state@.container_thread_inv_1();
+        //     new.kernel_state@.proc_thread_inv_1();
+        //     new.kernel_state@.container_inv();
+        //     new.kernel_state@.thread_inv();
+        //     new.kernel_state@.container_subtree_inv();
+        //     new.kernel_state@.container_subtree_disjoint_inv();
+        //     new.kernel_state@.container_owned_threads_disjoint_inv();
+        //     seq_push_lemma::<ProcPtr>();
+        //     set_insert_lemma::<ThreadPtr>();
+        //     assert(old.kernel_state@.get_container(old.containers.v_c_ptr).owned_procs@.contains(old.containers.v_p_ptr));
+        //     assert(old.kernel_state@.get_container(old.containers.v_c_ptr).owned_threads@.contains(old.containers.v_t_ptr));
+        //     assert(old.kernel_state@.get_container(old.containers.v_c_ptr).owned_threads@.contains(thread_ptr) == false);
+        //     assert(old.kernel_state@.get_proc(old.containers.v_p_ptr).owned_threads@.contains(thread_ptr) == false);
+        //     assert(thread_ptr != old.containers.v_t_ptr);
+        //     assert(target_proc_ptr != old.containers.v_p_ptr);
+        //     assert(target_container_ptr != old.containers.v_c_ptr);
 
 
-            if syscall_mmap_requirement(old.kernel_state@, thread_ptr, va_range) == false {
-                assert(new.kernel_state@ =~= old.kernel_state@);
-                assert(new.inv());
-            }
-            else{
-                assert(new.v_container_inv()) by {
-                    assert(new.kernel_state@.container_dom().contains(new.containers.v_c_ptr));
-                    assert(new.kernel_state@.get_container(new.containers.v_c_ptr).owned_procs@ =~= Seq::<ProcPtr>::empty().push(new.containers.v_p_ptr));
-                    assert(new.kernel_state@.get_container(new.containers.v_c_ptr).owned_threads@ =~= Set::<ThreadPtr>::empty().insert(new.containers.v_t_ptr));
-                    assert(new.kernel_state@.get_proc(new.containers.v_p_ptr).owned_threads@ =~= Seq::<ThreadPtr>::empty().push(new.containers.v_t_ptr));
-                    assert(new.kernel_state@.get_thread(new.containers.v_t_ptr).owning_container == new.containers.v_c_ptr);
-                    assert(new.kernel_state@.get_thread(new.containers.v_t_ptr).owning_proc == new.containers.v_p_ptr);
-                    assert(new.kernel_state@.get_proc(new.containers.v_p_ptr).owning_container == new.containers.v_c_ptr);
-                };
-                assert(new.v_address_space_inv());
-                assert(new.a_b_container_inv());
-                assert(new.memory_inv()) by {
+        //     if syscall_new_thread_with_endpoint_requirement(old.kernel_state@, thread_ptr, endpoint_index) == false {
+        //         assert(new.kernel_state@ =~= old.kernel_state@);
+        //         assert(new.inv());
+        //     }else{
+        //         let target_endpoint_ptr = old.kernel_state@.get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap();
+        //         let new_thread_ptr = ret.get_return_vaule_usize().unwrap();
+        //         assert(new.kernel_state@.thread_dom().contains(new.containers.v_t_ptr));
+        //         assert(ret.get_return_vaule_usize().is_Some());
+        //         assert(new.v_container_inv());
+        //         assert(new.v_address_space_inv());
+        //         assert(new.a_b_container_inv());
+        //         assert(new.memory_inv());
+        //         assert(new.endpoint_inv()) by {
+        //         };
+        //         assert(new.v_endpoint_inv());
+        //         assert(new.inv());
+        //     }
+        // }
 
-                    assert(
-                        forall|a_sub_c_ptr:ContainerPtr, a_p_ptr: ProcPtr, b_p_ptr: ProcPtr, b_sub_c_ptr:ContainerPtr,|
-                    #![trigger 
-                        new.kernel_state@.get_container(a_sub_c_ptr), 
-                        new.kernel_state@.get_container(b_sub_c_ptr),
-                        new.kernel_state@.get_container(a_sub_c_ptr).owned_procs@.contains(a_p_ptr),
-                        new.kernel_state@.get_container(b_sub_c_ptr).owned_procs@.contains(b_p_ptr),
-                    ]
-                        new.kernel_state@.get_container(new.containers.a_c_ptr).subtree_set@.insert(new.containers.a_c_ptr).contains(a_sub_c_ptr)
-                        &&
-                        new.kernel_state@.get_container(new.containers.b_c_ptr).subtree_set@.insert(new.containers.b_c_ptr).contains(b_sub_c_ptr)
-                        &&
-                        new.kernel_state@.get_container(a_sub_c_ptr).owned_procs@.contains(a_p_ptr)
-                        &&
-                        new.kernel_state@.get_container(b_sub_c_ptr).owned_procs@.contains(b_p_ptr)
-                        ==>
-                        b_p_ptr != a_p_ptr
-                    );
-                };
-                assert(new.endpoint_inv());
-                assert(new.v_endpoint_inv());
-                assert(new.inv());
-            }
-        }
+        // pub proof fn mmap_preserve_inv(old: IsolationStateMachine, new: IsolationStateMachine, thread_ptr:ThreadPtr, va_range: VaRange4K, ret: SyscallReturnStruct)
+        //     requires
+        //         old.kernel_state@.thread_dom().contains(thread_ptr),
+        //         va_range.wf(),
+        //         va_range.len * 4 < usize::MAX,
+        //         old.kernel_state@.wf(),
+        //         new.kernel_state@.wf(),
+        //         syscall_mmap_spec(old.kernel_state@, new.kernel_state@, thread_ptr, va_range, ret),
+        //         old.containers =~= new.containers,
+        //         old.containers.v_t_ptr == thread_ptr ==> old.v_step_mmap(va_range),
+        //         old.inv(),
+        //     ensures
+        //         // new.inv(),
+        // {
+        //     old.kernel_state@.container_thread_inv_1();
+        //     old.kernel_state@.proc_thread_inv_1();
+        //     old.kernel_state@.container_inv();
+        //     old.kernel_state@.thread_inv();
+        //     old.kernel_state@.container_subtree_inv();
+        //     old.kernel_state@.container_subtree_disjoint_inv();
+        //     old.kernel_state@.container_owned_procs_disjoint_inv();
+        //     new.kernel_state@.container_thread_inv_1();
+        //     new.kernel_state@.proc_thread_inv_1();
+        //     new.kernel_state@.container_inv();
+        //     new.kernel_state@.thread_inv();
+        //     new.kernel_state@.container_subtree_inv();
+        //     new.kernel_state@.container_subtree_disjoint_inv();
+        //     new.kernel_state@.container_owned_procs_disjoint_inv();
+        //     seq_push_lemma::<ProcPtr>();
+        //     set_insert_lemma::<ThreadPtr>();
+
+        //     let proc_ptr = old.kernel_state@.get_thread(thread_ptr).owning_proc;
+        //     let container_ptr = old.kernel_state@.get_thread(thread_ptr).owning_container;
+        //     assert(old.kernel_state@.get_container(old.containers.v_c_ptr).owned_procs@.contains(old.containers.v_p_ptr));
+        //     assert(old.kernel_state@.get_container(old.containers.v_c_ptr).owned_threads@.contains(old.containers.v_t_ptr));
+        //     assert(old.kernel_state@.get_container(old.containers.v_c_ptr).owned_threads@.contains(thread_ptr) == false);
+        //     assert(old.kernel_state@.get_proc(old.containers.v_p_ptr).owned_threads@.contains(thread_ptr) == false);
+        //     assert(thread_ptr != old.containers.v_t_ptr);
+        //     assert(proc_ptr != old.containers.v_p_ptr);
+        //     assert(container_ptr != old.containers.v_c_ptr);
+
+
+        //     if syscall_mmap_requirement(old.kernel_state@, thread_ptr, va_range) == false {
+        //         assert(new.kernel_state@ =~= old.kernel_state@);
+        //         assert(new.inv());
+        //     }
+        //     else{
+        //         assert(new.v_container_inv()) by {
+        //             assert(new.kernel_state@.container_dom().contains(new.containers.v_c_ptr));
+        //             assert(new.kernel_state@.get_container(new.containers.v_c_ptr).owned_procs@ =~= Seq::<ProcPtr>::empty().push(new.containers.v_p_ptr));
+        //             assert(new.kernel_state@.get_container(new.containers.v_c_ptr).owned_threads@ =~= Set::<ThreadPtr>::empty().insert(new.containers.v_t_ptr));
+        //             assert(new.kernel_state@.get_proc(new.containers.v_p_ptr).owned_threads@ =~= Seq::<ThreadPtr>::empty().push(new.containers.v_t_ptr));
+        //             assert(new.kernel_state@.get_thread(new.containers.v_t_ptr).owning_container == new.containers.v_c_ptr);
+        //             assert(new.kernel_state@.get_thread(new.containers.v_t_ptr).owning_proc == new.containers.v_p_ptr);
+        //             assert(new.kernel_state@.get_proc(new.containers.v_p_ptr).owning_container == new.containers.v_c_ptr);
+        //         };
+        //         assert(new.v_address_space_inv());
+        //         assert(new.a_b_container_inv());
+        //         assert(new.memory_inv()) by {
+
+        //             assert(
+        //                 forall|a_sub_c_ptr:ContainerPtr, a_p_ptr: ProcPtr, b_p_ptr: ProcPtr, b_sub_c_ptr:ContainerPtr,|
+        //             #![trigger 
+        //                 new.kernel_state@.get_container(a_sub_c_ptr), 
+        //                 new.kernel_state@.get_container(b_sub_c_ptr),
+        //                 new.kernel_state@.get_container(a_sub_c_ptr).owned_procs@.contains(a_p_ptr),
+        //                 new.kernel_state@.get_container(b_sub_c_ptr).owned_procs@.contains(b_p_ptr),
+        //             ]
+        //                 new.kernel_state@.get_container(new.containers.a_c_ptr).subtree_set@.insert(new.containers.a_c_ptr).contains(a_sub_c_ptr)
+        //                 &&
+        //                 new.kernel_state@.get_container(new.containers.b_c_ptr).subtree_set@.insert(new.containers.b_c_ptr).contains(b_sub_c_ptr)
+        //                 &&
+        //                 new.kernel_state@.get_container(a_sub_c_ptr).owned_procs@.contains(a_p_ptr)
+        //                 &&
+        //                 new.kernel_state@.get_container(b_sub_c_ptr).owned_procs@.contains(b_p_ptr)
+        //                 ==>
+        //                 b_p_ptr != a_p_ptr
+        //             );
+        //         };
+        //         assert(new.endpoint_inv());
+        //         assert(new.v_endpoint_inv());
+        //         assert(new.inv());
+        //     }
+        // }
 
     }
 }

@@ -342,6 +342,10 @@ impl Kernel {
                 ==>
                 self.container_dom().contains(self.get_thread(t_ptr).owning_container)
                 &&
+                self.get_container(self.get_thread(t_ptr).owning_container).owned_threads@.contains(t_ptr)
+                &&
+                self.get_container(self.get_thread(t_ptr).owning_container).owned_procs@.contains(self.get_thread(t_ptr).owning_proc)
+                &&
                 self.proc_dom().contains(self.get_thread(t_ptr).owning_proc)
                 &&
                 self.get_thread(t_ptr).endpoint_descriptors.wf()

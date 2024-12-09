@@ -14,17 +14,17 @@ use crate::define::*;
 use crate::kernel::Kernel;
 use crate::va_range::VaRange4K;
 
-pub open spec fn syscall_mmap_requirement(old:Kernel,  thread_ptr: ThreadPtr, va_range: VaRange4K) -> bool{
+pub open spec fn syscall_mmap_return_value(old:Kernel,  thread_ptr: ThreadPtr, va_range: VaRange4K) -> UserRetValueType{
     let proc_ptr = old.proc_man.get_thread(thread_ptr).owning_proc;
     let pcid = old.proc_man.get_proc(proc_ptr).pcid;
     let container_ptr = old.proc_man.get_proc(proc_ptr).owning_container;
 
     if old.get_container_quota(container_ptr) < va_range.len * 4{
-        false
+        UserRetValueType::ErrorNoQuota
     }else if old.address_space_range_free(proc_ptr, &va_range) == false {
-        false
+        UserRetValueType::ErrorVaInUse
     }else{
-        true
+        UserRetValueType::Success
     }
 }
 
@@ -32,7 +32,7 @@ pub open spec fn syscall_mmap_spec(old:Kernel, new:Kernel, thread_id: ThreadPtr,
     let proc_ptr = old.get_thread(thread_id).owning_proc;
     let container_ptr = old.get_thread(thread_id).owning_container;
     let mmapped_physcial_pages_seq = ret.get_return_vaule_seq_usize().unwrap();
-    if  syscall_mmap_requirement(old, thread_id, va_range) == false {
+    if  syscall_mmap_return_value(old, thread_id, va_range).is_error() {
         new =~= old
     }
     else{
@@ -151,7 +151,7 @@ pub fn syscall_mmap(&mut self, thread_ptr: ThreadPtr, va_range: VaRange4K) ->  (
         va_range.wf(),
         va_range.len * 4 < usize::MAX,
     ensures
-        syscall_mmap_requirement(*old(self), thread_ptr, va_range) == false <==> ret.is_error(),
+        // syscall_mmap_requirement(*old(self), thread_ptr, va_range) == false <==> ret.is_error(),
         syscall_mmap_spec(*old(self), *self, thread_ptr, va_range, ret),
 {
     let proc_ptr = self.proc_man.get_thread(thread_ptr).owning_proc;
@@ -163,7 +163,7 @@ pub fn syscall_mmap(&mut self, thread_ptr: ThreadPtr, va_range: VaRange4K) ->  (
     }
 
     if self.proc_man.get_container(container_ptr).mem_quota < va_range.len * 4{
-        return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
+        return SyscallReturnStruct::NoSwitchNew(RetValueType::ErrorNoQuota);
     }
 
     assert(self.page_alloc.free_pages_4k.len() >= va_range.len * 4) by {
@@ -171,7 +171,7 @@ pub fn syscall_mmap(&mut self, thread_ptr: ThreadPtr, va_range: VaRange4K) ->  (
     }
 
     if self.check_address_space_va_range_free(proc_ptr, &va_range) == false {
-        return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
+        return SyscallReturnStruct::NoSwitchNew(RetValueType::ErrorVaInUse);
     }
 
     let (num_page, seq_pages) = self.range_alloc_and_map(proc_ptr, &va_range);

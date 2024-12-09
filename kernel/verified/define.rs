@@ -123,11 +123,43 @@ pub enum PageTableErrorCode {
 
 #[derive(Clone, Copy)]
 #[allow(inconsistent_fields)]
+pub enum UserRetValueType{
+    Success,
+    ErrorNoQuota,
+    ErrorVaInUse,
+    Else,
+}
+impl UserRetValueType{
+
+    pub open spec fn spec_is_error(&self) -> bool{
+        match self{
+            Self::Success => {false},
+            Self::ErrorNoQuota => {true},
+            Self::ErrorVaInUse => {true},
+            Self::Else => {true},
+        }
+    }
+
+    #[verifier(when_used_as_spec(spec_is_error))]
+    pub fn is_error(&self) -> bool{
+        match self{
+            Self::Success => {false},
+            Self::ErrorNoQuota => {true},
+            Self::ErrorVaInUse => {true},
+            Self::Else => {true},
+        }
+    }    
+}
+
+#[derive(Clone, Copy)]
+#[allow(inconsistent_fields)]
 pub enum RetValueType{
     SuccessUsize{ value:usize },
     SuccessSeqUsize{ value:Ghost<Seq<usize>> },
     SuccessPairUsize{ value1:usize, value2:usize},
     SuccessThreeUsize{ value1:usize, value2:usize, value3:usize},
+    ErrorNoQuota,
+    ErrorVaInUse,
     CpuIdle,
     Error,
     Else,
@@ -199,6 +231,18 @@ pub struct SyscallReturnStruct{
 }
 
 impl SyscallReturnStruct{
+
+    pub open spec fn to_user_return_value(&self) -> UserRetValueType{
+        match self.error_code {
+            RetValueType::SuccessUsize{..} => UserRetValueType::Success,
+            RetValueType::SuccessSeqUsize{..} => UserRetValueType::Success,
+            RetValueType::SuccessPairUsize{..} => UserRetValueType::Success,
+            RetValueType::SuccessThreeUsize{..} => UserRetValueType::Success,
+            RetValueType::ErrorNoQuota => UserRetValueType::ErrorNoQuota,
+            RetValueType::ErrorVaInUse => UserRetValueType::ErrorVaInUse,
+            _ => UserRetValueType::Else,
+        }
+    }
 
     pub open spec fn get_return_vaule_usize(&self) -> Option<usize>
     {
