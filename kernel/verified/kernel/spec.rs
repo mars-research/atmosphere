@@ -330,7 +330,7 @@ impl Kernel {
         self.proc_man.container_inv();
     }
 
-        pub proof fn thread_inv(&self)
+    pub proof fn thread_inv(&self)
         requires
             self.wf()
         ensures
