@@ -89,17 +89,19 @@ extern "C" fn main(payload_base: *mut u8, payload_size: usize) -> isize {
 
     // test_alloc();
 
-    log::info!("Enumerating PCI");
+    // log::info!("Enumerating PCI");
 
-    scan_pci_devs();
+    // scan_pci_devs();
 
-    start_ixgbe_driver_fwd_test();
+    // start_ixgbe_driver_fwd_test();
 
     // test_ixgbe_with_ring_buffer_tx();
 
     // test_ixgbe_driver();
-    test_nvme_driver();
-
+    // test_nvme_driver();
+    unsafe {
+        asys::sys_print("end of system boot".as_ptr(), 18);
+    }
     loop {}
 }
 fn thread_1_main() {

@@ -1468,7 +1468,7 @@ pub fn start_ixgbe_driver_smoltcp_test() {
         device.do_rx();
 
         iface.poll(Instant::from_millis(timestamp), &mut device, &mut sockets);
-        httpd.handle(&mut sockets);
+        // httpd.handle(&mut sockets);
 
         device.do_tx();
 
