@@ -48,13 +48,13 @@ fn x86_64_asm_bin(source: &str, text_base: u64) {
         let binary = out_dir.join(binary_name);
 
         // .o -> elf with 0x7000
-        let ld = Command::new("ld")
+        let ld = Command::new("x86_64.ld")
             .args(&["-N", "-Ttext", &format!("{:#x}", text_base)])
             .arg("-o")
             .arg(&linked)
             .arg(&object)
             .status()
-            .expect("Failed to spawn ld");
+            .expect("Failed to spawn x86_64.ld");
 
         if !ld.success() {
             panic!("ld failed");
