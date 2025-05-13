@@ -94,7 +94,11 @@
 
         (mkCargoShim "verify")
         (mkCargoShim "gdb")
-      ]);
+      ]) ++ (lib.optionals pkgs.stdenv.isDarwin (with pkgs; [
+        # FIXME: Remove when upgrading nixpkgs
+        darwin.Security
+        curl
+      ]));
 
       buildInputs = [ pkgs.openssl ];
 
