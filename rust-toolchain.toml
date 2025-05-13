@@ -1,4 +1,4 @@
 [toolchain]
 channel = "nightly-2024-01-01"
-components = [ "rust-src", "rust-analyzer-preview", "clippy", "rustc-codegen-cranelift" ]
+components = [ "rust-src", "rust-analyzer-preview", "clippy" ]
 profile = "default"
