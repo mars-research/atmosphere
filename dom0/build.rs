@@ -34,13 +34,13 @@ fn x86_64_asm_elf(source: &str) {
         let linked = out_dir.join(linked_name);
 
         // .o -> static-pie elf
-        let ld = Command::new("ld")
+        let ld = Command::new("x86_64.ld")
             .args(&["--pie", "--no-dynamic-linker"])
             .arg("-o")
             .arg(&linked)
             .arg(&object)
             .status()
-            .expect("Failed to spawn ld");
+            .expect("Failed to spawn x86_64.ld");
 
         if !ld.success() {
             panic!("ld failed");
