@@ -44,6 +44,27 @@
       shift 1
       exec atmo ${sub} "$@"
     '';
+
+    gdb' = let
+      # macOS: Don't build gdbserver - We only need to connect to QEMU's X86 gdbserver
+      darwinGdb = (x86Tools.buildPackages.gdb.override {
+        hostCpuOnly = true;
+      }).overrideAttrs (old: let
+        inherit (x86Tools.stdenv.cc) targetPrefix;
+      in {
+        configureFlags = (old.configureFlags or []) ++ [
+          "--enable-targets=${x86Tools.stdenv.targetPlatform.config}"
+        ];
+        postInstall = (old.postInstall or "") + ''
+          if [[ -n "${targetPrefix}" ]]; then
+            ln -s "$out/bin/${targetPrefix}gdb" "$out/bin/gdb"
+          fi
+        '';
+        meta = old.meta // {
+          platforms = lib.platforms.darwin;
+        };
+      });
+    in if pkgs.stdenv.isDarwin then darwinGdb else pkgs.gdb;
   in {
     devShell = mkShell {
       nativeBuildInputs = [
@@ -67,7 +88,7 @@
 
         nasm
 
-        gdb
+        gdb'
 
         qemu
 
