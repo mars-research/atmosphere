@@ -1,0 +1,53 @@
+[package]
+name = "mlx5_driver"
+description = "Driver for Mellanox ConnectX-5 NIC, forked from Theseaus-os"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+lazy_static = { version = "1.4", features = ["spin_no_std"] }
+log = { version = "0.4", default-features = false }
+spin = "0.9.4"
+libm = "0.2.1"
+mpmc = "0.1.6"
+
+# Import 
+verified = { path = "../kernel/verified" }
+asys = { path = "../asys"}
+
+
+# [dependencies.log]
+# version = "0.4.8"
+
+# [dependencies.sync_irq]
+# path = "../../libs/sync_irq"
+
+# [dependencies.memory]
+# path = "../memory"
+
+# [dependencies.pci]
+# path = "../pci"
+
+# [dependencies.nic_initialization]
+# path = "../nic_initialization"
+
+# [dependencies.mlx_ethernet]
+# path = "../mlx_ethernet"
+
+# [dependencies.kernel_config]
+# path = "../kernel_config"
+
+# [dependencies.memory_structs]
+# path = "../memory_structs"
+
+# [dependencies.nic_buffers]
+# path = "../nic_buffers"
+
+# [dependencies.lazy_static]
+# features = ["spin_no_std"]
+# version = "1.4.0"
+
+[lib]
+crate-type = ["rlib"]
