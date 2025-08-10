@@ -51,7 +51,8 @@ impl Emulator for Qemu {
             + &format!(" qemu_debug_exit_io_base={}", self.debug_exit_io_base);
         let suppress_initial_outputs = config.suppress_initial_outputs; // FIXME
 
-        let mut command = Command::new(self.qemu_binary.as_os_str());
+        let mut command = Command::new("sudo");
+        command.arg(self.qemu_binary.as_os_str());
 
         let mut initrd = JumboBinary::new()?;
         initrd.push(&config.kernel)?;
