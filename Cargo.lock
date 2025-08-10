@@ -135,6 +135,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69f7f8c3906b62b754cd5326047894316021dcfe5a194c8ea52bdd94934a3457"
 
 [[package]]
+name = "array-init"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d62b7694a562cdf5a74227903507c56ab2cc8bdd1f781ed5cb4cf9c9f810bfc"
+
+[[package]]
 name = "astd"
 version = "0.1.0"
 dependencies = [
@@ -192,6 +198,12 @@ name = "autocfg"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
+
+[[package]]
+name = "b2histogram"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2de6f553fcc0ce1d05994ecc6972ceadf807c46cb030527f0b5e576bc4185345"
 
 [[package]]
 name = "backtrace"
@@ -908,10 +920,14 @@ dependencies = [
  "astd",
  "asys",
  "constants",
+ "ixgbe_driver",
  "lazy_static",
  "libtime",
  "log",
  "nasm-rs 0.3.0",
+ "nvme_driver",
+ "pcid",
+ "ring_buffer",
  "slabmalloc",
  "smoltcp",
  "spin",
@@ -1132,6 +1148,11 @@ dependencies = [
  "libz-sys",
  "miniz_oxide",
 ]
+
+[[package]]
+name = "fnv"
+version = "1.0.7"
+source = "git+https://github.com/servo/rust-fnv#4e55052a343a4372c191141f29a17ab829cf1dbc"
 
 [[package]]
 name = "form_urlencoded"
@@ -2392,6 +2413,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d75a2a4b1b190afb6f5425f10f6a8f959d2ea0b9c2b1d79553551850539e4674"
 
 [[package]]
+name = "ixgbe_driver"
+version = "0.1.0"
+dependencies = [
+ "array-init",
+ "asys",
+ "b2histogram",
+ "byteorder",
+ "fnv",
+ "heapless 0.7.17",
+ "libdma",
+ "libtime",
+ "log",
+ "pcid",
+ "ring_buffer",
+ "spin",
+ "twox-hash",
+ "x86 0.52.0",
+]
+
+[[package]]
 name = "jobserver"
 version = "0.1.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2495,6 +2536,13 @@ name = "libc"
 version = "0.2.167"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09d6582e104315a817dff97f75133544b2e094ee22447d2acf4a74e189ba06fc"
+
+[[package]]
+name = "libdma"
+version = "0.1.0"
+dependencies = [
+ "asys",
+]
 
 [[package]]
 name = "libgit2-sys"
@@ -2838,6 +2886,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c7398b9c8b70908f6371f47ed36737907c87c52af34c268fed0bf0ceb92ead9"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "nvme_driver"
+version = "0.1.0"
+dependencies = [
+ "array-init",
+ "asys",
+ "b2histogram",
+ "constants",
+ "heapless 0.7.17",
+ "libdma",
+ "libtime",
+ "log",
+ "pcid",
+ "ring_buffer",
+ "spin",
+ "x86 0.52.0",
 ]
 
 [[package]]
@@ -4011,6 +4077,16 @@ dependencies = [
  "tracing",
  "tracing-core",
  "tracing-log",
+]
+
+[[package]]
+name = "twox-hash"
+version = "1.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
+dependencies = [
+ "cfg-if",
+ "static_assertions",
 ]
 
 [[package]]

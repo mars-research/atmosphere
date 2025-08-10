@@ -8,8 +8,8 @@ extern crate nvme_driver;
 extern crate pcid;
 extern crate ring_buffer;
 
-// mod ixgbe_client;
-mod nvme_client;
+mod ixgbe_client;
+// mod nvme_client;
 mod pci;
 mod slab_alloc;
 // mod elf;
@@ -21,10 +21,10 @@ use core::panic::PanicInfo;
 // mod benchmark_null_driver;
 mod syscall_benchmark;
 use alloc::vec::Vec;
-// use ixgbe_client::*;
+use ixgbe_client::*;
 use libtime::sys_ns_loopsleep;
 pub use log::info as println;
-use nvme_client::test_nvme_driver;
+// use nvme_client::test_nvme_driver;
 use pci::scan_pci_devs;
 use constants::*;
 
@@ -103,8 +103,8 @@ extern "C" fn main(payload_base: *mut u8, payload_size: usize) -> isize {
 
     // // test_ixgbe_with_ring_buffer_tx();
 
-    // // test_ixgbe_driver();
-    test_nvme_driver();
+    test_ixgbe_driver();
+    // test_nvme_driver();
 
     loop {}
 }

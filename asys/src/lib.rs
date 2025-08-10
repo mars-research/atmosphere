@@ -97,7 +97,7 @@ pub unsafe fn sys_mresolve(va:usize) -> (usize,usize) {
     let _low_bits = va & 0xFFFu64 as usize;
     let ret = syscall!(__NR_MRESOLVE,va_masked,0,0) as usize;
     // return ((ret &0xFFFFFFFFFFFFF000u64 as usize) | low_bits, ret & 0xFFFusize);
-    return (ret, ret);
+    return (ret | _low_bits, ret);
 }
 
 pub unsafe fn sys_mresolve_io(va:usize) -> (usize,usize) {

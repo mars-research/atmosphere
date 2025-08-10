@@ -32,6 +32,8 @@ pub fn run_tx_udptest(net: &mut IxgbeDevice, pkt_len: usize, mut debug: bool) ->
     return Ok(());
 
     let batch_sz: usize = BATCH_SIZE;
+    // let mut packets: VecDeque<(Vec<u8>, u64)> = VecDeque::with_capacity(batch_sz);
+    // let mut collect: VecDeque<(Vec<u8>, u64)> = VecDeque::new();
     let mut packets: VecDeque<Vec<u8>> = VecDeque::with_capacity(batch_sz);
     let mut collect: VecDeque<Vec<u8>> = VecDeque::new();
 
@@ -70,6 +72,12 @@ pub fn run_tx_udptest(net: &mut IxgbeDevice, pkt_len: usize, mut debug: bool) ->
     pkt.extend(udp_hdr.iter());
     pkt.extend(payload.iter());
 
+    // for i in 0..batch_sz {
+    //     let packet: Vec<u8> = Vec::with_capacity(pkt_len);
+    //     let pkt_paddr = unsafe { sys_mresolve(packet.as_ptr() as usize).0 as u64 };
+    //     log::info!("pkt {:>08x} paddr {:x}", packet.as_ptr() as u64, pkt_paddr);
+    //     packets.push_front((packet, pkt_paddr));
+    // }
     for i in 0..batch_sz {
         packets.push_front(pkt.clone());
     }
@@ -102,10 +110,9 @@ pub fn run_tx_udptest(net: &mut IxgbeDevice, pkt_len: usize, mut debug: bool) ->
         collect_tx_hist.record(collect.len() as u64);
 
         log::trace!("{}: Appending {}", loop_count, collect.len());
+        log::trace!("{}: round", loop_count);
 
         packets.append(&mut collect);
-
-        log::trace!("{}: round", loop_count);
 
         if packets.len() == 0 {
             alloc_count += 1;
@@ -117,6 +124,21 @@ pub fn run_tx_udptest(net: &mut IxgbeDevice, pkt_len: usize, mut debug: bool) ->
             }
             alloc_elapsed += rdtsc() - alloc_rdstc_start;
         }
+
+        // packets.append(&mut collect);
+
+        // if (batch_sz == 1 && packets.len() == 0) || (batch_sz > 1 && packets.len() < batch_sz / 4) {
+        //     //println!("allocating new batch");
+        //     alloc_count += 1;
+
+        //     let alloc_rdstc_start = rdtsc();
+        //     for i in 0..batch_sz {
+        //         let packet: Vec<u8> = Vec::with_capacity(pkt_len);
+        //         let pkt_paddr = unsafe { sys_mresolve(packet.as_ptr() as usize).0 as u64 };
+        //         packets.push_front((packet, pkt_paddr));
+        //     }
+        //     alloc_elapsed += rdtsc() - alloc_rdstc_start;
+        // }
 
         if rdtsc() > end {
             break;
@@ -145,7 +167,8 @@ pub fn run_tx_udptest(net: &mut IxgbeDevice, pkt_len: usize, mut debug: bool) ->
         println!("Observed Pkts/s: {}", sum as f64 / adj_runtime as f64);
 
         //println!("packet.len {} collect.len {}", packets.unwrap().len(), collect.unwrap().len());
-        let done = net.poll(&mut collect, true);
+        let mut collect: VecDeque<Vec<u8>> = VecDeque::new();
+        let done = net.poll(&mut collect, false);
 
         println!("Reaped {} packets", done);
 
@@ -810,11 +833,11 @@ pub fn run_fwd_udptest_with_delay(
     let mut submit_tx_hist = Base2Histogram::new();
 
     let sender_mac = alloc::vec![
-        0x90, 0xe2, 0xba, 0xb3, 0xbd, 0x99, // Dst mac
+        0x90, 0xe2, 0xba, 0xb2, 0xa6, 0xb1, // Dst mac
     ];
     let our_mac = alloc::vec![
         // 90:E2:BA:B5:15:75
-        0x90, 0xe2, 0xba, 0xb5, 0x15, 0x75, // Src mac
+        0x90, 0xe2, 0xba, 0xb2, 0xa6, 0xb1, // Src mac
     ];
 
     for i in 0..batch_sz {
@@ -861,14 +884,14 @@ pub fn run_fwd_udptest_with_delay(
         rx_elapsed += rdtsc() - rx_start;
         sum += ret;
 
-        //println!("rx: submitted {} collect {}", ret, tx_packets.len());
-        /*if tx_packets.len() > 0 {
+        println!("rx: submitted {} collect {}", ret, tx_packets.len());
+        if tx_packets.len() > 0 {
             log::info!(
                 "tx_packets {} packet {:#?}",
                 tx_packets.len(),
                 tx_packets[0].as_ptr(),
             );
-        }*/
+        }
 
         let ms_start = rdtsc();
         for pkt in tx_packets.iter_mut() {
