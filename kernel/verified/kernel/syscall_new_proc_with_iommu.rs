@@ -54,7 +54,7 @@ impl Kernel {
         if self.proc_man.get_proc(proc_ptr).depth >= usize::MAX {
             return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
         }
-        if self.proc_man.get_container(container_ptr).quota.mem_4k < va_range.len * 3 + 2 {
+        if self.proc_man.get_container(container_ptr).quota.mem_4k < va_range.len * 3 + 3 {
             return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
         }
         if self.proc_man.get_container(container_ptr).scheduler.len()
@@ -64,29 +64,29 @@ impl Kernel {
         if self.proc_man.get_container(container_ptr).owned_procs.len() >= CONTAINER_PROC_LIST_LEN {
             return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
         }
-        if self.page_alloc.free_pages_4k.len() < va_range.len * 3 + 2 {
+        if self.page_alloc.free_pages_4k.len() < va_range.len * 3 + 3 {
             return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
         }
-        // if self.mem_man.free_pcids.len() < 1 {
-        //     return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
-        // }
-        // if self.mem_man.free_ioids.len() < 1 {
-        //     return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
-        // }
+        if self.mem_man.free_pcids.len() < 1 {
+            return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
+        }
+        if self.mem_man.free_ioids.len() < 1 {
+            return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
+        }
         let endpoint_ptr_op = self.proc_man.get_endpoint_ptr_by_endpoint_idx(
             thread_ptr,
             endpoint_index,
         );
-        // if endpoint_ptr_op.is_none() {
-        //     return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
-        // }
+        if endpoint_ptr_op.is_none() {
+            return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
+        }
         let endpoint_ptr = endpoint_ptr_op.unwrap();
-        // if self.proc_man.get_endpoint(endpoint_ptr).rf_counter == usize::MAX {
-        //     return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
-        // }
-        // if self.check_address_space_va_range_shareable(proc_ptr, &va_range) == false {
-        //     return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
-        // }
+        if self.proc_man.get_endpoint(endpoint_ptr).rf_counter == usize::MAX {
+            return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
+        }
+        if self.check_address_space_va_range_shareable(proc_ptr, &va_range) == false {
+            return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
+        }
         // let (page_ptr_1,mut page_perm_1) = self.page_alloc.alloc_page_4k();
 
         let (page_ptr_2, page_perm_2) = self.page_alloc.alloc_page_4k();
