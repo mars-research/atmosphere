@@ -22,7 +22,7 @@ pub struct MemoryManager {
     pub free_pcids: ArrayVec<Pcid, PCID_MAX>,
     pub pcid_to_proc_ptr: Array<Option<ProcPtr>, PCID_MAX>,
     pub page_tables: Array<Option<PageTable>, PCID_MAX>,
-    pub page_table_pages: Ghost<Set<PagePtr>>,
+    pub page_table_pages: Ghost<Map<PagePtr, Pcid>>,
     pub free_ioids: ArrayVec<IOid, IOID_MAX>,  //actual owners are procs
     pub ioid_to_proc_ptr: Array<Option<ProcPtr>, IOID_MAX>,
     pub iommu_tables: Array<Option<PageTable>, IOID_MAX>,
@@ -74,7 +74,7 @@ impl MemoryManager {
                 && self.page_tables@[pcid as int].unwrap().wf()
                 && self.page_tables@[pcid as int].unwrap().pcid =~= Some(pcid)
                 && self.page_tables@[pcid as int].unwrap().page_closure().subset_of(
-                self.page_table_pages@,
+                self.page_table_pages@.dom(),
             ) && self.page_tables@[pcid as int].unwrap().kernel_entries@
                 =~= self.kernel_entries_ghost@
                 && self.page_tables@[pcid as int].unwrap().kernel_l4_end
@@ -122,8 +122,18 @@ impl MemoryManager {
             )
     }
 
+    pub open spec fn no_memory_leak(&self) -> bool {
+        forall|p:PagePtr| 
+         #![trigger self.page_table_pages@.dom().contains(p), self.page_table_pages@[p]]
+            self.page_table_pages@.dom().contains(p)
+            ==>
+            0 <= self.page_table_pages@[p] < PCID_MAX
+            &&
+            self.get_pagetable_by_pcid(self.page_table_pages@[p]).unwrap().page_closure().contains(p)
+    }
+
     pub open spec fn pagetable_iommu_table_disjoint(&self) -> bool {
-        self.page_table_pages@.disjoint(self.iommu_table_pages@)
+        self.page_table_pages@.dom().disjoint(self.iommu_table_pages@)
     }
 
     pub open spec fn kernel_entries_wf(&self) -> bool {
@@ -229,7 +239,7 @@ impl MemoryManager {
     }
 
     pub open spec fn page_closure(&self) -> Set<PagePtr> {
-        self.iommu_table_pages@ + self.page_table_pages@
+        self.iommu_table_pages@ + self.page_table_pages@.dom()
     }
 
     pub open spec fn get_pagetable_by_pcid(&self, pcid: Pcid) -> Option<PageTable>
@@ -345,6 +355,7 @@ impl MemoryManager {
         &&& self.kernel_entries_wf()
         &&& self.pcid_to_proc_wf()
         &&& self.ioid_to_proc_wf()
+        &&& self.no_memory_leak()
     }
 
     #[verifier(external_body)]
@@ -355,7 +366,7 @@ impl MemoryManager {
             free_pcids: ArrayVec::<Pcid, PCID_MAX>::new(),
             pcid_to_proc_ptr: Array::<Option<ProcPtr>, PCID_MAX>::new(),
             page_tables: Array::<Option<PageTable>, PCID_MAX>::new(),
-            page_table_pages: Ghost(Set::<PagePtr>::empty()),
+            page_table_pages: Ghost(Map::<PagePtr, Pcid>::empty()),
             free_ioids: ArrayVec::<IOid, IOID_MAX>::new(),  //actual owners are procs
             ioid_to_proc_ptr: Array::<Option<ProcPtr>, IOID_MAX>::new(),
             iommu_tables: Array::<Option<PageTable>, IOID_MAX>::new(),
@@ -492,7 +503,7 @@ impl MemoryManager {
             self.root_table =~= old(self).root_table,
             self.root_table_cache =~= old(self).root_table_cache,
             self.pci_bitmap =~= old(self).pci_bitmap,
-            self.page_table_pages@ =~= old(self).page_table_pages@.insert(page_map_ptr),
+            self.page_table_pages@.dom() =~= old(self).page_table_pages@.dom().insert(page_map_ptr),
             forall|p: Pcid|
                 #![trigger self.pcid_active(p)]
                 self.pcid_active(p) == old(self).pcid_active(p),
@@ -592,7 +603,7 @@ impl MemoryManager {
             Tracked(page_map_perm),
         );
         proof {
-            self.page_table_pages@ = self.page_table_pages@.insert(page_map_ptr);
+            self.page_table_pages@ = self.page_table_pages@.insert(page_map_ptr, target_pcid);
         }
         assert(self.wf()) by {
             assert(self.pagetables_wf()) by {
@@ -763,11 +774,13 @@ impl MemoryManager {
                     self.get_free_ioids_as_set().contains(ioid)
                         ==> self.iommu_tables@[ioid as int].unwrap().is_empty()));
             };
+
             assert(self.pagetables_wf());
             assert(self.pagetable_iommu_table_disjoint());
             assert(self.root_table_wf());
             assert(self.root_table_cache_wf());
             assert(self.kernel_entries_wf());
+            assert(self.no_memory_leak());
         };
     }
 
@@ -891,7 +904,7 @@ impl MemoryManager {
             self.root_table =~= old(self).root_table,
             self.root_table_cache =~= old(self).root_table_cache,
             self.pci_bitmap =~= old(self).pci_bitmap,
-            self.page_table_pages@ =~= old(self).page_table_pages@.insert(page_map_ptr),
+            self.page_table_pages@.dom() =~= old(self).page_table_pages@.dom().insert(page_map_ptr),
             forall|p: Pcid|
                 #![trigger self.pcid_active(p)]
                 self.pcid_active(p) == old(self).pcid_active(p),
@@ -1003,7 +1016,7 @@ impl MemoryManager {
             Tracked(page_map_perm),
         );
         proof {
-            self.page_table_pages@ = self.page_table_pages@.insert(page_map_ptr);
+            self.page_table_pages@ = self.page_table_pages@.insert(page_map_ptr, target_pcid);
         }
         assert(self.wf()) by {
             assert(self.pagetables_wf());
@@ -1432,7 +1445,7 @@ impl MemoryManager {
             self.root_table =~= old(self).root_table,
             self.root_table_cache =~= old(self).root_table_cache,
             self.pci_bitmap =~= old(self).pci_bitmap,
-            self.page_table_pages@ =~= old(self).page_table_pages@.insert(page_map_ptr),
+            self.page_table_pages@.dom() =~= old(self).page_table_pages@.dom().insert(page_map_ptr),
             forall|p: Pcid|
                 #![trigger self.pcid_active(p)]
                 self.pcid_active(p) == old(self).pcid_active(p),
@@ -1558,7 +1571,7 @@ impl MemoryManager {
             Tracked(page_map_perm),
         );
         proof {
-            self.page_table_pages@ = self.page_table_pages@.insert(page_map_ptr);
+            self.page_table_pages@ = self.page_table_pages@.insert(page_map_ptr, target_pcid);
         }
         assert(self.wf()) by {
             assert(self.pagetables_wf());
@@ -1815,7 +1828,7 @@ impl MemoryManager {
             self.root_table =~= old(self).root_table,
             self.root_table_cache =~= old(self).root_table_cache,
             self.pci_bitmap =~= old(self).pci_bitmap,
-            // self.page_table_pages@ =~= old(self).page_table_pages@.insert(page_map_ptr),
+            // self.page_table_pages@.dom() =~= old(self).page_table_pages@.dom().insert(page_map_ptr),
             forall|p: Pcid|
                 #![trigger self.pcid_active(p)]
                 self.pcid_active(p) == old(self).pcid_active(p),
@@ -1950,7 +1963,7 @@ impl MemoryManager {
             self.root_table =~= old(self).root_table,
             self.root_table_cache =~= old(self).root_table_cache,
             self.pci_bitmap =~= old(self).pci_bitmap,
-            // self.page_table_pages@ =~= old(self).page_table_pages@.insert(page_map_ptr),
+            // self.page_table_pages@.dom() =~= old(self).page_table_pages@.dom().insert(page_map_ptr),
             forall|p: Pcid|
                 #![trigger self.pcid_active(p)]
                 self.pcid_active(p) == old(self).pcid_active(p),
@@ -2169,7 +2182,7 @@ impl MemoryManager {
     //         self.root_table =~= old(self).root_table,
     //         self.root_table_cache =~= old(self).root_table_cache,
     //         self.pci_bitmap =~= old(self).pci_bitmap,
-    //         self.page_table_pages@ =~= old(self).page_table_pages@.insert(page_map_ptr),
+    //         self.page_table_pages@.dom() =~= old(self).page_table_pages@.dom().insert(page_map_ptr),
     //         forall|p:Pcid|
     //             #![trigger self.pcid_active(p)]
     //             p != ret ==>
@@ -2204,7 +2217,7 @@ impl MemoryManager {
     //     self.pcid_to_proc_ptr.set(new_pcid,Some(new_proc_ptr));
     //     proof{
     //         set_lemma::<PagePtr>();
-    //         self.page_table_pages@ = self.page_table_pages@.insert(page_map_ptr);
+    //         self.page_table_pages@.dom() = self.page_table_pages@.dom().insert(page_map_ptr);
     //     }
     //     assert(self.pagetables_wf()) by {
     //         seq_pop_unique_lemma::<Pcid>();
@@ -2238,7 +2251,7 @@ impl MemoryManager {
             self.root_table =~= old(self).root_table,
             self.root_table_cache =~= old(self).root_table_cache,
             self.pci_bitmap =~= old(self).pci_bitmap,
-            self.page_table_pages@ =~= old(self).page_table_pages@,
+            self.page_table_pages@.dom() =~= old(self).page_table_pages@.dom(),
             forall|p: Pcid|
                 #![trigger self.pcid_active(p)]
                 p != ret ==> self.pcid_active(p) == old(self).pcid_active(p),
@@ -2316,7 +2329,7 @@ impl MemoryManager {
             self.root_table =~= old(self).root_table,
             self.root_table_cache =~= old(self).root_table_cache,
             self.pci_bitmap =~= old(self).pci_bitmap,
-            self.page_table_pages@ =~= old(self).page_table_pages@,
+            self.page_table_pages@.dom() =~= old(self).page_table_pages@.dom(),
             forall|p: Pcid|
                 #![trigger self.pcid_active(p)]
                 self.pcid_active(p) == old(self).pcid_active(p),
