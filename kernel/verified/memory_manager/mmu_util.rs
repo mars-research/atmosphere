@@ -2,7 +2,7 @@ use vstd::prelude::*;
 verus! {
 
 use vstd::simple_pptr::*;
-use crate::pagetable::pagetable_spec_impl::*;
+use crate::pagetable::pagetable_spec::*;
 use crate::array::Array;
 use crate::define::*;
 use crate::pagetable::pagemap::*;

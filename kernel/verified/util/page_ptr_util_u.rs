@@ -547,6 +547,11 @@ pub proof fn va_lemma()
                 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l1i < 512 && spec_index2va(
                 (l4i, l3i, l2i, l1i),
             ) == va,
+        forall|l4i: L4Index, l3i: L3Index, l2i: L2Index|
+            #![trigger va_2m_valid(spec_index2va((l4i,l3i,l2i,0)))]
+            0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 ==> va_2m_valid(
+                spec_index2va((l4i, l3i, l2i, 0)),
+            ),
 {
     // assert(forall|va:VAddr| #![auto] (va & (!0x0000_fffc_0000_0000u64) as usize == 0) && (va as u64 >> 39u64 & 0x1ffu64) >= 1u64 as u64 ==>
     //     0 <= ((va >> 39 & 0x1ff) as usize) < 512

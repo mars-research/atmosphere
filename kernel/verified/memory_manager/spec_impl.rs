@@ -6,7 +6,7 @@ use crate::array_vec::ArrayVec;
 use crate::define::*;
 use crate::array::Array;
 use crate::memory_manager::*;
-use crate::pagetable::pagetable_spec_impl::PageTable;
+use crate::pagetable::pagetable_spec::PageTable;
 use crate::pagetable::entry::*;
 use crate::util::page_ptr_util_u::*;
 use vstd::simple_pptr::PointsTo;
