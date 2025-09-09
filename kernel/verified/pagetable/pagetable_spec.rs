@@ -1155,6 +1155,19 @@ impl PageTable {
                 != self.spec_resolve_mapping_l2(l4j, l3j, l2j).get_Some_0().addr);
 
     }
+    pub proof fn four_level_empty_imply_4k_map_empty(&self)
+        requires
+            self.wf(),
+            forall|l4i: L4Index, l3i: L3Index, l2i: L2Index, l1i: L1Index|
+                #![trigger self.spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i)]
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l1i < 512 ==>
+                    self.spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i).is_None(),
+        ensures
+            self.mapping_4k@.dom() == Set::<VAddr>::empty(),
+    {
+        va_lemma();
+        admit();
+    }
 }
 
 

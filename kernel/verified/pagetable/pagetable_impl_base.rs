@@ -813,6 +813,7 @@ impl PageTable {
             self.mapping_4k@ == old(self).mapping_4k@.remove(
                 spec_index2va((target_l4i, target_l3i, target_l2i, target_l1i)),
             ),
+            self.spec_resolve_mapping_4k_l1(target_l4i, target_l3i, target_l2i, target_l1i).is_None(),
             self.mapping_2m() =~= old(self).mapping_2m(),
             self.mapping_1g() =~= old(self).mapping_1g(),
             // self.mapped_4k_pages() =~= old(self).mapped_4k_pages().insert(target_entry.addr),
