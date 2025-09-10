@@ -39,24 +39,12 @@ pub fn proc_push_thread(
             *thread_ptr,
         ),
         proc_perm@.value().owned_threads.len() == old(proc_perm)@.value().owned_threads.len() + 1,
-        forall|index: SLLIndex|
-            #![trigger old(proc_perm)@.value().owned_threads.node_ref_valid(index)]
-            #![trigger proc_perm@.value().owned_threads.node_ref_valid(index)]
-            old(proc_perm)@.value().owned_threads.node_ref_valid(index)
-                ==> proc_perm@.value().owned_threads.node_ref_valid(index),
-        forall|index: SLLIndex|
-            #![trigger old(proc_perm)@.value().owned_threads.node_ref_valid(index)]
-            old(proc_perm)@.value().owned_threads.node_ref_valid(index) ==> index != ret,
-        forall|index: SLLIndex|
-            #![trigger old(proc_perm)@.value().owned_threads.node_ref_valid(index)]
-            #![trigger proc_perm@.value().owned_threads.node_ref_resolve(index)]
-            #![trigger old(proc_perm)@.value().owned_threads.node_ref_resolve(index)]
-            old(proc_perm)@.value().owned_threads.node_ref_valid(index)
-                ==> proc_perm@.value().owned_threads.node_ref_resolve(index) == old(
-                proc_perm,
-            )@.value().owned_threads.node_ref_resolve(index),
-        proc_perm@.value().owned_threads.node_ref_valid(ret),
-        proc_perm@.value().owned_threads.node_ref_resolve(ret) == *thread_ptr,
+        forall|v:ThreadPtr|
+            #![auto]
+            old(proc_perm)@.value().owned_threads@.contains(v) ==> 
+                old(proc_perm)@.value().owned_threads.get_node_ref(v) == 
+                    proc_perm@.value().owned_threads.get_node_ref(v),
+        proc_perm@.value().owned_threads.get_node_ref(*thread_ptr) == ret,
         proc_perm@.value().owned_threads.unique(),
 {
     unsafe {
@@ -71,12 +59,14 @@ pub fn proc_remove_thread(
     proc_ptr: ProcPtr,
     proc_perm: &mut Tracked<PointsTo<Process>>,
     rev_ptr: SLLIndex,
+    thread_ptr: Ghost<ThreadPtr>,
 ) -> (ret: ThreadPtr)
     requires
         old(proc_perm)@.is_init(),
         old(proc_perm)@.addr() == proc_ptr,
         old(proc_perm)@.value().owned_threads.wf(),
-        old(proc_perm)@.value().owned_threads.node_ref_valid(rev_ptr),
+        old(proc_perm)@.value().owned_threads@.contains(thread_ptr@),
+        old(proc_perm)@.value().owned_threads.get_node_ref(thread_ptr@) == rev_ptr,
     ensures
         proc_perm@.is_init(),
         proc_perm@.addr() == proc_ptr,
@@ -92,32 +82,16 @@ pub fn proc_remove_thread(
         proc_perm@.value().subtree_set =~= old(proc_perm)@.value().subtree_set,
         proc_perm@.value().depth =~= old(proc_perm)@.value().depth,
         proc_perm@.value().dmd_paging_mode =~= old(proc_perm)@.value().dmd_paging_mode,
-                    proc_perm@.value().owned_threads.wf(),
-            proc_perm@.value().owned_threads.len() == old(proc_perm)@.value().owned_threads.len() - 1,
-            ret == old(proc_perm)@.value().owned_threads.node_ref_resolve(rev_ptr),
-            forall|index: SLLIndex|
-                #![trigger old(proc_perm)@.value().owned_threads.node_ref_valid(index)]
-                #![trigger proc_perm@.value().owned_threads.node_ref_valid(index)]
-                old(proc_perm)@.value().owned_threads.node_ref_valid(index) && index != rev_ptr ==> proc_perm@.value().owned_threads.node_ref_valid(
-                    index,
-                ),
-            forall|index: SLLIndex|
-                #![trigger old(proc_perm)@.value().owned_threads.node_ref_valid(index)]
-                #![trigger proc_perm@.value().owned_threads.node_ref_resolve(index)]
-                #![trigger old(proc_perm)@.value().owned_threads.node_ref_resolve(index)]
-                old(proc_perm)@.value().owned_threads.node_ref_valid(index) && index != rev_ptr ==> proc_perm@.value().owned_threads.node_ref_resolve(
-                    index,
-                ) == old(proc_perm)@.value().owned_threads.node_ref_resolve(index),
-            forall|index: SLLIndex|
-                #![trigger old(proc_perm)@.value().owned_threads.node_ref_valid(index)]
-                #![trigger proc_perm@.value().owned_threads.node_ref_valid(index)]
-                #![trigger old(proc_perm)@.value().owned_threads.node_ref_resolve(index)]
-                #![trigger proc_perm@.value().owned_threads.node_ref_resolve(index)]
-                old(proc_perm)@.value().owned_threads.node_ref_valid(index) && old(proc_perm)@.value().owned_threads.node_ref_resolve(index) != ret
-                    ==> proc_perm@.value().owned_threads.node_ref_valid(index) && proc_perm@.value().owned_threads.node_ref_resolve(index) == old(
-                    proc_perm)@.value().owned_threads.node_ref_resolve(index),
-            proc_perm@.value().owned_threads.unique(),
-            proc_perm@.value().owned_threads@ =~= old(proc_perm)@.value().owned_threads@.remove_value(ret),
+        proc_perm@.value().owned_threads.wf(),
+        proc_perm@.value().owned_threads.len() == old(proc_perm)@.value().owned_threads.len() - 1,
+        ret == thread_ptr@,
+        forall|v:ThreadPtr|
+            #![auto]
+            proc_perm@.value().owned_threads@.contains(v) ==> 
+                old(proc_perm)@.value().owned_threads.get_node_ref(v) == 
+                    proc_perm@.value().owned_threads.get_node_ref(v),
+        proc_perm@.value().owned_threads.unique(),
+        proc_perm@.value().owned_threads@ =~= old(proc_perm)@.value().owned_threads@.remove_value(ret),
 {
     unsafe {
         let uptr = proc_ptr as *mut MaybeUninit<Process>;
@@ -157,24 +131,12 @@ pub fn proc_push_child(
         proc_perm@.value().children.wf(),
         proc_perm@.value().children@ =~= old(proc_perm)@.value().children@.push(*new_proc_ptr),
         proc_perm@.value().children.len() == old(proc_perm)@.value().children.len() + 1,
-        forall|index: SLLIndex|
-            #![trigger old(proc_perm)@.value().children.node_ref_valid(index)]
-            #![trigger proc_perm@.value().children.node_ref_valid(index)]
-            old(proc_perm)@.value().children.node_ref_valid(index)
-                ==> proc_perm@.value().children.node_ref_valid(index),
-        forall|index: SLLIndex|
-            #![trigger old(proc_perm)@.value().children.node_ref_valid(index)]
-            old(proc_perm)@.value().children.node_ref_valid(index) ==> index != ret,
-        forall|index: SLLIndex|
-            #![trigger old(proc_perm)@.value().children.node_ref_valid(index)]
-            #![trigger proc_perm@.value().children.node_ref_resolve(index)]
-            #![trigger old(proc_perm)@.value().children.node_ref_resolve(index)]
-            old(proc_perm)@.value().children.node_ref_valid(index)
-                ==> proc_perm@.value().children.node_ref_resolve(index) == old(
-                proc_perm,
-            )@.value().children.node_ref_resolve(index),
-        proc_perm@.value().children.node_ref_valid(ret),
-        proc_perm@.value().children.node_ref_resolve(ret) == *new_proc_ptr,
+         forall|v:ProcPtr|
+            #![auto]
+            old(proc_perm)@.value().children@.contains(v) ==> 
+                old(proc_perm)@.value().children.get_node_ref(v) == 
+                    proc_perm@.value().children.get_node_ref(v),
+        proc_perm@.value().children.get_node_ref(*new_proc_ptr) == ret,
         proc_perm@.value().children.unique(),
 {
     unsafe {
@@ -212,9 +174,6 @@ pub fn page_to_proc(
         ret.1@.value().owned_threads.wf(),
         ret.1@.value().owned_threads@ == Seq::<ThreadPtr>::empty(),
         ret.1@.value().owned_threads.len() == 0,
-        forall|index: SLLIndex|
-            #![trigger ret.1@.value().owned_threads.node_ref_valid(index)]
-            ret.1@.value().owned_threads.node_ref_valid(index) == false,
         ret.1@.value().parent == parent,
         ret.1@.value().children.wf(),
         ret.1@.value().children@ =~= Seq::empty(),
@@ -268,13 +227,7 @@ pub fn page_to_proc_with_first_thread(
         ret.1@.value().owned_threads.wf(),
         ret.1@.value().owned_threads@ == Seq::<ThreadPtr>::empty().push(first_thread),
         ret.1@.value().owned_threads.len() == 1,
-        // forall|index:SLLIndex|
-        //     #![trigger ret.1@.value().owned_threads.node_ref_valid(index)]
-        //     index != ret.2
-        //     ==>
-        //     ret.1@.value().owned_threads.node_ref_valid(index) == false,
-        ret.1@.value().owned_threads.node_ref_valid(ret.2),
-        ret.1@.value().owned_threads.node_ref_resolve(ret.2) == first_thread,
+        ret.1@.value().owned_threads.get_node_ref(first_thread) == ret.2,
         ret.1@.value().parent == parent,
         ret.1@.value().children.wf(),
         ret.1@.value().children@ =~= Seq::empty(),

@@ -81,17 +81,6 @@ impl<T, const N: usize> StaticLinkedList<T, N> {
         self.value_list@[self@.index_of(v)]
     }
 
-    pub closed spec fn node_ref_valid(&self, index: SLLIndex) -> bool {
-        self.value_list@.contains(index)
-    }
-
-    pub closed spec fn node_ref_resolve(&self, index: SLLIndex) -> T
-        recommends
-            self.node_ref_valid(index),
-    {
-        self.arr_seq@[index as int].value.get_Some_0()
-    }
-
     pub closed spec fn prev_free_node_of(&self, i: nat) -> int
         recommends
             i < self.free_list@.len(),
@@ -275,7 +264,6 @@ impl<T: Copy, const N: usize> StaticLinkedList<T, N> {
             self.wf(),
             self@ =~= Seq::empty(),
             self.len() == 0,
-            forall|i: SLLIndex| #![trigger self.node_ref_valid(i)] self.node_ref_valid(i) == false,
     {
         self.spec_seq = Ghost(Seq::empty());
 
@@ -315,9 +303,6 @@ impl<T: Copy, const N: usize> StaticLinkedList<T, N> {
                 forall|j: int|
                     #![trigger self.free_list@[j]]
                     0 <= j < self.free_list_len ==> self.free_list@[j] == j as SLLIndex,
-                forall|i: SLLIndex|
-                    #![trigger self.node_ref_valid(i)]
-                    self.node_ref_valid(i) == false,
         {
             self.free_list_len = self.free_list_len + 1;
             if i == 0 {

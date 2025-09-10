@@ -392,14 +392,11 @@ impl PageAllocator {
         &&& self.free_pages_4k.unique()
         &&& forall|i: int|
             #![trigger self.free_pages_4k@.contains(self.page_array@[i].addr)]
-            #![trigger self.free_pages_4k.node_ref_valid(self.page_array@[i].rev_pointer)]
-            #![trigger self.free_pages_4k.node_ref_resolve(self.page_array@[i].rev_pointer)]
-            #![trigger self.page_array@[i].is_io_page]
+            #![trigger self.page_array@[i].rev_pointer]
             0 <= i < NUM_PAGES && self.page_array@[i].state == PageState::Free4k
                 ==> self.free_pages_4k@.contains(self.page_array@[i].addr)
-                && self.free_pages_4k.node_ref_valid(self.page_array@[i].rev_pointer)
-                && self.free_pages_4k.node_ref_resolve(self.page_array@[i].rev_pointer)
-                == self.page_array@[i].addr && self.page_array@[i].is_io_page == false
+                && self.free_pages_4k.get_node_ref(self.page_array@[i].addr) == self.page_array@[i].rev_pointer
+                && self.page_array@[i].is_io_page == false
         &&& forall|page_ptr: PagePtr|
             #![trigger page_ptr_valid(page_ptr)]
             #![trigger self.page_array@[page_ptr2page_index(page_ptr) as int].state]
@@ -420,14 +417,13 @@ impl PageAllocator {
         &&& self.free_pages_2m.unique()
         &&& forall|i: int|
             #![trigger self.free_pages_2m@.contains(self.page_array@[i].addr)]
-            #![trigger self.free_pages_2m.node_ref_valid(self.page_array@[i].rev_pointer)]
-            #![trigger self.free_pages_2m.node_ref_resolve(self.page_array@[i].rev_pointer)]
             #![trigger self.page_array@[i].is_io_page]
+            #![trigger self.page_array@[i].rev_pointer]
             0 <= i < NUM_PAGES && self.page_array@[i].state == PageState::Free2m
                 ==> self.free_pages_2m@.contains(self.page_array@[i].addr)
-                && self.free_pages_2m.node_ref_valid(self.page_array@[i].rev_pointer)
-                && self.free_pages_2m.node_ref_resolve(self.page_array@[i].rev_pointer)
-                == self.page_array@[i].addr && self.page_array@[i].is_io_page == false
+                && self.free_pages_2m.get_node_ref(self.page_array@[i].addr ) == 
+                    self.page_array@[i].rev_pointer
+                && self.page_array@[i].is_io_page == false
         &&& forall|page_ptr: PagePtr|
             #![trigger page_ptr_2m_valid(page_ptr)]
             #![trigger self.page_array@[page_ptr2page_index(page_ptr) as int].state]
@@ -448,14 +444,12 @@ impl PageAllocator {
         &&& self.free_pages_1g.unique()
         &&& forall|i: int|
             #![trigger self.free_pages_1g@.contains(self.page_array@[i].addr)]
-            #![trigger self.free_pages_1g.node_ref_valid(self.page_array@[i].rev_pointer)]
-            #![trigger self.free_pages_1g.node_ref_resolve(self.page_array@[i].rev_pointer)]
             #![trigger self.page_array@[i].is_io_page]
+            #![trigger self.page_array@[i].rev_pointer]
             0 <= i < NUM_PAGES && self.page_array@[i].state == PageState::Free1g
                 ==> self.free_pages_1g@.contains(self.page_array@[i].addr)
-                && self.free_pages_1g.node_ref_valid(self.page_array@[i].rev_pointer)
-                && self.free_pages_1g.node_ref_resolve(self.page_array@[i].rev_pointer)
-                == self.page_array@[i].addr && self.page_array@[i].is_io_page == false
+                && self.free_pages_1g.get_node_ref(self.page_array@[i].addr) == self.page_array@[i].rev_pointer
+                && self.page_array@[i].is_io_page == false
         &&& forall|page_ptr: PagePtr|
             #![trigger page_ptr_1g_valid(page_ptr)]
             #![trigger self.page_array@[page_ptr2page_index(page_ptr) as int].state]

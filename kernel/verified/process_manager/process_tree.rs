@@ -130,20 +130,13 @@ pub closed spec fn procs_linkedlist_wf(
         )
     &&& forall|p_ptr: ProcPtr|
         #![trigger proc_tree_dom.contains(p_ptr)]
-    //#![trigger proc_perms[p_ptr].value().parent_rev_ptr.is_Some()]
-    //#![trigger proc_perms[proc_perms[p_ptr].value().parent.unwrap()].value().children@.contains(p_ptr)]
-    //#![trigger proc_perms[proc_perms[p_ptr].value().parent.unwrap()].value().children.node_ref_valid(proc_perms[p_ptr].value().parent_rev_ptr.unwrap())]
-    //#![trigger proc_perms[proc_perms[p_ptr].value().parent.unwrap()].value().children.node_ref_resolve(proc_perms[p_ptr].value().parent_rev_ptr.unwrap())]
-
         proc_tree_dom.contains(p_ptr) && p_ptr != root_proc
             ==> proc_perms[p_ptr].value().parent_rev_ptr.is_Some()
             && proc_perms[proc_perms[p_ptr].value().parent.unwrap()].value().children@.contains(
             p_ptr,
-        ) && proc_perms[proc_perms[p_ptr].value().parent.unwrap()].value().children.node_ref_valid(
-            proc_perms[p_ptr].value().parent_rev_ptr.unwrap(),
-        )
-            && proc_perms[proc_perms[p_ptr].value().parent.unwrap()].value().children.node_ref_resolve(
-        proc_perms[p_ptr].value().parent_rev_ptr.unwrap()) == p_ptr
+        ) && proc_perms[proc_perms[p_ptr].value().parent.unwrap()].value().children.get_node_ref(p_ptr) 
+        == 
+        proc_perms[p_ptr].value().parent_rev_ptr.unwrap()
 }
 
 pub closed spec fn proc_childern_depth_wf(
@@ -845,28 +838,14 @@ pub open spec fn new_proc_ensures(
         == old_proc_perms[proc_ptr].value().children@.push(new_proc_ptr)
     &&& new_proc_perms[proc_ptr].value().children.len()
         == old_proc_perms[proc_ptr].value().children.len() + 1
-    &&& forall|index: SLLIndex|
-        #![trigger old_proc_perms[proc_ptr].value().children.node_ref_valid(index)]
-        #![trigger new_proc_perms[proc_ptr].value().children.node_ref_valid(index)]
-        old_proc_perms[proc_ptr].value().children.node_ref_valid(index)
-            ==> new_proc_perms[proc_ptr].value().children.node_ref_valid(index)
-    &&& forall|index: SLLIndex|
-        #![trigger old_proc_perms[proc_ptr].value().children.node_ref_valid(index)]
-        old_proc_perms[proc_ptr].value().children.node_ref_valid(index) ==> index
-            != new_proc_perms[new_proc_ptr].value().parent_rev_ptr.unwrap()
-    &&& forall|index: SLLIndex|
-        #![trigger old_proc_perms[proc_ptr].value().children.node_ref_valid(index)]
-        #![trigger new_proc_perms[proc_ptr].value().children.node_ref_resolve(index)]
-        #![trigger old_proc_perms[proc_ptr].value().children.node_ref_resolve(index)]
-        old_proc_perms[proc_ptr].value().children.node_ref_valid(index)
-            ==> new_proc_perms[proc_ptr].value().children.node_ref_resolve(index)
-            == old_proc_perms[proc_ptr].value().children.node_ref_resolve(index)
-    &&& new_proc_perms[proc_ptr].value().children.node_ref_valid(
-        new_proc_perms[new_proc_ptr].value().parent_rev_ptr.unwrap(),
-    )
-    &&& new_proc_perms[proc_ptr].value().children.node_ref_resolve(
-        new_proc_perms[new_proc_ptr].value().parent_rev_ptr.unwrap(),
-    ) == new_proc_ptr
+    &&&
+    forall|v:ProcPtr|
+    #![auto]
+    old_proc_perms[proc_ptr].value().children@.contains(v) ==> 
+        old_proc_perms[proc_ptr].value().children.get_node_ref(v) == 
+            new_proc_perms[proc_ptr].value().children.get_node_ref(v)
+    &&& new_proc_perms[proc_ptr].value().children.get_node_ref(new_proc_ptr) ==
+        new_proc_perms[new_proc_ptr].value().parent_rev_ptr.unwrap()
     &&& new_proc_perms[proc_ptr].value().children.unique()
 }
 
@@ -946,29 +925,13 @@ pub proof fn new_proc_preserve_tree_inv(
             == old_proc_perms[proc_ptr].value().children@.push(new_proc_ptr),
         new_proc_perms[proc_ptr].value().children.len()
             == old_proc_perms[proc_ptr].value().children.len() + 1,
-        forall|index: SLLIndex|
-            #![trigger old_proc_perms[proc_ptr].value().children.node_ref_valid(index)]
-            #![trigger new_proc_perms[proc_ptr].value().children.node_ref_valid(index)]
-            old_proc_perms[proc_ptr].value().children.node_ref_valid(index)
-                ==> new_proc_perms[proc_ptr].value().children.node_ref_valid(index),
-        forall|index: SLLIndex|
-         //#![trigger old_proc_perms[proc_ptr].value().children.node_ref_valid(index)]
-
-            old_proc_perms[proc_ptr].value().children.node_ref_valid(index) ==> index
-                != new_proc_perms[new_proc_ptr].value().parent_rev_ptr.unwrap(),
-        forall|index: SLLIndex|
-            #![trigger old_proc_perms[proc_ptr].value().children.node_ref_valid(index)]
-            #![trigger new_proc_perms[proc_ptr].value().children.node_ref_resolve(index)]
-            #![trigger old_proc_perms[proc_ptr].value().children.node_ref_resolve(index)]
-            old_proc_perms[proc_ptr].value().children.node_ref_valid(index)
-                ==> new_proc_perms[proc_ptr].value().children.node_ref_resolve(index)
-                == old_proc_perms[proc_ptr].value().children.node_ref_resolve(index),
-        new_proc_perms[proc_ptr].value().children.node_ref_valid(
+        forall|v:ProcPtr|
+            #![auto]
+            old_proc_perms[proc_ptr].value().children@.contains(v) ==> 
+                old_proc_perms[proc_ptr].value().children.get_node_ref(v) == 
+                    new_proc_perms[proc_ptr].value().children.get_node_ref(v),
+        new_proc_perms[proc_ptr].value().children.get_node_ref(new_proc_ptr) == 
             new_proc_perms[new_proc_ptr].value().parent_rev_ptr.unwrap(),
-        ),
-        new_proc_perms[proc_ptr].value().children.node_ref_resolve(
-            new_proc_perms[new_proc_ptr].value().parent_rev_ptr.unwrap(),
-        ) == new_proc_ptr,
         new_proc_perms[proc_ptr].value().children.unique(),
     ensures
 // proc_root_wf(root_proc, proc_tree_dom.insert(new_proc_ptr), new_proc_perms),

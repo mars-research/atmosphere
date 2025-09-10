@@ -123,19 +123,12 @@ pub closed spec fn containers_linkedlist_wf(
         )
     &&& forall|c_ptr: ContainerPtr|
         #![trigger container_perms.dom().contains(c_ptr)]
-    //#![trigger container_perms[c_ptr].value().parent_rev_ptr.is_Some()]
-    //#![trigger container_perms[container_perms[c_ptr].value().parent.unwrap()].value().children@.contains(c_ptr)]
-    //#![trigger container_perms[container_perms[c_ptr].value().parent.unwrap()].value().children.node_ref_valid(container_perms[c_ptr].value().parent_rev_ptr.unwrap())]
-    //#![trigger container_perms[container_perms[c_ptr].value().parent.unwrap()].value().children.node_ref_resolve(container_perms[c_ptr].value().parent_rev_ptr.unwrap())]
-
         container_perms.dom().contains(c_ptr) && c_ptr != root_container
             ==> container_perms[c_ptr].value().parent_rev_ptr.is_Some()
             && container_perms[container_perms[c_ptr].value().parent.unwrap()].value().children@.contains(
         c_ptr)
-            && container_perms[container_perms[c_ptr].value().parent.unwrap()].value().children.node_ref_valid(
-        container_perms[c_ptr].value().parent_rev_ptr.unwrap())
-            && container_perms[container_perms[c_ptr].value().parent.unwrap()].value().children.node_ref_resolve(
-        container_perms[c_ptr].value().parent_rev_ptr.unwrap()) == c_ptr
+            && container_perms[container_perms[c_ptr].value().parent.unwrap()].value().children.get_node_ref(c_ptr) == 
+        container_perms[c_ptr].value().parent_rev_ptr.unwrap()
 }
 
 pub closed spec fn container_childern_depth_wf(
@@ -795,28 +788,15 @@ pub open spec fn new_container_ensures(
         == old_container_perms[container_ptr].value().children@.push(new_container_ptr)
     &&& new_container_perms[container_ptr].value().children.len()
         == old_container_perms[container_ptr].value().children.len() + 1
-    &&& forall|index: SLLIndex|
-        #![trigger old_container_perms[container_ptr].value().children.node_ref_valid(index)]
-        #![trigger new_container_perms[container_ptr].value().children.node_ref_valid(index)]
-        old_container_perms[container_ptr].value().children.node_ref_valid(index)
-            ==> new_container_perms[container_ptr].value().children.node_ref_valid(index)
-    &&& forall|index: SLLIndex|
-        #![trigger old_container_perms[container_ptr].value().children.node_ref_valid(index)]
-        old_container_perms[container_ptr].value().children.node_ref_valid(index) ==> index
-            != new_container_perms[new_container_ptr].value().parent_rev_ptr.unwrap()
-    &&& forall|index: SLLIndex|
-        #![trigger old_container_perms[container_ptr].value().children.node_ref_valid(index)]
-        #![trigger new_container_perms[container_ptr].value().children.node_ref_resolve(index)]
-        #![trigger old_container_perms[container_ptr].value().children.node_ref_resolve(index)]
-        old_container_perms[container_ptr].value().children.node_ref_valid(index)
-            ==> new_container_perms[container_ptr].value().children.node_ref_resolve(index)
-            == old_container_perms[container_ptr].value().children.node_ref_resolve(index)
-    &&& new_container_perms[container_ptr].value().children.node_ref_valid(
-        new_container_perms[new_container_ptr].value().parent_rev_ptr.unwrap(),
-    )
-    &&& new_container_perms[container_ptr].value().children.node_ref_resolve(
-        new_container_perms[new_container_ptr].value().parent_rev_ptr.unwrap(),
-    ) == new_container_ptr
+    &&&
+    forall|v:ContainerPtr|
+        #![auto]
+        old_container_perms[container_ptr].value().children@.contains(v) ==> 
+            old_container_perms[container_ptr].value().children.get_node_ref(v) == 
+                new_container_perms[container_ptr].value().children.get_node_ref(v)
+    &&&
+    new_container_perms[container_ptr].value().children.get_node_ref(new_container_ptr) == 
+        new_container_perms[new_container_ptr].value().parent_rev_ptr.unwrap()
     &&& new_container_perms[container_ptr].value().children.unique()
 }
 
@@ -900,29 +880,13 @@ pub proof fn new_container_preserve_tree_inv(
             == old_container_perms[container_ptr].value().children@.push(new_container_ptr),
         new_container_perms[container_ptr].value().children.len()
             == old_container_perms[container_ptr].value().children.len() + 1,
-        forall|index: SLLIndex|
-            #![trigger old_container_perms[container_ptr].value().children.node_ref_valid(index)]
-            #![trigger new_container_perms[container_ptr].value().children.node_ref_valid(index)]
-            old_container_perms[container_ptr].value().children.node_ref_valid(index)
-                ==> new_container_perms[container_ptr].value().children.node_ref_valid(index),
-        forall|index: SLLIndex|
-         //#![trigger old_container_perms[container_ptr].value().children.node_ref_valid(index)]
-
-            old_container_perms[container_ptr].value().children.node_ref_valid(index) ==> index
-                != new_container_perms[new_container_ptr].value().parent_rev_ptr.unwrap(),
-        forall|index: SLLIndex|
-            #![trigger old_container_perms[container_ptr].value().children.node_ref_valid(index)]
-            #![trigger new_container_perms[container_ptr].value().children.node_ref_resolve(index)]
-            #![trigger old_container_perms[container_ptr].value().children.node_ref_resolve(index)]
-            old_container_perms[container_ptr].value().children.node_ref_valid(index)
-                ==> new_container_perms[container_ptr].value().children.node_ref_resolve(index)
-                == old_container_perms[container_ptr].value().children.node_ref_resolve(index),
-        new_container_perms[container_ptr].value().children.node_ref_valid(
+        forall|v:ContainerPtr|
+            #![auto]
+            old_container_perms[container_ptr].value().children@.contains(v) ==> 
+                old_container_perms[container_ptr].value().children.get_node_ref(v) == 
+                    new_container_perms[container_ptr].value().children.get_node_ref(v),
+        new_container_perms[container_ptr].value().children.get_node_ref(new_container_ptr) == 
             new_container_perms[new_container_ptr].value().parent_rev_ptr.unwrap(),
-        ),
-        new_container_perms[container_ptr].value().children.node_ref_resolve(
-            new_container_perms[new_container_ptr].value().parent_rev_ptr.unwrap(),
-        ) == new_container_ptr,
         new_container_perms[container_ptr].value().children.unique(),
     ensures
 // container_root_wf(root_container, new_container_perms),

@@ -54,7 +54,7 @@ impl ProcessManager {
         let thread_perm = Tracked(self.thread_perms.borrow_mut().tracked_remove(thread_ptr));
 
         let mut proc_perm = Tracked(self.process_perms.borrow_mut().tracked_remove(proc_ptr));
-        proc_remove_thread(proc_ptr, &mut proc_perm, proc_rev_ptr);
+        proc_remove_thread(proc_ptr, &mut proc_perm, proc_rev_ptr, Ghost(thread_ptr));
         proof{
             self.process_perms.borrow_mut().tracked_insert(proc_ptr, proc_perm.get());
         }
@@ -111,21 +111,6 @@ impl ProcessManager {
                 ==> self.thread_perms@.dom().contains(child_t_ptr)
                 && self.thread_perms@[child_t_ptr].value().owning_proc == p_ptr
         );
-        assert( forall|t_ptr: ThreadPtr|
-            #![trigger self.thread_perms@[t_ptr].value().owning_proc]
-            #![trigger self.process_perms@[self.thread_perms@[t_ptr].value().owning_proc].value().owned_threads]
-            self.thread_perms@.dom().contains(t_ptr) ==> self.container_dom().contains(
-                self.thread_perms@[t_ptr].value().owning_container,
-            ) && self.process_perms@.dom().contains(self.thread_perms@[t_ptr].value().owning_proc)
-                && self.process_perms@[self.thread_perms@[t_ptr].value().owning_proc].value().owned_threads@.contains(
-            t_ptr)
-                && self.process_perms@[self.thread_perms@[t_ptr].value().owning_proc].value().owned_threads.node_ref_valid(
-            self.thread_perms@[t_ptr].value().proc_rev_ptr)
-                && self.process_perms@[self.thread_perms@[t_ptr].value().owning_proc].value().owned_threads.node_ref_resolve(
-            self.thread_perms@[t_ptr].value().proc_rev_ptr) == t_ptr
-                && self.process_perms@[self.thread_perms@[t_ptr].value().owning_proc].value().owning_container
-                == self.thread_perms@[t_ptr].value().owning_container
-                );
         };
         // assert(self.threads_perms_wf());
         // assert(self.endpoint_perms_wf());

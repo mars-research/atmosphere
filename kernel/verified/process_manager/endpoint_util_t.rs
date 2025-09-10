@@ -116,34 +116,11 @@ pub fn endpoint_pop_head(
         endpoint_perm@.value().queue.len() == old(endpoint_perm)@.value().queue.len() - 1,
         endpoint_perm@.value().queue@ == old(endpoint_perm)@.value().queue@.skip(1),
         ret.0 == old(endpoint_perm)@.value().queue@[0],
-        old(endpoint_perm)@.value().queue.value_list@[0] == ret.1,
-        old(endpoint_perm)@.value().queue.node_ref_valid(ret.1),
-        old(endpoint_perm)@.value().queue.node_ref_resolve(ret.1) == ret.0,
-        forall|index: SLLIndex|
-            #![trigger old(endpoint_perm)@.value().queue.node_ref_valid(index)]
-            #![trigger endpoint_perm@.value().queue.node_ref_valid(index)]
-            old(endpoint_perm)@.value().queue.node_ref_valid(index) && index != ret.1
-                ==> endpoint_perm@.value().queue.node_ref_valid(index),
-        forall|index: SLLIndex|
-            #![trigger old(endpoint_perm)@.value().queue.node_ref_valid(index)]
-            #![trigger endpoint_perm@.value().queue.node_ref_resolve(index)]
-            #![trigger old(endpoint_perm)@.value().queue.node_ref_resolve(index)]
-            old(endpoint_perm)@.value().queue.node_ref_valid(index) && index != ret.1
-                ==> endpoint_perm@.value().queue.node_ref_resolve(index) == old(
-                endpoint_perm,
-            )@.value().queue.node_ref_resolve(index),
-        forall|index: SLLIndex|
-            #![trigger old(endpoint_perm)@.value().queue.node_ref_valid(index)]
-            #![trigger endpoint_perm@.value().queue.node_ref_valid(index)]
-            #![trigger old(endpoint_perm)@.value().queue.node_ref_resolve(index)]
-            #![trigger endpoint_perm@.value().queue.node_ref_resolve(index)]
-            old(endpoint_perm)@.value().queue.node_ref_valid(index) && old(
-                endpoint_perm,
-            )@.value().queue.node_ref_resolve(index) != ret.0
-                ==> endpoint_perm@.value().queue.node_ref_valid(index)
-                && endpoint_perm@.value().queue.node_ref_resolve(index) == old(
-                endpoint_perm,
-            )@.value().queue.node_ref_resolve(index),
+        forall|v:ThreadPtr|
+            #![auto]
+            endpoint_perm@.value().queue@.contains(v) ==> 
+                old(endpoint_perm)@.value().queue.get_node_ref(v) == 
+                    endpoint_perm@.value().queue.get_node_ref(v),
         endpoint_perm@.value().queue.unique(),
         endpoint_perm@.value().queue@.no_duplicates(),
 {
@@ -176,24 +153,12 @@ pub fn endpoint_push(
         endpoint_perm@.value().queue.wf(),
         endpoint_perm@.value().queue@ == old(endpoint_perm)@.value().queue@.push(t_ptr),
         endpoint_perm@.value().queue.len() == old(endpoint_perm)@.value().queue.len() + 1,
-        forall|index: SLLIndex|
-            #![trigger old(endpoint_perm)@.value().queue.node_ref_valid(index)]
-            #![trigger endpoint_perm@.value().queue.node_ref_valid(index)]
-            old(endpoint_perm)@.value().queue.node_ref_valid(index)
-                ==> endpoint_perm@.value().queue.node_ref_valid(index),
-        forall|index: SLLIndex|
-            #![trigger old(endpoint_perm)@.value().queue.node_ref_valid(index)]
-            old(endpoint_perm)@.value().queue.node_ref_valid(index) ==> index != ret,
-        forall|index: SLLIndex|
-            #![trigger old(endpoint_perm)@.value().queue.node_ref_valid(index)]
-            #![trigger endpoint_perm@.value().queue.node_ref_resolve(index)]
-            #![trigger old(endpoint_perm)@.value().queue.node_ref_resolve(index)]
-            old(endpoint_perm)@.value().queue.node_ref_valid(index)
-                ==> endpoint_perm@.value().queue.node_ref_resolve(index) == old(
-                endpoint_perm,
-            )@.value().queue.node_ref_resolve(index),
-        endpoint_perm@.value().queue.node_ref_valid(ret),
-        endpoint_perm@.value().queue.node_ref_resolve(ret) == t_ptr,
+        forall|v:ThreadPtr|
+            #![auto]
+            old(endpoint_perm)@.value().queue@.contains(v) ==> 
+                old(endpoint_perm)@.value().queue.get_node_ref(v) == 
+                    endpoint_perm@.value().queue.get_node_ref(v),
+        endpoint_perm@.value().queue.get_node_ref(t_ptr) == ret,
         endpoint_perm@.value().queue.unique(),
 {
     unsafe {
@@ -226,24 +191,12 @@ pub fn endpoint_push_and_set_state(
         endpoint_perm@.value().queue.wf(),
         endpoint_perm@.value().queue@ == old(endpoint_perm)@.value().queue@.push(t_ptr),
         endpoint_perm@.value().queue.len() == old(endpoint_perm)@.value().queue.len() + 1,
-        forall|index: SLLIndex|
-            #![trigger old(endpoint_perm)@.value().queue.node_ref_valid(index)]
-            #![trigger endpoint_perm@.value().queue.node_ref_valid(index)]
-            old(endpoint_perm)@.value().queue.node_ref_valid(index)
-                ==> endpoint_perm@.value().queue.node_ref_valid(index),
-        forall|index: SLLIndex|
-            #![trigger old(endpoint_perm)@.value().queue.node_ref_valid(index)]
-            old(endpoint_perm)@.value().queue.node_ref_valid(index) ==> index != ret,
-        forall|index: SLLIndex|
-            #![trigger old(endpoint_perm)@.value().queue.node_ref_valid(index)]
-            #![trigger endpoint_perm@.value().queue.node_ref_resolve(index)]
-            #![trigger old(endpoint_perm)@.value().queue.node_ref_resolve(index)]
-            old(endpoint_perm)@.value().queue.node_ref_valid(index)
-                ==> endpoint_perm@.value().queue.node_ref_resolve(index) == old(
-                endpoint_perm,
-            )@.value().queue.node_ref_resolve(index),
-        endpoint_perm@.value().queue.node_ref_valid(ret),
-        endpoint_perm@.value().queue.node_ref_resolve(ret) == t_ptr,
+        forall|v:ThreadPtr|
+            #![auto]
+            old(endpoint_perm)@.value().queue@.contains(v) ==> 
+                old(endpoint_perm)@.value().queue.get_node_ref(v) == 
+                    endpoint_perm@.value().queue.get_node_ref(v),
+        endpoint_perm@.value().queue.get_node_ref(t_ptr) == ret,
         endpoint_perm@.value().queue.unique(),
 {
     unsafe {
