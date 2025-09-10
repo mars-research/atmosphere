@@ -628,10 +628,7 @@ impl ProcessManager {
                 self.process_perms@[p_ptr].value().owning_container,
             ).owned_procs@.contains(p_ptr) && self.get_container(
                 self.process_perms@[p_ptr].value().owning_container,
-            ).owned_procs.node_ref_valid(self.process_perms@[p_ptr].value().rev_ptr)
-                && self.get_container(
-                self.process_perms@[p_ptr].value().owning_container,
-            ).owned_procs.node_ref_resolve(self.process_perms@[p_ptr].value().rev_ptr) == p_ptr
+            ).owned_procs.get_node_ref(p_ptr) == self.process_perms@[p_ptr].value().rev_ptr
     }
 
     pub open spec fn threads_process_wf(&self) -> bool {
@@ -650,10 +647,8 @@ impl ProcessManager {
             ) && self.process_perms@.dom().contains(self.thread_perms@[t_ptr].value().owning_proc)
                 && self.process_perms@[self.thread_perms@[t_ptr].value().owning_proc].value().owned_threads@.contains(
             t_ptr)
-                && self.process_perms@[self.thread_perms@[t_ptr].value().owning_proc].value().owned_threads.node_ref_valid(
-            self.thread_perms@[t_ptr].value().proc_rev_ptr)
-                && self.process_perms@[self.thread_perms@[t_ptr].value().owning_proc].value().owned_threads.node_ref_resolve(
-            self.thread_perms@[t_ptr].value().proc_rev_ptr) == t_ptr
+                && self.process_perms@[self.thread_perms@[t_ptr].value().owning_proc].value().owned_threads.get_node_ref(t_ptr)
+                == self.thread_perms@[t_ptr].value().proc_rev_ptr
                 && self.process_perms@[self.thread_perms@[t_ptr].value().owning_proc].value().owning_container
                 == self.thread_perms@[t_ptr].value().owning_container
     }
@@ -751,10 +746,8 @@ impl ProcessManager {
             )
                 && self.endpoint_perms@[self.thread_perms@[t_ptr].value().blocking_endpoint_ptr.unwrap()].value().queue@.contains(
             t_ptr)
-                && self.endpoint_perms@[self.thread_perms@[t_ptr].value().blocking_endpoint_ptr.unwrap()].value().queue.node_ref_valid(
-            self.thread_perms@[t_ptr].value().endpoint_rev_ptr.unwrap())
-                && self.endpoint_perms@[self.thread_perms@[t_ptr].value().blocking_endpoint_ptr.unwrap()].value().queue.node_ref_resolve(
-            self.thread_perms@[t_ptr].value().endpoint_rev_ptr.unwrap()) == t_ptr
+                && self.endpoint_perms@[self.thread_perms@[t_ptr].value().blocking_endpoint_ptr.unwrap()].value().queue.get_node_ref(t_ptr) 
+                == self.thread_perms@[t_ptr].value().endpoint_rev_ptr.unwrap()
         &&& forall|e_ptr: EndpointPtr, i: int|
             #![trigger self.endpoint_perms@[e_ptr].value().queue@[i]]
             self.endpoint_perms@.dom().contains(e_ptr) && 0 <= i
@@ -795,12 +788,7 @@ impl ProcessManager {
                 && self.thread_perms@[t_ptr].value().scheduler_rev_ptr.is_Some()
                 && self.get_container(
                 self.thread_perms@[t_ptr].value().owning_container,
-            ).scheduler.node_ref_valid(self.thread_perms@[t_ptr].value().scheduler_rev_ptr.unwrap())
-                && self.get_container(
-                self.thread_perms@[t_ptr].value().owning_container,
-            ).scheduler.node_ref_resolve(
-                self.thread_perms@[t_ptr].value().scheduler_rev_ptr.unwrap(),
-            ) == t_ptr
+            ).scheduler.get_node_ref(t_ptr) == self.thread_perms@[t_ptr].value().scheduler_rev_ptr.unwrap()
         &&& forall|c_ptr: ContainerPtr, t_ptr: ThreadPtr|
             #![trigger self.get_container(c_ptr).scheduler@.contains(t_ptr)]
             #![trigger self.container_dom().contains(c_ptr), self.thread_perms@[t_ptr].value().owning_container]
@@ -3070,10 +3058,8 @@ impl ProcessManager {
                 )
                     && self.endpoint_perms@[self.thread_perms@[t_ptr].value().blocking_endpoint_ptr.unwrap()].value().queue@.contains(
                 t_ptr)
-                    && self.endpoint_perms@[self.thread_perms@[t_ptr].value().blocking_endpoint_ptr.unwrap()].value().queue.node_ref_valid(
-                self.thread_perms@[t_ptr].value().endpoint_rev_ptr.unwrap())
-                    && self.endpoint_perms@[self.thread_perms@[t_ptr].value().blocking_endpoint_ptr.unwrap()].value().queue.node_ref_resolve(
-                self.thread_perms@[t_ptr].value().endpoint_rev_ptr.unwrap()) == t_ptr);
+                    && self.endpoint_perms@[self.thread_perms@[t_ptr].value().blocking_endpoint_ptr.unwrap()].value().queue.get_node_ref(t_ptr) 
+                == self.thread_perms@[t_ptr].value().endpoint_rev_ptr.unwrap());
             assert(forall|e_ptr: EndpointPtr, i: int|
                 #![trigger self.endpoint_perms@[e_ptr].value().queue@[i]]
                 self.endpoint_perms@.dom().contains(e_ptr) && 0 <= i

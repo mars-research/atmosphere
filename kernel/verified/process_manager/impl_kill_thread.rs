@@ -60,7 +60,7 @@ impl ProcessManager {
         }
 
         let mut container_perm = Tracked(self.container_perms.borrow_mut().tracked_remove(container_ptr));
-        scheduler_remove_thread(container_ptr, &mut container_perm, scheduler_rev_ptr);
+        scheduler_remove_thread(container_ptr, &mut container_perm, scheduler_rev_ptr, Ghost(thread_ptr));
         proof{
             self.container_perms.borrow_mut().tracked_insert(container_ptr, container_perm.get());
         }

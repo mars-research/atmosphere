@@ -46,24 +46,12 @@ pub fn scheduler_push_thread(
             *thread_ptr,
         ),
         container_perm@.value().scheduler.len() == old(container_perm)@.value().scheduler.len() + 1,
-        forall|index: SLLIndex|
-            #![trigger old(container_perm)@.value().scheduler.node_ref_valid(index)]
-            #![trigger container_perm@.value().scheduler.node_ref_valid(index)]
-            old(container_perm)@.value().scheduler.node_ref_valid(index)
-                ==> container_perm@.value().scheduler.node_ref_valid(index),
-        forall|index: SLLIndex|
-            #![trigger old(container_perm)@.value().scheduler.node_ref_valid(index)]
-            old(container_perm)@.value().scheduler.node_ref_valid(index) ==> index != ret,
-        forall|index: SLLIndex|
-            #![trigger old(container_perm)@.value().scheduler.node_ref_valid(index)]
-            #![trigger container_perm@.value().scheduler.node_ref_resolve(index)]
-            #![trigger old(container_perm)@.value().scheduler.node_ref_resolve(index)]
-            old(container_perm)@.value().scheduler.node_ref_valid(index)
-                ==> container_perm@.value().scheduler.node_ref_resolve(index) == old(
-                container_perm,
-            )@.value().scheduler.node_ref_resolve(index),
-        container_perm@.value().scheduler.node_ref_valid(ret),
-        container_perm@.value().scheduler.node_ref_resolve(ret) == *thread_ptr,
+        forall|t_ptr:ThreadPtr|
+            #![auto]
+            old(container_perm)@.value().scheduler@.contains(t_ptr) ==> 
+                old(container_perm)@.value().scheduler.get_node_ref(t_ptr) == 
+                    container_perm@.value().scheduler.get_node_ref(t_ptr),
+        container_perm@.value().scheduler.get_node_ref(*thread_ptr) == ret,
         container_perm@.value().scheduler.unique(),
 {
     unsafe {
@@ -108,34 +96,11 @@ pub fn scheduler_pop_head(
         container_perm@.value().scheduler.len() == old(container_perm)@.value().scheduler.len() - 1,
         container_perm@.value().scheduler@ == old(container_perm)@.value().scheduler@.skip(1),
         ret.0 == old(container_perm)@.value().scheduler@[0],
-        old(container_perm)@.value().scheduler.value_list@[0] == ret.1,
-        old(container_perm)@.value().scheduler.node_ref_valid(ret.1),
-        old(container_perm)@.value().scheduler.node_ref_resolve(ret.1) == ret.0,
-        forall|index: SLLIndex|
-            #![trigger old(container_perm)@.value().scheduler.node_ref_valid(index)]
-            #![trigger container_perm@.value().scheduler.node_ref_valid(index)]
-            old(container_perm)@.value().scheduler.node_ref_valid(index) && index != ret.1
-                ==> container_perm@.value().scheduler.node_ref_valid(index),
-        forall|index: SLLIndex|
-            #![trigger old(container_perm)@.value().scheduler.node_ref_valid(index)]
-            #![trigger container_perm@.value().scheduler.node_ref_resolve(index)]
-            #![trigger old(container_perm)@.value().scheduler.node_ref_resolve(index)]
-            old(container_perm)@.value().scheduler.node_ref_valid(index) && index != ret.1
-                ==> container_perm@.value().scheduler.node_ref_resolve(index) == old(
-                container_perm,
-            )@.value().scheduler.node_ref_resolve(index),
-        forall|index: SLLIndex|
-            #![trigger old(container_perm)@.value().scheduler.node_ref_valid(index)]
-            #![trigger container_perm@.value().scheduler.node_ref_valid(index)]
-            #![trigger old(container_perm)@.value().scheduler.node_ref_resolve(index)]
-            #![trigger container_perm@.value().scheduler.node_ref_resolve(index)]
-            old(container_perm)@.value().scheduler.node_ref_valid(index) && old(
-                container_perm,
-            )@.value().scheduler.node_ref_resolve(index) != ret.0
-                ==> container_perm@.value().scheduler.node_ref_valid(index)
-                && container_perm@.value().scheduler.node_ref_resolve(index) == old(
-                container_perm,
-            )@.value().scheduler.node_ref_resolve(index),
+        forall|v:ThreadPtr|
+            #![auto]
+            container_perm@.value().scheduler@.contains(v) ==> 
+                old(container_perm)@.value().scheduler.get_node_ref(v) == 
+                    container_perm@.value().scheduler.get_node_ref(v),
 {
     unsafe {
         let uptr = container_ptr as *mut MaybeUninit<Container>;
@@ -149,13 +114,14 @@ pub fn scheduler_pop_head(
 pub fn scheduler_remove_thread(
     container_ptr: ContainerPtr,
     container_perm: &mut Tracked<PointsTo<Container>>,
-    rev_ptr: SLLIndex
+    rev_ptr: SLLIndex,
+    thread_ptr_g: Ghost<ThreadPtr>,
 ) -> (ret: ThreadPtr)
     requires
         old(container_perm)@.is_init(),
         old(container_perm)@.addr() == container_ptr,
         old(container_perm)@.value().scheduler.wf(),
-        old(container_perm)@.value().scheduler.node_ref_valid(rev_ptr),
+        old(container_perm)@.value().scheduler.get_node_ref(thread_ptr_g@) == rev_ptr,
     ensures
         container_perm@.is_init(),
         container_perm@.addr() == container_ptr,
@@ -175,32 +141,16 @@ pub fn scheduler_remove_thread(
             container_perm,
         )@.value().can_have_children,
         container_perm@.value().root_process =~= old(container_perm)@.value().root_process,
-            container_perm@.value().scheduler.wf(),
-            container_perm@.value().scheduler.len() == old(container_perm)@.value().scheduler.len() - 1,
-            ret == old(container_perm)@.value().scheduler.node_ref_resolve(rev_ptr),
-            forall|index: SLLIndex|
-                #![trigger old(container_perm)@.value().scheduler.node_ref_valid(index)]
-                #![trigger container_perm@.value().scheduler.node_ref_valid(index)]
-                old(container_perm)@.value().scheduler.node_ref_valid(index) && index != rev_ptr ==> container_perm@.value().scheduler.node_ref_valid(
-                    index,
-                ),
-            forall|index: SLLIndex|
-                #![trigger old(container_perm)@.value().scheduler.node_ref_valid(index)]
-                #![trigger container_perm@.value().scheduler.node_ref_resolve(index)]
-                #![trigger old(container_perm)@.value().scheduler.node_ref_resolve(index)]
-                old(container_perm)@.value().scheduler.node_ref_valid(index) && index != rev_ptr ==> container_perm@.value().scheduler.node_ref_resolve(
-                    index,
-                ) == old(container_perm)@.value().scheduler.node_ref_resolve(index),
-            forall|index: SLLIndex|
-                #![trigger old(container_perm)@.value().scheduler.node_ref_valid(index)]
-                #![trigger container_perm@.value().scheduler.node_ref_valid(index)]
-                #![trigger old(container_perm)@.value().scheduler.node_ref_resolve(index)]
-                #![trigger container_perm@.value().scheduler.node_ref_resolve(index)]
-                old(container_perm)@.value().scheduler.node_ref_valid(index) && old(container_perm)@.value().scheduler.node_ref_resolve(index) != ret
-                    ==> container_perm@.value().scheduler.node_ref_valid(index) && container_perm@.value().scheduler.node_ref_resolve(index) == old(
-                    container_perm)@.value().scheduler.node_ref_resolve(index),
-            container_perm@.value().scheduler.unique(),
-            container_perm@.value().scheduler@ =~= old(container_perm)@.value().scheduler@.remove_value(ret),
+        container_perm@.value().scheduler.wf(),
+        container_perm@.value().scheduler.len() == old(container_perm)@.value().scheduler.len() - 1,
+        ret == thread_ptr_g@,
+        container_perm@.value().scheduler.unique(),
+        container_perm@.value().scheduler@ =~= old(container_perm)@.value().scheduler@.remove_value(ret),
+        forall|v:ThreadPtr|
+            #![auto]
+            container_perm@.value().scheduler@.contains(v) ==> 
+                old(container_perm)@.value().scheduler.get_node_ref(v) == 
+                    container_perm@.value().scheduler.get_node_ref(v),
 {
     unsafe {
         let uptr = container_ptr as *mut MaybeUninit<Container>;
@@ -246,27 +196,14 @@ pub fn container_push_proc(
         container_perm@.value().owned_procs@ == old(container_perm)@.value().owned_procs@.push(
             p_ptr,
         ),
-        container_perm@.value().owned_procs.len() == old(container_perm)@.value().owned_procs.len()
-            + 1,
-        forall|index: SLLIndex|
-            #![trigger old(container_perm)@.value().owned_procs.node_ref_valid(index)]
-            #![trigger container_perm@.value().owned_procs.node_ref_valid(index)]
-            old(container_perm)@.value().owned_procs.node_ref_valid(index)
-                ==> container_perm@.value().owned_procs.node_ref_valid(index),
-        forall|index: SLLIndex|
-            #![trigger old(container_perm)@.value().owned_procs.node_ref_valid(index)]
-            old(container_perm)@.value().owned_procs.node_ref_valid(index) ==> index != ret,
-        forall|index: SLLIndex|
-            #![trigger old(container_perm)@.value().owned_procs.node_ref_valid(index)]
-            #![trigger container_perm@.value().owned_procs.node_ref_resolve(index)]
-            #![trigger old(container_perm)@.value().owned_procs.node_ref_resolve(index)]
-            old(container_perm)@.value().owned_procs.node_ref_valid(index)
-                ==> container_perm@.value().owned_procs.node_ref_resolve(index) == old(
-                container_perm,
-            )@.value().owned_procs.node_ref_resolve(index),
-        container_perm@.value().owned_procs.node_ref_valid(ret),
-        container_perm@.value().owned_procs.node_ref_resolve(ret) == p_ptr,
+        container_perm@.value().owned_procs.len() == old(container_perm)@.value().owned_procs.len() + 1,
         container_perm@.value().owned_procs.unique(),
+        forall|v:ThreadPtr|
+            #![auto]
+            old(container_perm)@.value().owned_procs@.contains(v) ==> 
+                old(container_perm)@.value().owned_procs.get_node_ref(v) == 
+                    container_perm@.value().owned_procs.get_node_ref(v),
+        container_perm@.value().owned_procs.get_node_ref(p_ptr) == ret,
 {
     unsafe {
         let uptr = container_ptr as *mut MaybeUninit<Container>;
@@ -311,25 +248,13 @@ pub fn container_push_child(
         container_perm@.value().children.wf(),
         container_perm@.value().children@ == old(container_perm)@.value().children@.push(c_ptr),
         container_perm@.value().children.len() == old(container_perm)@.value().children.len() + 1,
-        forall|index: SLLIndex|
-            #![trigger old(container_perm)@.value().children.node_ref_valid(index)]
-            #![trigger container_perm@.value().children.node_ref_valid(index)]
-            old(container_perm)@.value().children.node_ref_valid(index)
-                ==> container_perm@.value().children.node_ref_valid(index),
-        forall|index: SLLIndex|
-            #![trigger old(container_perm)@.value().children.node_ref_valid(index)]
-            old(container_perm)@.value().children.node_ref_valid(index) ==> index != ret,
-        forall|index: SLLIndex|
-            #![trigger old(container_perm)@.value().children.node_ref_valid(index)]
-            #![trigger container_perm@.value().children.node_ref_resolve(index)]
-            #![trigger old(container_perm)@.value().children.node_ref_resolve(index)]
-            old(container_perm)@.value().children.node_ref_valid(index)
-                ==> container_perm@.value().children.node_ref_resolve(index) == old(
-                container_perm,
-            )@.value().children.node_ref_resolve(index),
-        container_perm@.value().children.node_ref_valid(ret),
-        container_perm@.value().children.node_ref_resolve(ret) == c_ptr,
         container_perm@.value().children.unique(),
+        forall|v:ThreadPtr|
+            #![auto]
+            old(container_perm)@.value().children@.contains(v) ==> 
+                old(container_perm)@.value().children.get_node_ref(v) == 
+                    container_perm@.value().children.get_node_ref(v),
+        container_perm@.value().children.get_node_ref(c_ptr) == ret,
 {
     unsafe {
         let uptr = container_ptr as *mut MaybeUninit<Container>;
@@ -540,19 +465,13 @@ pub fn page_to_container(
         ret.3@.value().owned_procs.wf(),
         ret.3@.value().owned_procs@ =~= Seq::<ProcPtr>::empty().push(first_proc),
         ret.3@.value().owned_procs.len() == 1,
-        forall|index: SLLIndex|
-            #![trigger ret.3@.value().owned_procs.node_ref_valid(index)]
-            index != ret.0 ==> ret.3@.value().owned_procs.node_ref_valid(index) == false,
-        ret.3@.value().owned_procs.node_ref_valid(ret.0),
-        ret.3@.value().owned_procs.node_ref_resolve(ret.0) == first_proc,
+
+        ret.3@.value().owned_procs.get_node_ref(first_proc) == ret.0,
         ret.3@.value().parent =~= Some(parent_container),
         ret.3@.value().parent_rev_ptr =~= Some(parent_rev_ptr),
         ret.3@.value().children.wf(),
         ret.3@.value().children@ =~= Seq::<ContainerPtr>::empty(),
         ret.3@.value().children.len() == 0,
-        forall|index: SLLIndex|
-            #![trigger ret.3@.value().children.node_ref_valid(index)]
-            ret.3@.value().children.node_ref_valid(index) == false,
         ret.3@.value().owned_endpoints@ =~= Set::<EndpointPtr>::empty(),
         ret.3@.value().quota =~= init_quota,
         // ret.3@.value().mem_used =~= 0,
@@ -560,11 +479,7 @@ pub fn page_to_container(
         ret.3@.value().scheduler.wf(),
         ret.3@.value().scheduler@ =~= Seq::<ThreadPtr>::empty().push(first_thread),
         ret.3@.value().scheduler.len() == 1,
-        forall|index: SLLIndex|
-            #![trigger ret.3@.value().scheduler.node_ref_valid(index)]
-            index != ret.1 ==> ret.3@.value().scheduler.node_ref_valid(index) == false,
-        ret.3@.value().scheduler.node_ref_valid(ret.1),
-        ret.3@.value().scheduler.node_ref_resolve(ret.1) == first_thread,
+        ret.3@.value().scheduler.get_node_ref(first_thread) == ret.2,
         ret.3@.value().owned_threads@ =~= Set::<ThreadPtr>::empty().insert(first_thread),
         ret.3@.value().can_have_children =~= false,
         ret.3@.value().root_process =~= Some(first_proc),
@@ -610,19 +525,12 @@ pub fn page_to_container_tree_version(
         ret.3@.value().owned_procs.wf(),
         ret.3@.value().owned_procs@ =~= Seq::<ProcPtr>::empty().push(first_proc),
         ret.3@.value().owned_procs.len() == 1,
-        forall|index: SLLIndex|
-            #![trigger ret.3@.value().owned_procs.node_ref_valid(index)]
-            index != ret.0 ==> ret.3@.value().owned_procs.node_ref_valid(index) == false,
-        ret.3@.value().owned_procs.node_ref_valid(ret.0),
-        ret.3@.value().owned_procs.node_ref_resolve(ret.0) == first_proc,
+        ret.3@.value().owned_procs.get_node_ref(first_proc) == ret.0,
         ret.3@.value().parent =~= Some(parent_container),
         ret.3@.value().parent_rev_ptr =~= Some(parent_rev_ptr),
         ret.3@.value().children.wf(),
         ret.3@.value().children@ =~= Seq::<ContainerPtr>::empty(),
         ret.3@.value().children.len() == 0,
-        forall|index: SLLIndex|
-            #![trigger ret.3@.value().children.node_ref_valid(index)]
-            ret.3@.value().children.node_ref_valid(index) == false,
         ret.3@.value().owned_endpoints@ =~= Set::<EndpointPtr>::empty(),
         ret.3@.value().quota =~= init_quota,
         // ret.3@.value().mem_used =~= 0,
@@ -630,11 +538,7 @@ pub fn page_to_container_tree_version(
         ret.3@.value().scheduler.wf(),
         ret.3@.value().scheduler@ =~= Seq::<ThreadPtr>::empty().push(first_thread),
         ret.3@.value().scheduler.len() == 1,
-        forall|index: SLLIndex|
-            #![trigger ret.3@.value().scheduler.node_ref_valid(index)]
-            index != ret.1 ==> ret.3@.value().scheduler.node_ref_valid(index) == false,
-        ret.3@.value().scheduler.node_ref_valid(ret.1),
-        ret.3@.value().scheduler.node_ref_resolve(ret.1) == first_thread,
+        ret.3@.value().scheduler.get_node_ref(first_thread) == ret.1,
         ret.3@.value().owned_threads@ =~= Set::<ThreadPtr>::empty().insert(first_thread),
         ret.3@.value().depth =~= depth,
         ret.3@.value().subtree_set =~= subtree_set,
@@ -682,17 +586,11 @@ pub fn page_to_container_tree_version_1(
         ret.1@.addr() == page_ptr,
         ret.1@.value().owned_procs.wf(),
         ret.1@.value().owned_procs@ =~= Seq::<ProcPtr>::empty(),
-        // forall|index:SLLIndex|
-        //     #![trigger ret.1@.value().owned_procs.node_ref_valid(index)]
-        //     ret.1@.value().owned_procs.node_ref_valid(index) == false,
         ret.1@.value().parent =~= Some(parent_container),
         ret.1@.value().parent_rev_ptr =~= Some(parent_rev_ptr),
         ret.1@.value().children.wf(),
         ret.1@.value().children@ =~= Seq::<ContainerPtr>::empty(),
         ret.1@.value().children.len() == 0,
-        // forall|index:SLLIndex|
-        //     #![trigger ret.1@.value().children.node_ref_valid(index)]
-        //     ret.1@.value().children.node_ref_valid(index) == false,
         ret.1@.value().owned_endpoints@ =~= Set::<EndpointPtr>::empty(),
         ret.1@.value().quota =~= init_quota,
         // ret.1@.value().mem_used =~= 0,
