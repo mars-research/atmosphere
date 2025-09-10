@@ -3,7 +3,7 @@ verus! {
 
 use crate::allocator::page_allocator_spec_impl::*;
 use crate::memory_manager::spec_impl::*;
-use crate::process_manager::spec_proof::*;
+use crate::process_manager::spec_impl::*;
 use crate::util::page_ptr_util_u::*;
 use vstd::simple_pptr::PointsTo;
 use crate::pagetable::pagemap::PageMap;
@@ -274,11 +274,8 @@ impl Kernel {
                 #![trigger self.container_dom().contains(c_ptr)]
                 #![trigger self.get_container(c_ptr).owned_cpus.wf()]
                 #![trigger self.get_container(c_ptr).scheduler.wf()]
-                #![trigger self.get_container(c_ptr).owned_endpoints.wf()]
                 self.container_dom().contains(c_ptr) ==> self.get_container(c_ptr).owned_cpus.wf()
-                    && self.get_container(c_ptr).scheduler.wf() && self.get_container(
-                    c_ptr,
-                ).owned_endpoints.wf(),
+                    && self.get_container(c_ptr).scheduler.wf(),
             forall|c_ptr: ContainerPtr, p_ptr: ProcPtr|
                 #![auto]
                 self.container_dom().contains(c_ptr) && self.get_container(

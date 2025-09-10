@@ -22,7 +22,7 @@ use core::mem::MaybeUninit;
 use crate::trap::Registers;
 use crate::process_manager::container_tree::*;
 use crate::process_manager::process_tree::*;
-use crate::process_manager::spec_proof::*;
+use crate::process_manager::spec_impl::*;
 use crate::quota::Quota;
 
 impl ProcessManager {
@@ -220,8 +220,7 @@ impl ProcessManager {
                 old(self).get_thread(thread_ptr).owning_container,
             ),
             self.get_container(page_ptr_1).children@ =~= Seq::<ContainerPtr>::empty(),
-            self.get_container(page_ptr_1).owned_endpoints.wf(),
-            self.get_container(page_ptr_1).owned_endpoints@ =~= Seq::<EndpointPtr>::empty(),
+            self.get_container(page_ptr_1).owned_endpoints@ =~= Set::<EndpointPtr>::empty(),
             self.get_container(page_ptr_1).quota =~= *new_quota,
             // self.get_container(page_ptr_1).mem_used =~= 0,
             self.get_container(page_ptr_1).owned_cpus.wf(),

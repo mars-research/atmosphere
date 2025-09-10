@@ -5,6 +5,7 @@ use crate::slinkedlist::node::*;
 use crate::define::SLLIndex;
 use crate::lemma::lemma_u::*;
 
+#[verifier::reject_recursive_types(T)]
 pub struct StaticLinkedList<T, const N: usize> {
     pub ar: [Node<T>; N],
     pub spec_seq: Ghost<Seq<T>>,
@@ -70,6 +71,14 @@ impl<T, const N: usize> StaticLinkedList<T, N> {
     // #[verifier(inline)]
     pub open spec fn view(&self) -> Seq<T> {
         self.spec_seq@
+    }
+
+    pub closed spec fn get_node_ref(&self, v: T) -> SLLIndex
+        recommends
+            self.wf(),
+            self@.contains(v),
+    {   
+        self.value_list@[self@.index_of(v)]
     }
 
     pub closed spec fn node_ref_valid(&self, index: SLLIndex) -> bool {
@@ -353,26 +362,17 @@ impl<T: Copy, const N: usize> StaticLinkedList<T, N> {
             self.wf(),
             self@ == old(self)@.push(*new_value),
             self.len() == old(self).len() + 1,
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_valid(index)]
-                old(self).node_ref_valid(index) ==> self.node_ref_valid(index),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                old(self).node_ref_valid(index) ==> index != free_node_index,
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_resolve(index)]
-                #![trigger old(self).node_ref_resolve(index)]
-                old(self).node_ref_valid(index) ==> self.node_ref_resolve(index) == old(
-                    self,
-                ).node_ref_resolve(index),
-            self.node_ref_valid(free_node_index),
-            self.node_ref_resolve(free_node_index) == *new_value,
-            self.unique(),
+            forall|v:T|
+                #![auto]
+                old(self)@.contains(v) ==> 
+                    old(self).get_node_ref(v) == 
+                        self.get_node_ref(v),
+            self.get_node_ref(*new_value) == free_node_index,
     {
         proof {
             seq_push_lemma::<SLLIndex>();
+            seq_push_lemma::<T>();
+            seq_push_index_of_lemma::<T>();
         }
         if self.value_list_len == 0 {
             // value list empty
@@ -407,6 +407,7 @@ impl<T: Copy, const N: usize> StaticLinkedList<T, N> {
             }
             self.value_list_len = self.value_list_len + 1;
             self.set_value(ret, Some(*new_value));
+            
             assert(self.wf());
             assert(self@ == old(self)@.push(*new_value));
             return ret;
@@ -473,33 +474,18 @@ impl<T: Copy, const N: usize> StaticLinkedList<T, N> {
             self.len() == old(self).len() - 1,
             self@ == old(self)@.skip(1),
             ret.0 == old(self)@[0],
-            old(self).value_list@[0] == ret.1,
-            old(self).node_ref_valid(ret.1),
-            old(self).node_ref_resolve(ret.1) == ret.0,
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_valid(index)]
-                old(self).node_ref_valid(index) && index != ret.1 ==> self.node_ref_valid(index),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_resolve(index)]
-                #![trigger old(self).node_ref_resolve(index)]
-                old(self).node_ref_valid(index) && index != ret.1 ==> self.node_ref_resolve(index)
-                    == old(self).node_ref_resolve(index),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_valid(index)]
-                #![trigger old(self).node_ref_resolve(index)]
-                #![trigger self.node_ref_resolve(index)]
-                old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) != ret.0
-                    ==> self.node_ref_valid(index) && self.node_ref_resolve(index) == old(
-                    self,
-                ).node_ref_resolve(index),
-            self.unique(),
+            ret.1 == old(self).get_node_ref(ret.0),
+            forall|v:T|
+                #![auto]
+                self@.contains(v) ==> 
+                    old(self).get_node_ref(v) == 
+                        self.get_node_ref(v),
     {
         proof {
             seq_push_lemma::<SLLIndex>();
             seq_skip_lemma::<SLLIndex>();
+            seq_skip_lemma::<T>();
+            seq_skip_index_of_lemma::<T>();
         }
         if self.free_list_len == 0 {
             let ret_index = self.value_list_head;
@@ -576,44 +562,29 @@ impl<T: Copy, const N: usize> StaticLinkedList<T, N> {
         }
     }
 
-    pub fn remove_helper1(&mut self, remove_index: SLLIndex) -> (ret: T)
+    pub fn remove_helper1(&mut self, remove_index: SLLIndex, v: Ghost<T>) -> (ret: T)
         requires
             old(self).wf(),
-            old(self).node_ref_valid(remove_index),
+            old(self)@.contains(v@),
+            old(self).get_node_ref(v@) == remove_index,
             old(self).value_list_len == 1,
         ensures
             self.wf(),
             self.len() == old(self).len() - 1,
-            ret == old(self).node_ref_resolve(remove_index),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_valid(index)]
-                old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_valid(
-                    index,
-                ),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_resolve(index)]
-                #![trigger old(self).node_ref_resolve(index)]
-                old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_resolve(
-                    index,
-                ) == old(self).node_ref_resolve(index),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_valid(index)]
-                #![trigger old(self).node_ref_resolve(index)]
-                #![trigger self.node_ref_resolve(index)]
-                old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) != ret
-                    ==> self.node_ref_valid(index) && self.node_ref_resolve(index) == old(
-                    self,
-                ).node_ref_resolve(index),
+            ret == v@,
             self.unique(),
             self@ =~= old(self)@.remove_value(ret),
+            forall|v:T|
+                #![auto]
+                self@.contains(v) ==> 
+                    old(self).get_node_ref(v) == 
+                        self.get_node_ref(v),
     {
         proof {
             seq_push_lemma::<SLLIndex>();
             seq_skip_lemma::<SLLIndex>();
             seq_skip_lemma::<T>();
+            seq_skip_index_of_lemma::<T>();
         }
         let ret = self.get_value(remove_index).unwrap();
         let old_free_list_tail = self.free_list_tail;
@@ -637,45 +608,30 @@ impl<T: Copy, const N: usize> StaticLinkedList<T, N> {
         return ret;
     }
 
-    pub fn remove_helper2(&mut self, remove_index: SLLIndex) -> (ret: T)
+    pub fn remove_helper2(&mut self, remove_index: SLLIndex, v: Ghost<T>) -> (ret: T)
         requires
             old(self).wf(),
-            old(self).node_ref_valid(remove_index),
+            old(self)@.contains(v@),
+            old(self).get_node_ref(v@) == remove_index,
             old(self).value_list_len != 1,
             old(self).free_list_len == 0 && old(self).value_list_head == remove_index,
         ensures
             self.wf(),
             self.len() == old(self).len() - 1,
-            ret == old(self).node_ref_resolve(remove_index),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_valid(index)]
-                old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_valid(
-                    index,
-                ),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_resolve(index)]
-                #![trigger old(self).node_ref_resolve(index)]
-                old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_resolve(
-                    index,
-                ) == old(self).node_ref_resolve(index),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_valid(index)]
-                #![trigger old(self).node_ref_resolve(index)]
-                #![trigger self.node_ref_resolve(index)]
-                old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) != ret
-                    ==> self.node_ref_valid(index) && self.node_ref_resolve(index) == old(
-                    self,
-                ).node_ref_resolve(index),
+            ret == v@,
             self.unique(),
             self@ =~= old(self)@.remove_value(ret),
+            forall|v:T|
+                #![auto]
+                self@.contains(v) ==> 
+                    old(self).get_node_ref(v) == 
+                        self.get_node_ref(v),
     {
         proof {
             seq_push_lemma::<SLLIndex>();
             seq_skip_lemma::<SLLIndex>();
             seq_skip_lemma::<T>();
+            seq_skip_index_of_lemma::<T>();
         }
         let ret = self.get_value(remove_index).unwrap();
         let new_value_list_head = self.get_next(remove_index);
@@ -700,45 +656,31 @@ impl<T: Copy, const N: usize> StaticLinkedList<T, N> {
         return ret;
     }
 
-    pub fn remove_helper3(&mut self, remove_index: SLLIndex) -> (ret: T)
+    pub fn remove_helper3(&mut self, remove_index: SLLIndex, v: Ghost<T>) -> (ret: T)
         requires
             old(self).wf(),
-            old(self).node_ref_valid(remove_index),
+            old(self)@.contains(v@),
+            old(self).get_node_ref(v@) == remove_index,
             old(self).value_list_len != 1,
             old(self).free_list_len == 0 && old(self).value_list_tail == remove_index,
         ensures
             self.wf(),
             self.len() == old(self).len() - 1,
-            ret == old(self).node_ref_resolve(remove_index),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_valid(index)]
-                old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_valid(
-                    index,
-                ),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_resolve(index)]
-                #![trigger old(self).node_ref_resolve(index)]
-                old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_resolve(
-                    index,
-                ) == old(self).node_ref_resolve(index),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_valid(index)]
-                #![trigger old(self).node_ref_resolve(index)]
-                #![trigger self.node_ref_resolve(index)]
-                old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) != ret
-                    ==> self.node_ref_valid(index) && self.node_ref_resolve(index) == old(
-                    self,
-                ).node_ref_resolve(index),
             self.unique(),
             self@ =~= old(self)@.remove_value(ret),
+            ret == v@,
+            forall|v:T|
+                #![auto]
+                self@.contains(v) ==> 
+                    old(self).get_node_ref(v) == 
+                        self.get_node_ref(v),
     {
         proof {
             seq_push_lemma::<SLLIndex>();
             seq_remove_lemma::<SLLIndex>();
             seq_remove_lemma::<T>();
+            // seq_remove_index_of_lemma::<SLLIndex>();
+            // seq_remove_index_of_lemma::<T>();
         }
         let ret = self.get_value(remove_index).unwrap();
         let new_value_list_tail = self.get_prev(remove_index);
@@ -767,10 +709,11 @@ impl<T: Copy, const N: usize> StaticLinkedList<T, N> {
         return ret;
     }
 
-    pub fn remove_helper4(&mut self, remove_index: SLLIndex) -> (ret: T)
+    pub fn remove_helper4(&mut self, remove_index: SLLIndex, v: Ghost<T>) -> (ret: T)
         requires
             old(self).wf(),
-            old(self).node_ref_valid(remove_index),
+            old(self)@.contains(v@),
+            old(self).get_node_ref(v@) == remove_index,
             old(self).value_list_len != 1,
             old(self).free_list_len == 0 && old(self).value_list_tail != remove_index && old(
                 self,
@@ -778,29 +721,12 @@ impl<T: Copy, const N: usize> StaticLinkedList<T, N> {
         ensures
             self.wf(),
             self.len() == old(self).len() - 1,
-            ret == old(self).node_ref_resolve(remove_index),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_valid(index)]
-                old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_valid(
-                    index,
-                ),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_resolve(index)]
-                #![trigger old(self).node_ref_resolve(index)]
-                old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_resolve(
-                    index,
-                ) == old(self).node_ref_resolve(index),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_valid(index)]
-                #![trigger old(self).node_ref_resolve(index)]
-                #![trigger self.node_ref_resolve(index)]
-                old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) != ret
-                    ==> self.node_ref_valid(index) && self.node_ref_resolve(index) == old(
-                    self,
-                ).node_ref_resolve(index),
+            ret == v@,
+            forall|v:T|
+                #![auto]
+                self@.contains(v) ==> 
+                    old(self).get_node_ref(v) == 
+                        self.get_node_ref(v),
             self.unique(),
             self@ =~= old(self)@.remove_value(ret),
     {
@@ -808,6 +734,8 @@ impl<T: Copy, const N: usize> StaticLinkedList<T, N> {
             seq_push_lemma::<SLLIndex>();
             seq_remove_lemma::<SLLIndex>();
             seq_remove_lemma::<T>();
+            // seq_remove_index_of_lemma::<SLLIndex>();
+            // seq_remove_index_of_lemma::<T>();
         }
         let ret = self.get_value(remove_index).unwrap();
         let prev = self.get_prev(remove_index);
@@ -815,8 +743,9 @@ impl<T: Copy, const N: usize> StaticLinkedList<T, N> {
         self.set_next(prev, next);
         self.set_prev(next, prev);
 
-        let ghost_index = Ghost(self.value_list@.index_of(remove_index));
-        assert(0 <= ghost_index@ < self.value_list@.len());
+        let ghost_index = Ghost(self.spec_seq@.index_of(v@));
+        assert(0 <= ghost_index@ < self.spec_seq@.len());
+        assert(self.spec_seq@[ghost_index@] == v@);
         assert(self.value_list@[ghost_index@] == remove_index);
 
         proof {
@@ -838,14 +767,28 @@ impl<T: Copy, const N: usize> StaticLinkedList<T, N> {
         }
         self.free_list_len = self.free_list_len + 1;
 
-        assert(self.wf());
+        assert(self.wf()) by {
+            assert(self.array_wf());
+            assert( self.free_list_len + self.value_list_len == N);
+            assert( self.value_list_wf());
+            assert( self.free_list_wf());
+            assert( self.spec_seq_wf());
+        };
+        assert(
+            forall|v:T|
+                #![auto]
+                self@.contains(v) ==> 
+                    old(self).get_node_ref(v) == 
+                        self.get_node_ref(v)
+        );
         return ret;
     }
 
-    pub fn remove_helper5(&mut self, remove_index: SLLIndex) -> (ret: T)
+    pub fn remove_helper5(&mut self, remove_index: SLLIndex, v:Ghost<T>) -> (ret: T)
         requires
             old(self).wf(),
-            old(self).node_ref_valid(remove_index),
+            old(self)@.contains(v@),
+            old(self).get_node_ref(v@) == remove_index,
             old(self).value_list_len != 1,
             old(self).free_list_len != 0 && old(self).value_list_head == remove_index && old(
                 self,
@@ -853,36 +796,20 @@ impl<T: Copy, const N: usize> StaticLinkedList<T, N> {
         ensures
             self.wf(),
             self.len() == old(self).len() - 1,
-            ret == old(self).node_ref_resolve(remove_index),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_valid(index)]
-                old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_valid(
-                    index,
-                ),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_resolve(index)]
-                #![trigger old(self).node_ref_resolve(index)]
-                old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_resolve(
-                    index,
-                ) == old(self).node_ref_resolve(index),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_valid(index)]
-                #![trigger old(self).node_ref_resolve(index)]
-                #![trigger self.node_ref_resolve(index)]
-                old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) != ret
-                    ==> self.node_ref_valid(index) && self.node_ref_resolve(index) == old(
-                    self,
-                ).node_ref_resolve(index),
             self.unique(),
             self@ =~= old(self)@.remove_value(ret),
+            ret == v@,
+            forall|v:T|
+                #![auto]
+                self@.contains(v) ==> 
+                    old(self).get_node_ref(v) == 
+                        self.get_node_ref(v),
     {
         proof {
             seq_push_lemma::<SLLIndex>();
             seq_skip_lemma::<SLLIndex>();
             seq_skip_lemma::<T>();
+            seq_skip_index_of_lemma::<T>();
         }
         let ret = self.get_value(remove_index).unwrap();
         let new_value_list_head = self.get_next(remove_index);
@@ -908,10 +835,11 @@ impl<T: Copy, const N: usize> StaticLinkedList<T, N> {
         return ret;
     }
 
-    pub fn remove_helper6(&mut self, remove_index: SLLIndex) -> (ret: T)
+    pub fn remove_helper6(&mut self, remove_index: SLLIndex, v:Ghost<T>) -> (ret: T)
         requires
             old(self).wf(),
-            old(self).node_ref_valid(remove_index),
+            old(self)@.contains(v@),
+            old(self).get_node_ref(v@) == remove_index, 
             old(self).value_list_len != 1,
             old(self).free_list_len != 0 && old(self).value_list_tail == remove_index && old(
                 self,
@@ -919,31 +847,14 @@ impl<T: Copy, const N: usize> StaticLinkedList<T, N> {
         ensures
             self.wf(),
             self.len() == old(self).len() - 1,
-            ret == old(self).node_ref_resolve(remove_index),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_valid(index)]
-                old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_valid(
-                    index,
-                ),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_resolve(index)]
-                #![trigger old(self).node_ref_resolve(index)]
-                old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_resolve(
-                    index,
-                ) == old(self).node_ref_resolve(index),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_valid(index)]
-                #![trigger old(self).node_ref_resolve(index)]
-                #![trigger self.node_ref_resolve(index)]
-                old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) != ret
-                    ==> self.node_ref_valid(index) && self.node_ref_resolve(index) == old(
-                    self,
-                ).node_ref_resolve(index),
             self.unique(),
             self@ =~= old(self)@.remove_value(ret),
+            ret == v@,
+            forall|v:T|
+                #![auto]
+                self@.contains(v) ==> 
+                    old(self).get_node_ref(v) == 
+                        self.get_node_ref(v),
     {
         proof {
             seq_push_lemma::<SLLIndex>();
@@ -978,10 +889,11 @@ impl<T: Copy, const N: usize> StaticLinkedList<T, N> {
         return ret;
     }
 
-    pub fn remove_helper7(&mut self, remove_index: SLLIndex) -> (ret: T)
+    pub fn remove_helper7(&mut self, remove_index: SLLIndex, v:Ghost<T>) -> (ret: T)
         requires
             old(self).wf(),
-            old(self).node_ref_valid(remove_index),
+            old(self)@.contains(v@),
+            old(self).get_node_ref(v@) == remove_index, 
             old(self).value_list_len != 1,
             old(self).free_list_len != 0 && old(self).value_list_tail != remove_index && old(
                 self,
@@ -989,31 +901,14 @@ impl<T: Copy, const N: usize> StaticLinkedList<T, N> {
         ensures
             self.wf(),
             self.len() == old(self).len() - 1,
-            ret == old(self).node_ref_resolve(remove_index),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_valid(index)]
-                old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_valid(
-                    index,
-                ),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_resolve(index)]
-                #![trigger old(self).node_ref_resolve(index)]
-                old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_resolve(
-                    index,
-                ) == old(self).node_ref_resolve(index),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_valid(index)]
-                #![trigger old(self).node_ref_resolve(index)]
-                #![trigger self.node_ref_resolve(index)]
-                old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) != ret
-                    ==> self.node_ref_valid(index) && self.node_ref_resolve(index) == old(
-                    self,
-                ).node_ref_resolve(index),
             self.unique(),
             self@ =~= old(self)@.remove_value(ret),
+            ret == v@,
+            forall|v:T|
+                #![auto]
+                self@.contains(v) ==> 
+                    old(self).get_node_ref(v) == 
+                        self.get_node_ref(v),
     {
         proof {
             seq_push_lemma::<SLLIndex>();
@@ -1056,54 +951,39 @@ impl<T: Copy, const N: usize> StaticLinkedList<T, N> {
         return ret;
     }
 
-    pub fn remove(&mut self, remove_index: SLLIndex) -> (ret: T)
+    pub fn remove(&mut self, remove_index: SLLIndex, v: Ghost<T>) -> (ret: T)
         requires
             old(self).wf(),
-            old(self).node_ref_valid(remove_index),
+            old(self).unique(),
+            old(self)@.contains(v@),
+            old(self).get_node_ref(v@) == remove_index, 
         ensures
             self.wf(),
             self.len() == old(self).len() - 1,
-            ret == old(self).node_ref_resolve(remove_index),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_valid(index)]
-                old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_valid(
-                    index,
-                ),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_resolve(index)]
-                #![trigger old(self).node_ref_resolve(index)]
-                old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_resolve(
-                    index,
-                ) == old(self).node_ref_resolve(index),
-            forall|index: SLLIndex|
-                #![trigger old(self).node_ref_valid(index)]
-                #![trigger self.node_ref_valid(index)]
-                #![trigger old(self).node_ref_resolve(index)]
-                #![trigger self.node_ref_resolve(index)]
-                old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) != ret
-                    ==> self.node_ref_valid(index) && self.node_ref_resolve(index) == old(
-                    self,
-                ).node_ref_resolve(index),
             self.unique(),
             self@ =~= old(self)@.remove_value(ret),
+            ret == v@,
+            forall|v:T|
+                #![auto]
+                self@.contains(v) ==> 
+                    old(self).get_node_ref(v) == 
+                        self.get_node_ref(v),
     {
         assert(self.value_list_len != 0);
         if self.value_list_len == 1 {
-            return self.remove_helper1(remove_index);
+            return self.remove_helper1(remove_index, v);
         } else if self.free_list_len == 0 && self.value_list_head == remove_index {
-            return self.remove_helper2(remove_index);
+            return self.remove_helper2(remove_index, v);
         } else if self.free_list_len == 0 && self.value_list_tail == remove_index {
-            return self.remove_helper3(remove_index);
+            return self.remove_helper3(remove_index,v);
         } else if self.free_list_len == 0 {
-            return self.remove_helper4(remove_index);
+            return self.remove_helper4(remove_index, v);
         } else if self.value_list_head == remove_index {
-            return self.remove_helper5(remove_index);
+            return self.remove_helper5(remove_index, v);
         } else if self.value_list_tail == remove_index {
-            return self.remove_helper6(remove_index);
+            return self.remove_helper6(remove_index, v);
         } else {
-            return self.remove_helper7(remove_index);
+            return self.remove_helper7(remove_index, v);
         }
     }
 }

@@ -59,6 +59,22 @@ pub fn page_to_thread(
 }
 
 #[verifier(external_body)]
+pub fn thread_to_page(
+    thread_ptr: ThreadPtr,
+    thread_perm: Tracked<PointsTo<Thread>>,
+) -> (ret: (PagePtr, Tracked<PagePerm4k>))
+    requires
+        thread_perm@.is_init(),
+        thread_perm@.addr() == thread_ptr,
+    ensures
+        ret.0 == thread_ptr,
+        ret.1@.is_init(),
+        ret.1@.addr() == ret.0,
+{
+    (thread_ptr, Tracked::assume_new())
+}
+
+#[verifier(external_body)]
 pub fn page_to_thread_with_endpoint(
     page_ptr: PagePtr,
     page_perm: Tracked<PagePerm4k>,

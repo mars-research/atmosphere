@@ -15,7 +15,7 @@ pub struct Container {
     pub subtree_set: Ghost<Set<ContainerPtr>>,
     pub root_process: Option<ProcPtr>,
     pub owned_procs: StaticLinkedList<ProcPtr, CONTAINER_PROC_LIST_LEN>,
-    pub owned_endpoints: StaticLinkedList<EndpointPtr, CONTAINER_ENDPOINT_LIST_LEN>,
+    pub owned_endpoints: Ghost<Set<EndpointPtr>>,
     pub owned_threads: Ghost<Set<ThreadPtr>>,
     // pub mem_quota: usize,
     // pub mem_quota_2m: usize,

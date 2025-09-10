@@ -144,6 +144,71 @@ pub fn scheduler_pop_head(
     }
 }
 
+
+#[verifier(external_body)]
+pub fn scheduler_remove_thread(
+    container_ptr: ContainerPtr,
+    container_perm: &mut Tracked<PointsTo<Container>>,
+    rev_ptr: SLLIndex
+) -> (ret: ThreadPtr)
+    requires
+        old(container_perm)@.is_init(),
+        old(container_perm)@.addr() == container_ptr,
+        old(container_perm)@.value().scheduler.wf(),
+        old(container_perm)@.value().scheduler.node_ref_valid(rev_ptr),
+    ensures
+        container_perm@.is_init(),
+        container_perm@.addr() == container_ptr,
+        container_perm@.value().owned_procs =~= old(container_perm)@.value().owned_procs,
+        container_perm@.value().parent =~= old(container_perm)@.value().parent,
+        container_perm@.value().parent_rev_ptr =~= old(container_perm)@.value().parent_rev_ptr,
+        container_perm@.value().children =~= old(container_perm)@.value().children,
+        container_perm@.value().owned_endpoints =~= old(container_perm)@.value().owned_endpoints,
+        container_perm@.value().quota =~= old(container_perm)@.value().quota,
+        // container_perm@.value().mem_used =~= old(container_perm)@.value().mem_used,
+        container_perm@.value().owned_cpus =~= old(container_perm)@.value().owned_cpus,
+        container_perm@.value().owned_threads =~= old(container_perm)@.value().owned_threads,
+        container_perm@.value().depth =~= old(container_perm)@.value().depth,
+        container_perm@.value().uppertree_seq =~= old(container_perm)@.value().uppertree_seq,
+        container_perm@.value().subtree_set =~= old(container_perm)@.value().subtree_set,
+        container_perm@.value().can_have_children =~= old(
+            container_perm,
+        )@.value().can_have_children,
+        container_perm@.value().root_process =~= old(container_perm)@.value().root_process,
+            container_perm@.value().scheduler.wf(),
+            container_perm@.value().scheduler.len() == old(container_perm)@.value().scheduler.len() - 1,
+            ret == old(container_perm)@.value().scheduler.node_ref_resolve(rev_ptr),
+            forall|index: SLLIndex|
+                #![trigger old(container_perm)@.value().scheduler.node_ref_valid(index)]
+                #![trigger container_perm@.value().scheduler.node_ref_valid(index)]
+                old(container_perm)@.value().scheduler.node_ref_valid(index) && index != rev_ptr ==> container_perm@.value().scheduler.node_ref_valid(
+                    index,
+                ),
+            forall|index: SLLIndex|
+                #![trigger old(container_perm)@.value().scheduler.node_ref_valid(index)]
+                #![trigger container_perm@.value().scheduler.node_ref_resolve(index)]
+                #![trigger old(container_perm)@.value().scheduler.node_ref_resolve(index)]
+                old(container_perm)@.value().scheduler.node_ref_valid(index) && index != rev_ptr ==> container_perm@.value().scheduler.node_ref_resolve(
+                    index,
+                ) == old(container_perm)@.value().scheduler.node_ref_resolve(index),
+            forall|index: SLLIndex|
+                #![trigger old(container_perm)@.value().scheduler.node_ref_valid(index)]
+                #![trigger container_perm@.value().scheduler.node_ref_valid(index)]
+                #![trigger old(container_perm)@.value().scheduler.node_ref_resolve(index)]
+                #![trigger container_perm@.value().scheduler.node_ref_resolve(index)]
+                old(container_perm)@.value().scheduler.node_ref_valid(index) && old(container_perm)@.value().scheduler.node_ref_resolve(index) != ret
+                    ==> container_perm@.value().scheduler.node_ref_valid(index) && container_perm@.value().scheduler.node_ref_resolve(index) == old(
+                    container_perm)@.value().scheduler.node_ref_resolve(index),
+            container_perm@.value().scheduler.unique(),
+            container_perm@.value().scheduler@ =~= old(container_perm)@.value().scheduler@.remove_value(ret),
+{
+    unsafe {
+        let uptr = container_ptr as *mut MaybeUninit<Container>;
+        let ret = (*uptr).assume_init_mut().scheduler.remove(rev_ptr, Ghost(0));
+        ret
+    }
+}
+
 #[verifier(external_body)]
 pub fn container_push_proc(
     container_ptr: ContainerPtr,
@@ -278,13 +343,10 @@ pub fn container_push_endpoint(
     container_ptr: ContainerPtr,
     container_perm: &mut Tracked<PointsTo<Container>>,
     e_ptr: EndpointPtr,
-) -> (ret: SLLIndex)
+)
     requires
         old(container_perm)@.is_init(),
         old(container_perm)@.addr() == container_ptr,
-        old(container_perm)@.value().owned_endpoints.wf(),
-        old(container_perm)@.value().owned_endpoints.unique(),
-        old(container_perm)@.value().owned_endpoints.len() < CONTAINER_ENDPOINT_LIST_LEN,
         old(container_perm)@.value().owned_endpoints@.contains(e_ptr) == false,
     ensures
         container_perm@.is_init(),
@@ -306,38 +368,46 @@ pub fn container_push_endpoint(
             container_perm,
         )@.value().can_have_children,
         container_perm@.value().root_process =~= old(container_perm)@.value().root_process,
-        container_perm@.value().owned_endpoints.wf(),
         container_perm@.value().owned_endpoints@ == old(
             container_perm,
-        )@.value().owned_endpoints@.push(e_ptr),
-        container_perm@.value().owned_endpoints.len() == old(
-            container_perm,
-        )@.value().owned_endpoints.len() + 1,
-        forall|index: SLLIndex|
-            #![trigger old(container_perm)@.value().owned_endpoints.node_ref_valid(index)]
-            #![trigger container_perm@.value().owned_endpoints.node_ref_valid(index)]
-            old(container_perm)@.value().owned_endpoints.node_ref_valid(index)
-                ==> container_perm@.value().owned_endpoints.node_ref_valid(index),
-        forall|index: SLLIndex|
-            #![trigger old(container_perm)@.value().owned_endpoints.node_ref_valid(index)]
-            old(container_perm)@.value().owned_endpoints.node_ref_valid(index) ==> index != ret,
-        forall|index: SLLIndex|
-            #![trigger old(container_perm)@.value().owned_endpoints.node_ref_valid(index)]
-            #![trigger container_perm@.value().owned_endpoints.node_ref_resolve(index)]
-            #![trigger old(container_perm)@.value().owned_endpoints.node_ref_resolve(index)]
-            old(container_perm)@.value().owned_endpoints.node_ref_valid(index)
-                ==> container_perm@.value().owned_endpoints.node_ref_resolve(index) == old(
-                container_perm,
-            )@.value().owned_endpoints.node_ref_resolve(index),
-        container_perm@.value().owned_endpoints.node_ref_valid(ret),
-        container_perm@.value().owned_endpoints.node_ref_resolve(ret) == e_ptr,
-        container_perm@.value().owned_endpoints.unique(),
+        )@.value().owned_endpoints@.insert(e_ptr),
 {
-    unsafe {
-        let uptr = container_ptr as *mut MaybeUninit<Container>;
-        let ret = (*uptr).assume_init_mut().owned_endpoints.push(&e_ptr);
-        return ret;
-    }
+}
+
+#[verifier(external_body)]
+pub fn container_pop_endpoint(
+    container_ptr: ContainerPtr,
+    container_perm: &mut Tracked<PointsTo<Container>>,
+    e_ptr: EndpointPtr,
+)
+    requires
+        old(container_perm)@.is_init(),
+        old(container_perm)@.addr() == container_ptr,
+        old(container_perm)@.value().owned_endpoints@.contains(e_ptr),
+    ensures
+        container_perm@.is_init(),
+        container_perm@.addr() == container_ptr,
+        container_perm@.value().owned_procs =~= old(container_perm)@.value().owned_procs,
+        container_perm@.value().parent =~= old(container_perm)@.value().parent,
+        container_perm@.value().parent_rev_ptr =~= old(container_perm)@.value().parent_rev_ptr,
+        container_perm@.value().children =~= old(container_perm)@.value().children,
+        // container_perm@.value().owned_endpoints =~= old(container_perm)@.value().owned_endpoints,
+        container_perm@.value().quota =~= old(container_perm)@.value().quota,
+        // container_perm@.value().mem_used =~= old(container_perm)@.value().mem_used,
+        container_perm@.value().owned_cpus =~= old(container_perm)@.value().owned_cpus,
+        container_perm@.value().owned_threads =~= old(container_perm)@.value().owned_threads,
+        container_perm@.value().scheduler =~= old(container_perm)@.value().scheduler,
+        container_perm@.value().depth =~= old(container_perm)@.value().depth,
+        container_perm@.value().uppertree_seq =~= old(container_perm)@.value().uppertree_seq,
+        container_perm@.value().subtree_set =~= old(container_perm)@.value().subtree_set,
+        container_perm@.value().can_have_children =~= old(
+            container_perm,
+        )@.value().can_have_children,
+        container_perm@.value().root_process =~= old(container_perm)@.value().root_process,
+        container_perm@.value().owned_endpoints@ == old(
+            container_perm,
+        )@.value().owned_endpoints@.remove(e_ptr),
+{
 }
 
 #[verifier(external_body)]
@@ -483,12 +553,7 @@ pub fn page_to_container(
         forall|index: SLLIndex|
             #![trigger ret.3@.value().children.node_ref_valid(index)]
             ret.3@.value().children.node_ref_valid(index) == false,
-        ret.3@.value().owned_endpoints.wf(),
-        ret.3@.value().owned_endpoints@ =~= Seq::<EndpointPtr>::empty(),
-        ret.3@.value().owned_endpoints.len() == 0,
-        forall|index: SLLIndex|
-            #![trigger ret.3@.value().owned_endpoints.node_ref_valid(index)]
-            ret.3@.value().owned_endpoints.node_ref_valid(index) == false,
+        ret.3@.value().owned_endpoints@ =~= Set::<EndpointPtr>::empty(),
         ret.3@.value().quota =~= init_quota,
         // ret.3@.value().mem_used =~= 0,
         ret.3@.value().owned_cpus =~= new_cpus,
@@ -511,7 +576,6 @@ pub fn page_to_container(
         (*uptr).assume_init_mut().parent = Some(parent_container);
         (*uptr).assume_init_mut().parent_rev_ptr = Some(parent_rev_ptr);
         (*uptr).assume_init_mut().children.init();
-        (*uptr).assume_init_mut().owned_endpoints.init();
         (*uptr).assume_init_mut().quota = init_quota;
         // (*uptr).assume_init_mut().mem_used = 0;
         (*uptr).assume_init_mut().owned_cpus = new_cpus;
@@ -559,12 +623,7 @@ pub fn page_to_container_tree_version(
         forall|index: SLLIndex|
             #![trigger ret.3@.value().children.node_ref_valid(index)]
             ret.3@.value().children.node_ref_valid(index) == false,
-        ret.3@.value().owned_endpoints.wf(),
-        ret.3@.value().owned_endpoints@ =~= Seq::<EndpointPtr>::empty(),
-        ret.3@.value().owned_endpoints.len() == 0,
-        forall|index: SLLIndex|
-            #![trigger ret.3@.value().owned_endpoints.node_ref_valid(index)]
-            ret.3@.value().owned_endpoints.node_ref_valid(index) == false,
+        ret.3@.value().owned_endpoints@ =~= Set::<EndpointPtr>::empty(),
         ret.3@.value().quota =~= init_quota,
         // ret.3@.value().mem_used =~= 0,
         ret.3@.value().owned_cpus =~= new_cpus,
@@ -590,7 +649,6 @@ pub fn page_to_container_tree_version(
         (*uptr).assume_init_mut().parent = Some(parent_container);
         (*uptr).assume_init_mut().parent_rev_ptr = Some(parent_rev_ptr);
         (*uptr).assume_init_mut().children.init();
-        (*uptr).assume_init_mut().owned_endpoints.init();
         (*uptr).assume_init_mut().quota = init_quota;
         // (*uptr).assume_init_mut().mem_used = 0;
         (*uptr).assume_init_mut().owned_cpus = new_cpus;
@@ -635,9 +693,7 @@ pub fn page_to_container_tree_version_1(
         // forall|index:SLLIndex|
         //     #![trigger ret.1@.value().children.node_ref_valid(index)]
         //     ret.1@.value().children.node_ref_valid(index) == false,
-        ret.1@.value().owned_endpoints.wf(),
-        ret.1@.value().owned_endpoints@ =~= Seq::<EndpointPtr>::empty(),
-        ret.1@.value().owned_endpoints.len() == 0,
+        ret.1@.value().owned_endpoints@ =~= Set::<EndpointPtr>::empty(),
         ret.1@.value().quota =~= init_quota,
         // ret.1@.value().mem_used =~= 0,
         ret.1@.value().owned_cpus =~= new_cpus,
@@ -656,7 +712,6 @@ pub fn page_to_container_tree_version_1(
         (*uptr).assume_init_mut().parent = Some(parent_container);
         (*uptr).assume_init_mut().parent_rev_ptr = Some(parent_rev_ptr);
         (*uptr).assume_init_mut().children.init();
-        (*uptr).assume_init_mut().owned_endpoints.init();
         (*uptr).assume_init_mut().quota = init_quota;
         // (*uptr).assume_init_mut().mem_used = 0;
         (*uptr).assume_init_mut().owned_cpus = new_cpus;

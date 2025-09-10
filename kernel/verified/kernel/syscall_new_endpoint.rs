@@ -20,9 +20,6 @@ pub open spec fn syscall_new_endpoint_success_pre(
         false
     } else if old.get_container(container_ptr).quota.mem_4k == 0 {
         false
-    } else if old.get_container(container_ptr).owned_endpoints.len()
-        >= CONTAINER_ENDPOINT_LIST_LEN {
-        false
     } else if old.get_num_of_free_pages() == 0 {
         false
     } else {
@@ -66,7 +63,7 @@ pub open spec fn syscall_new_endpoint_success_post(
                             // things that changed
                              && old.endpoint_dom().insert(new_endpoint_ptr) =~= new.endpoint_dom()
                                 && new.get_container(container_ptr).owned_endpoints@
-                                =~= old.get_container(container_ptr).owned_endpoints@.push(
+                                =~= old.get_container(container_ptr).owned_endpoints@.insert(
                                 new_endpoint_ptr,
                             ) && new.get_container(container_ptr).quota.mem_4k == old.get_container(
                                 container_ptr,
@@ -83,7 +80,7 @@ pub open spec fn syscall_new_endpoint_success_post(
                                 && new.get_container(container_ptr).scheduler == old.get_container(
                                 container_ptr,
                             ).scheduler && new.get_container(container_ptr).owned_endpoints@
-                                == old.get_container(container_ptr).owned_endpoints@.push(
+                                == old.get_container(container_ptr).owned_endpoints@.insert(
                                 new_endpoint_ptr,
                             ) && new.get_container(container_ptr).children == old.get_container(
                                 container_ptr,
@@ -132,10 +129,6 @@ impl Kernel {
             return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
         }
         if self.proc_man.get_container(container_ptr).quota.mem_4k == 0 {
-            return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
-        }
-        if self.proc_man.get_container(container_ptr).owned_endpoints.len()
-            >= CONTAINER_ENDPOINT_LIST_LEN {
             return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
         }
         if self.page_alloc.free_pages_4k.len() <= 0 {

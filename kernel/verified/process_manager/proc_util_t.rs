@@ -67,6 +67,66 @@ pub fn proc_push_thread(
 }
 
 #[verifier(external_body)]
+pub fn proc_remove_thread(
+    proc_ptr: ProcPtr,
+    proc_perm: &mut Tracked<PointsTo<Process>>,
+    rev_ptr: SLLIndex,
+) -> (ret: ThreadPtr)
+    requires
+        old(proc_perm)@.is_init(),
+        old(proc_perm)@.addr() == proc_ptr,
+        old(proc_perm)@.value().owned_threads.wf(),
+        old(proc_perm)@.value().owned_threads.node_ref_valid(rev_ptr),
+    ensures
+        proc_perm@.is_init(),
+        proc_perm@.addr() == proc_ptr,
+        proc_perm@.value().owning_container =~= old(proc_perm)@.value().owning_container,
+        proc_perm@.value().rev_ptr =~= old(proc_perm)@.value().rev_ptr,
+        proc_perm@.value().pcid =~= old(proc_perm)@.value().pcid,
+        proc_perm@.value().ioid =~= old(proc_perm)@.value().ioid,
+        // proc_perm@.value().owned_threads =~= old(proc_perm)@.value().owned_threads,
+        proc_perm@.value().parent =~= old(proc_perm)@.value().parent,
+        proc_perm@.value().parent_rev_ptr =~= old(proc_perm)@.value().parent_rev_ptr,
+        proc_perm@.value().children =~= old(proc_perm)@.value().children,
+        proc_perm@.value().uppertree_seq =~= old(proc_perm)@.value().uppertree_seq,
+        proc_perm@.value().subtree_set =~= old(proc_perm)@.value().subtree_set,
+        proc_perm@.value().depth =~= old(proc_perm)@.value().depth,
+        proc_perm@.value().dmd_paging_mode =~= old(proc_perm)@.value().dmd_paging_mode,
+                    proc_perm@.value().owned_threads.wf(),
+            proc_perm@.value().owned_threads.len() == old(proc_perm)@.value().owned_threads.len() - 1,
+            ret == old(proc_perm)@.value().owned_threads.node_ref_resolve(rev_ptr),
+            forall|index: SLLIndex|
+                #![trigger old(proc_perm)@.value().owned_threads.node_ref_valid(index)]
+                #![trigger proc_perm@.value().owned_threads.node_ref_valid(index)]
+                old(proc_perm)@.value().owned_threads.node_ref_valid(index) && index != rev_ptr ==> proc_perm@.value().owned_threads.node_ref_valid(
+                    index,
+                ),
+            forall|index: SLLIndex|
+                #![trigger old(proc_perm)@.value().owned_threads.node_ref_valid(index)]
+                #![trigger proc_perm@.value().owned_threads.node_ref_resolve(index)]
+                #![trigger old(proc_perm)@.value().owned_threads.node_ref_resolve(index)]
+                old(proc_perm)@.value().owned_threads.node_ref_valid(index) && index != rev_ptr ==> proc_perm@.value().owned_threads.node_ref_resolve(
+                    index,
+                ) == old(proc_perm)@.value().owned_threads.node_ref_resolve(index),
+            forall|index: SLLIndex|
+                #![trigger old(proc_perm)@.value().owned_threads.node_ref_valid(index)]
+                #![trigger proc_perm@.value().owned_threads.node_ref_valid(index)]
+                #![trigger old(proc_perm)@.value().owned_threads.node_ref_resolve(index)]
+                #![trigger proc_perm@.value().owned_threads.node_ref_resolve(index)]
+                old(proc_perm)@.value().owned_threads.node_ref_valid(index) && old(proc_perm)@.value().owned_threads.node_ref_resolve(index) != ret
+                    ==> proc_perm@.value().owned_threads.node_ref_valid(index) && proc_perm@.value().owned_threads.node_ref_resolve(index) == old(
+                    proc_perm)@.value().owned_threads.node_ref_resolve(index),
+            proc_perm@.value().owned_threads.unique(),
+            proc_perm@.value().owned_threads@ =~= old(proc_perm)@.value().owned_threads@.remove_value(ret),
+{
+    unsafe {
+        let uptr = proc_ptr as *mut MaybeUninit<Process>;
+        let ret = (*uptr).assume_init_mut().owned_threads.remove(rev_ptr, Ghost(0));
+        return ret;
+    }
+}
+
+#[verifier(external_body)]
 pub fn proc_push_child(
     proc_ptr: ProcPtr,
     proc_perm: &mut Tracked<PointsTo<Process>>,

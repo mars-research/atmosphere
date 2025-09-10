@@ -140,7 +140,7 @@ impl ProcessManager {
     #[verifier(inline)]
     pub open spec fn spec_get_thread(&self, thread_ptr: ThreadPtr) -> &Thread
         recommends
-            self.wf(),
+            self.threads_perms_wf(),
             self.thread_dom().contains(thread_ptr),
     {
         &self.thread_perms@[thread_ptr].value()
@@ -591,9 +591,7 @@ impl ProcessManager {
                 && self.get_container(c_ptr).scheduler.wf() && self.get_container(
                 c_ptr,
             ).scheduler.unique() && self.get_container(c_ptr).owned_procs.wf()
-                && self.get_container(c_ptr).owned_procs.unique() && self.get_container(
-                c_ptr,
-            ).owned_endpoints.wf() && self.get_container(c_ptr).owned_endpoints.unique()
+                && self.get_container(c_ptr).owned_procs.unique()
     }
 
     pub open spec fn process_fields_wf(&self) -> bool {
@@ -684,10 +682,10 @@ impl ProcessManager {
                 c_ptr,
             ).owned_threads@.subset_of(self.thread_perms@.dom())
         &&& forall|c_ptr: ContainerPtr, t_ptr: ThreadPtr|
-            #![trigger self.get_container(c_ptr).owned_threads@.contains(t_ptr)]
+            #![trigger  self.get_container(c_ptr), self.get_thread(t_ptr)]
             self.container_dom().contains(c_ptr) && self.get_container(
                 c_ptr,
-            ).owned_threads@.contains(t_ptr) ==> self.thread_perms@[t_ptr].value().owning_container
+            ).owned_threads@.contains(t_ptr) ==> self.get_thread(t_ptr).owning_container
                 == c_ptr
         &&& forall|t_ptr: ThreadPtr|
             #![trigger self.container_dom().contains(self.thread_perms@[t_ptr].value().owning_container)]
@@ -782,14 +780,7 @@ impl ProcessManager {
                 self.endpoint_perms@[e_ptr].value().owning_container,
             ) && self.get_container(
                 self.endpoint_perms@[e_ptr].value().owning_container,
-            ).owned_endpoints@.to_set().contains(e_ptr) && self.get_container(
-                self.endpoint_perms@[e_ptr].value().owning_container,
-            ).owned_endpoints.node_ref_valid(self.endpoint_perms@[e_ptr].value().container_rev_ptr)
-                && self.get_container(
-                self.endpoint_perms@[e_ptr].value().owning_container,
-            ).owned_endpoints.node_ref_resolve(
-                self.endpoint_perms@[e_ptr].value().container_rev_ptr,
-            ) == e_ptr
+            ).owned_endpoints@.contains(e_ptr) 
     }
 
     pub open spec fn schedulers_wf(&self) -> bool {
@@ -986,11 +977,8 @@ impl ProcessManager {
                 #![trigger self.container_dom().contains(c_ptr)]
                 #![trigger self.get_container(c_ptr).owned_cpus.wf()]
                 #![trigger self.get_container(c_ptr).scheduler.wf()]
-                #![trigger self.get_container(c_ptr).owned_endpoints.wf()]
                 self.container_dom().contains(c_ptr) ==> self.get_container(c_ptr).owned_cpus.wf()
-                    && self.get_container(c_ptr).scheduler.wf() && self.get_container(
-                    c_ptr,
-                ).owned_endpoints.wf(),
+                    && self.get_container(c_ptr).scheduler.wf(),
             forall|c_ptr: ContainerPtr, p_ptr: ProcPtr|
                 #![auto]
                 self.container_dom().contains(c_ptr) && self.get_container(
@@ -1216,7 +1204,6 @@ impl ProcessManager {
             (*root_container_ptr).assume_init_mut().parent = None;
             (*root_container_ptr).assume_init_mut().parent_rev_ptr = None;
             (*root_container_ptr).assume_init_mut().children.init();
-            (*root_container_ptr).assume_init_mut().owned_endpoints.init();
             (*root_container_ptr).assume_init_mut().quota = init_quota;
             // (*root_container_ptr).assume_init_mut().mem_used = 0;
             (*root_container_ptr).assume_init_mut().owned_cpus.init();
@@ -2918,9 +2905,6 @@ impl ProcessManager {
             page_perm_1@.addr() == page_ptr_1,
             old(self).get_container(old(self).get_thread(thread_ptr).owning_container).quota.mem_4k
                 > 0,
-            old(self).get_container(
-                old(self).get_thread(thread_ptr).owning_container,
-            ).owned_endpoints.len() < CONTAINER_ENDPOINT_LIST_LEN,
         ensures
             self.wf(),
             self.page_closure() =~= old(self).page_closure().insert(page_ptr_1),
@@ -2964,7 +2948,7 @@ impl ProcessManager {
                 == self.get_container(old(self).get_thread(thread_ptr).owning_container).scheduler,
             old(self).get_container(
                 old(self).get_thread(thread_ptr).owning_container,
-            ).owned_endpoints@.push(page_ptr_1) == self.get_container(
+            ).owned_endpoints@.insert(page_ptr_1) == self.get_container(
                 old(self).get_thread(thread_ptr).owning_container,
             ).owned_endpoints@,
             old(self).get_container(old(self).get_thread(thread_ptr).owning_container).children
@@ -3003,7 +2987,6 @@ impl ProcessManager {
             container_ptr,
             thread_ptr,
             endpoint_index,
-            sll_index,
             page_ptr_1,
             page_perm_1,
         );

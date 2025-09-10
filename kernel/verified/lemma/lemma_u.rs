@@ -47,7 +47,26 @@ pub proof fn seq_push_lemma<A>()
         forall|s: Seq<A>, v: A, x: A| !s.contains(x) && v != x ==> !s.push(v).contains(x),
 {
 }
+#[verifier(external_body)]
+pub proof fn seq_push_index_of_lemma<A>()
+    ensures
+        forall|s: Seq<A>, v: A, x: A|
+            s.no_duplicates() && s.contains(v) && v != x
+            ==> 
+            s.push(x).index_of(v) == s.index_of(v),
+{
+}
 
+#[verifier(external_body)]
+pub proof fn seq_skip_index_of_lemma<A>()
+    ensures
+        forall|s: Seq<A>, v: A,|
+            #![auto]
+            s.len() != 0 && s.no_duplicates() && s.contains(v) && s[0] != v
+            ==> 
+            s.skip(1).index_of(v) == s.index_of(v) - 1,
+{
+}
 #[verifier(external_body)]
 pub proof fn seq_to_set_lemma<A>()
     ensures
@@ -131,6 +150,31 @@ pub proof fn seq_remove_lemma<A>()
             ) == s.remove_value(v),
 {
 }
+
+#[verifier(external_body)]
+pub proof fn seq_remove_index_of_lemma<A>()
+    ensures
+        forall|s: Seq<A>, v: A, i: int|
+            #![trigger s.index_of(v), s[i]]
+            s.contains(v) && s[i] != v && s.no_duplicates() && s.subrange(0, i).contains(v) ==> s.subrange(0, i).add(
+                s.subrange(i + 1, s.len() as int),
+            ).index_of(v) == s.index_of(v),
+        forall|s: Seq<A>, v: A, i: int|
+        #![trigger s.index_of(v), s[i]]
+            s.contains(v) && s[i] != v && s.no_duplicates() && s.index_of(v) < i ==> s.subrange(0, i).add(
+                s.subrange(i + 1, s.len() as int),
+            ).index_of(v) == s.index_of(v),
+        forall|s: Seq<A>, v: A, i: int|
+            #![trigger s.index_of(v), s[i]]
+            s.contains(v) && s[i] != v && s.no_duplicates() && s.subrange(i + 1, s.len() as int).contains(v) ==> s.subrange(0, i).add(
+                s.subrange(i + 1, s.len() as int),
+            ).index_of(v) == s.index_of(v) - 1,
+        forall|s: Seq<A>, v: A, i: int|
+            #![trigger s.index_of(v), s[i]]
+            s.contains(v) && s[i] != v && s.no_duplicates() && s.index_of(v) > i ==> s.subrange(0, i).add(
+                s.subrange(i + 1, s.len() as int),
+            ).index_of(v) == s.index_of(v) - 1,
+{}
 
 #[verifier(external_body)]
 pub proof fn seq_push_unique_lemma<A>()
