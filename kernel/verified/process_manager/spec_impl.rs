@@ -677,7 +677,7 @@ impl ProcessManager {
                 c_ptr,
             ).owned_threads@.subset_of(self.thread_perms@.dom())
         &&& forall|c_ptr: ContainerPtr, t_ptr: ThreadPtr|
-            #![trigger  self.get_container(c_ptr), self.get_thread(t_ptr)]
+            #![trigger  self.get_container(c_ptr).owned_threads, self.get_thread(t_ptr)]
             self.container_dom().contains(c_ptr) && self.get_container(
                 c_ptr,
             ).owned_threads@.contains(t_ptr) ==> self.get_thread(t_ptr).owning_container
@@ -694,7 +694,8 @@ impl ProcessManager {
     pub open spec fn endpoint_perms_wf(&self) -> bool {
         &&& forall|e_ptr: EndpointPtr|
             #![trigger self.endpoint_perms@.dom().contains(e_ptr) ]
-            self.endpoint_perms@.dom().contains(e_ptr) ==> self.endpoint_perms@[e_ptr].is_init()
+            self.endpoint_perms@.dom().contains(e_ptr) ==> 
+                self.endpoint_perms@[e_ptr].is_init()
                 && self.endpoint_perms@[e_ptr].addr() == e_ptr
                 && self.endpoint_perms@[e_ptr].value().queue.wf()
                 && self.endpoint_perms@[e_ptr].value().queue.unique()
@@ -748,14 +749,14 @@ impl ProcessManager {
             t_ptr)
                 && self.endpoint_perms@[self.thread_perms@[t_ptr].value().blocking_endpoint_ptr.unwrap()].value().queue.get_node_ref(t_ptr) 
                 == self.thread_perms@[t_ptr].value().endpoint_rev_ptr.unwrap()
-        &&& forall|e_ptr: EndpointPtr, i: int|
-            #![trigger self.endpoint_perms@[e_ptr].value().queue@[i]]
-            self.endpoint_perms@.dom().contains(e_ptr) && 0 <= i
-                < self.endpoint_perms@[e_ptr].value().queue@.len()
-                ==> self.thread_perms@.dom().contains(self.endpoint_perms@[e_ptr].value().queue@[i])
-                && self.thread_perms@[self.endpoint_perms@[e_ptr].value().queue@[i]].value().blocking_endpoint_ptr
+        &&& forall|e_ptr: EndpointPtr, t_ptr: ThreadPtr|
+            #![trigger self.endpoint_perms@[e_ptr].value().queue@.contains(t_ptr), ]
+            self.endpoint_perms@.dom().contains(e_ptr) && self.endpoint_perms@[e_ptr].value().queue@.contains(t_ptr)
+                ==> 
+                self.thread_perms@.dom().contains(t_ptr)
+                && self.thread_perms@[t_ptr].value().blocking_endpoint_ptr
                 == Some(e_ptr)
-                && self.thread_perms@[self.endpoint_perms@[e_ptr].value().queue@[i]].value().state
+                && self.thread_perms@[t_ptr].value().state
                 == ThreadState::BLOCKED
     }
 
@@ -1003,6 +1004,13 @@ impl ProcessManager {
                     && self.get_thread(self.get_endpoint(e_ptr).queue@[i]).state
                     == ThreadState::BLOCKED,
     {
+        assert(
+            forall|e_ptr: EndpointPtr, i: int|
+                #![trigger self.get_endpoint(e_ptr).queue@[i]]
+                self.endpoint_dom().contains(e_ptr) && 0 <= i < self.get_endpoint(e_ptr).queue.len()
+                ==> 
+                self.get_endpoint(e_ptr).queue@.contains(self.get_endpoint(e_ptr).queue@[i])
+        );
     }
 
     pub proof fn container_owned_procs_disjoint_inv(&self)
@@ -1036,12 +1044,26 @@ impl ProcessManager {
             self.wf(),
         ensures
             forall|c_ptr_i: ContainerPtr, c_ptr_j: ContainerPtr|
-                #![trigger  self.get_container(c_ptr_i).owned_threads, self.get_container(c_ptr_j).owned_threads]
+                #![trigger  self.get_container(c_ptr_i), self.get_container(c_ptr_j)]
                 self.container_dom().contains(c_ptr_i) && self.container_dom().contains(c_ptr_j)
                     && c_ptr_i != c_ptr_j ==> self.get_container(c_ptr_i).owned_threads@.disjoint(
                     self.get_container(c_ptr_j).owned_threads@,
                 ),
     {
+    }
+
+    pub proof fn proc_owned_threads_disjoint_inv(&self)
+        requires
+            self.wf(),
+        ensures
+            forall|p_ptr_i: ProcPtr, p_ptr_j: ProcPtr|
+                #![trigger  self.get_proc(p_ptr_i).owned_threads, self.get_proc(p_ptr_j).owned_threads]
+                self.proc_dom().contains(p_ptr_i) && self.proc_dom().contains(p_ptr_j)
+                    && p_ptr_i != p_ptr_j ==> self.get_proc(p_ptr_i).owned_threads@.disjoint(
+                    self.get_proc(p_ptr_j).owned_threads@,
+                ),
+    {
+        admit();
     }
 
     pub proof fn container_subtree_disjoint_inv(&self)
@@ -1689,6 +1711,7 @@ impl ProcessManager {
             ).queue@[0],
     {
         let thread_ptr = self.get_endpoint(endpoint_ptr).queue.get_head();
+        assert(self.get_endpoint(endpoint_ptr).queue@.contains(thread_ptr));
         let thread_ref = self.get_thread(thread_ptr);
         let proc_ref = self.get_proc(thread_ref.owning_proc);
         let new_pcid = proc_ref.pcid;
@@ -1872,7 +1895,12 @@ impl ProcessManager {
         }
 
         let thread_ptr = self.get_endpoint(endpoint_ptr).queue.get_head();
+
+        assert(self.get_endpoint(endpoint_ptr).queue@.contains(thread_ptr));
         let container_ptr = self.get_thread(thread_ptr).owning_container;
+
+        assert(self.get_endpoint(endpoint_ptr).queue@.contains(self.get_endpoint(endpoint_ptr).queue@[0]));
+        assert(self.get_thread(thread_ptr).state == ThreadState::BLOCKED);
 
         let mut container_perm = Tracked(
             self.container_perms.borrow_mut().tracked_remove(container_ptr),
@@ -3060,17 +3088,28 @@ impl ProcessManager {
                 t_ptr)
                     && self.endpoint_perms@[self.thread_perms@[t_ptr].value().blocking_endpoint_ptr.unwrap()].value().queue.get_node_ref(t_ptr) 
                 == self.thread_perms@[t_ptr].value().endpoint_rev_ptr.unwrap());
-            assert(forall|e_ptr: EndpointPtr, i: int|
-                #![trigger self.endpoint_perms@[e_ptr].value().queue@[i]]
-                self.endpoint_perms@.dom().contains(e_ptr) && 0 <= i
-                    < self.endpoint_perms@[e_ptr].value().queue@.len()
-                    ==> self.thread_perms@.dom().contains(
-                    self.endpoint_perms@[e_ptr].value().queue@[i],
-                )
-                    && self.thread_perms@[self.endpoint_perms@[e_ptr].value().queue@[i]].value().blocking_endpoint_ptr
+            assert(forall|e_ptr: EndpointPtr|
+                #![auto]
+                old(self).endpoint_perms@.dom().contains(e_ptr)
+                    ==> 
+                self.endpoint_perms@.dom().contains(e_ptr)
+                &&
+                self.get_endpoint(e_ptr) == old(self).get_endpoint(e_ptr)
+                    // && self.thread_perms@[t_ptr].value().blocking_endpoint_ptr
+                    // == Some(e_ptr)
+                    // && self.thread_perms@[t_ptr].value().state
+                    // == ThreadState::BLOCKED
+                );
+            assert(forall|e_ptr: EndpointPtr, t_ptr: ThreadPtr|
+                #![auto]
+                old(self).endpoint_perms@.dom().contains(e_ptr) && self.endpoint_perms@[e_ptr].value().queue@.contains(t_ptr)
+                    ==> 
+                    self.thread_perms@.dom().contains(t_ptr)
+                    && self.thread_perms@[t_ptr].value().blocking_endpoint_ptr
                     == Some(e_ptr)
-                    && self.thread_perms@[self.endpoint_perms@[e_ptr].value().queue@[i]].value().state
-                    == ThreadState::BLOCKED);
+                    && self.thread_perms@[t_ptr].value().state
+                    == ThreadState::BLOCKED
+                );
         };
         assert(self.endpoints_container_wf()) by {
             seq_push_lemma::<usize>();
