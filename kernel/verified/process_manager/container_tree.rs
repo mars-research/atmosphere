@@ -1177,6 +1177,258 @@ pub proof fn new_container_preserve_tree_inv_7(
     seq_push_unique_lemma::<ContainerPtr>();
 }
 
+pub open spec fn remove_container_ensures(
+    root_container: ContainerPtr,
+    old_container_perms: Map<ContainerPtr, PointsTo<Container>>,
+    new_container_perms: Map<ContainerPtr, PointsTo<Container>>,
+    // parent_container_ptr: ContainerPtr,
+    container_ptr: ContainerPtr,
+) -> bool {
+    &&& container_perms_wf(old_container_perms)
+    &&& container_perms_wf(new_container_perms)
+    &&& container_tree_wf(root_container, old_container_perms)
+    &&& old_container_perms.dom().contains(container_ptr)
+    &&& container_ptr != root_container
+    &&& old_container_perms[container_ptr].value().children@ == Seq::<ContainerPtr>::empty()
+    &&& old_container_perms[container_ptr].value().parent.is_Some()
+    &&& old_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children@.remove_value(container_ptr) ==
+        new_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children@
+    &&& new_container_perms.dom() == old_container_perms.dom().remove(container_ptr)
+    &&& forall|c_ptr: ContainerPtr|
+        #![trigger old_container_perms.dom().contains(c_ptr)]
+        old_container_perms.dom().contains(c_ptr) && c_ptr != container_ptr
+            ==> new_container_perms[c_ptr].value().parent
+            =~= old_container_perms[c_ptr].value().parent
+            && new_container_perms[c_ptr].value().parent_rev_ptr
+            =~= old_container_perms[c_ptr].value().parent_rev_ptr
+            && new_container_perms[c_ptr].value().children
+            =~= old_container_perms[c_ptr].value().children
+            && new_container_perms[c_ptr].value().depth =~= old_container_perms[c_ptr].value().depth
+            && new_container_perms[c_ptr].value().uppertree_seq
+            =~= old_container_perms[c_ptr].value().uppertree_seq
+    &&& forall|c_ptr: ContainerPtr|
+        #![trigger old_container_perms[container_ptr].value().uppertree_seq@.contains(c_ptr)]
+        old_container_perms[container_ptr].value().uppertree_seq@.contains(c_ptr)
+            ==> new_container_perms[c_ptr].value().subtree_set@
+            =~= old_container_perms[c_ptr].value().subtree_set@.remove(c_ptr)
+    &&& forall|c_ptr: ContainerPtr|
+        #![trigger old_container_perms.dom().contains(c_ptr)]
+    //#![trigger old_container_perms[c_ptr].value().subtree_set]
+    //#![trigger new_container_perms[c_ptr].value().subtree_set]
+
+        old_container_perms.dom().contains(c_ptr)
+            && old_container_perms[container_ptr].value().uppertree_seq@.contains(c_ptr) == false 
+            ==> new_container_perms[c_ptr].value().subtree_set
+                =~= old_container_perms[c_ptr].value().subtree_set
+    &&&
+    forall|v:ContainerPtr|
+        #![auto]
+        new_container_perms[container_ptr].value().children@.contains(v) ==> 
+            old_container_perms[container_ptr].value().children.get_node_ref(v) == 
+                new_container_perms[container_ptr].value().children.get_node_ref(v)
+}
+
+pub proof fn remove_container_preserve_tree_inv_1(
+    root_container: ContainerPtr,
+    old_container_perms: Map<ContainerPtr, PointsTo<Container>>,
+    new_container_perms: Map<ContainerPtr, PointsTo<Container>>,
+    container_ptr: ContainerPtr,
+)
+    requires
+        remove_container_ensures(
+            root_container,
+            old_container_perms,
+            new_container_perms,
+            container_ptr,
+        ),
+    ensures
+        container_root_wf(
+            root_container,
+            new_container_perms,
+        ),
+
+{
+    seq_remove_lemma::<ContainerPtr>();
+    seq_remove_lemma_2::<ContainerPtr>();
+}
+
+pub proof fn remove_container_preserve_tree_inv_2(
+    root_container: ContainerPtr,
+    old_container_perms: Map<ContainerPtr, PointsTo<Container>>,
+    new_container_perms: Map<ContainerPtr, PointsTo<Container>>,
+    container_ptr: ContainerPtr,
+)
+    requires
+        remove_container_ensures(
+            root_container,
+            old_container_perms,
+            new_container_perms,
+            container_ptr,
+        ),
+    ensures
+        container_childern_parent_wf(
+            root_container,
+            new_container_perms,
+        ),
+
+{
+    seq_remove_lemma::<ContainerPtr>();
+    seq_remove_lemma_2::<ContainerPtr>();
+    new_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children.unique_implys_no_duplicates();
+}
+
+pub proof fn remove_container_preserve_tree_inv_3(
+    root_container: ContainerPtr,
+    old_container_perms: Map<ContainerPtr, PointsTo<Container>>,
+    new_container_perms: Map<ContainerPtr, PointsTo<Container>>,
+    container_ptr: ContainerPtr,
+)
+    requires
+        remove_container_ensures(
+            root_container,
+            old_container_perms,
+            new_container_perms,
+            container_ptr,
+        ),
+    ensures
+        containers_linkedlist_wf(
+            root_container,
+            new_container_perms,
+        ),
+
+{
+    seq_remove_lemma::<ContainerPtr>();
+    seq_remove_lemma_2::<ContainerPtr>();
+}
+
+pub proof fn remove_container_preserve_tree_inv_4(
+    root_container: ContainerPtr,
+    old_container_perms: Map<ContainerPtr, PointsTo<Container>>,
+    new_container_perms: Map<ContainerPtr, PointsTo<Container>>,
+    container_ptr: ContainerPtr,
+)
+    requires
+        remove_container_ensures(
+            root_container,
+            old_container_perms,
+            new_container_perms,
+            container_ptr,
+        ),
+    ensures
+        container_childern_depth_wf(
+            root_container,
+            new_container_perms,
+        ),
+
+{
+    seq_remove_lemma::<ContainerPtr>();
+    seq_remove_lemma_2::<ContainerPtr>();
+}
+
+pub proof fn remove_container_preserve_tree_inv_5(
+    root_container: ContainerPtr,
+    old_container_perms: Map<ContainerPtr, PointsTo<Container>>,
+    new_container_perms: Map<ContainerPtr, PointsTo<Container>>,
+    container_ptr: ContainerPtr,
+)
+    requires
+        remove_container_ensures(
+            root_container,
+            old_container_perms,
+            new_container_perms,
+            container_ptr,
+        ),
+    ensures
+        container_subtree_set_wf(
+            root_container,
+            new_container_perms,
+        ),
+
+{
+    seq_remove_lemma::<ContainerPtr>();
+    seq_remove_lemma_2::<ContainerPtr>();
+    new_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children.unique_implys_no_duplicates();
+
+}
+
+pub proof fn remove_container_preserve_tree_inv_6(
+    root_container: ContainerPtr,
+    old_container_perms: Map<ContainerPtr, PointsTo<Container>>,
+    new_container_perms: Map<ContainerPtr, PointsTo<Container>>,
+    container_ptr: ContainerPtr,
+)
+    requires
+        remove_container_ensures(
+            root_container,
+            old_container_perms,
+            new_container_perms,
+            container_ptr,
+        ),
+    ensures
+        container_uppertree_seq_wf(
+            root_container,
+            new_container_perms,
+        ),
+
+{
+    seq_remove_lemma::<ContainerPtr>();
+    seq_remove_lemma_2::<ContainerPtr>();
+    new_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children.unique_implys_no_duplicates();
+
+}
+
+pub proof fn remove_container_preserve_tree_inv_7(
+    root_container: ContainerPtr,
+    old_container_perms: Map<ContainerPtr, PointsTo<Container>>,
+    new_container_perms: Map<ContainerPtr, PointsTo<Container>>,
+    container_ptr: ContainerPtr,
+)
+    requires
+        remove_container_ensures(
+            root_container,
+            old_container_perms,
+            new_container_perms,
+            container_ptr,
+        ),
+    ensures
+        container_subtree_set_exclusive(
+            root_container,
+            new_container_perms,
+        ),
+
+{
+    seq_remove_lemma::<ContainerPtr>();
+    seq_remove_lemma_2::<ContainerPtr>();
+}
+
+pub proof fn remove_container_preserve_tree_inv(
+    root_container: ContainerPtr,
+    old_container_perms: Map<ContainerPtr, PointsTo<Container>>,
+    new_container_perms: Map<ContainerPtr, PointsTo<Container>>,
+    container_ptr: ContainerPtr,
+)
+    requires
+        remove_container_ensures(
+            root_container,
+            old_container_perms,
+            new_container_perms,
+            container_ptr,
+        ),
+    ensures
+        container_tree_wf(
+            root_container,
+            new_container_perms,
+        ),
+{
+    remove_container_preserve_tree_inv_1(root_container, old_container_perms, new_container_perms,container_ptr,);
+    remove_container_preserve_tree_inv_2(root_container, old_container_perms, new_container_perms,container_ptr,);
+    remove_container_preserve_tree_inv_3(root_container, old_container_perms, new_container_perms,container_ptr,);
+    remove_container_preserve_tree_inv_4(root_container, old_container_perms, new_container_perms,container_ptr,);
+    remove_container_preserve_tree_inv_5(root_container, old_container_perms, new_container_perms,container_ptr,);
+    remove_container_preserve_tree_inv_6(root_container, old_container_perms, new_container_perms,container_ptr,);
+    remove_container_preserve_tree_inv_7(root_container, old_container_perms, new_container_perms,container_ptr,);
+}
+
 //exec
 pub fn check_is_ancestor(
     root_container: ContainerPtr,

@@ -76,13 +76,9 @@ pub closed spec fn proc_root_wf(
     &&& proc_tree_dom.contains(root_proc)
     &&& proc_perms[root_proc].value().depth == 0
     &&& forall|p_ptr: ProcPtr|
-     //#![trigger proc_tree_dom.contains(p_ptr), proc_perms[p_ptr].value().depth ]
-
         #![trigger proc_tree_dom.contains(p_ptr)]
         proc_tree_dom.contains(p_ptr) && p_ptr != root_proc ==> proc_perms[p_ptr].value().depth != 0
     &&& forall|p_ptr: ProcPtr|
-     //#![trigger proc_perms[p_ptr].value().parent.is_Some() ]
-
         #![trigger proc_tree_dom.contains(p_ptr)]
         proc_tree_dom.contains(p_ptr) && p_ptr != root_proc
             ==> proc_perms[p_ptr].value().parent.is_Some()
@@ -94,19 +90,12 @@ pub closed spec fn proc_childern_parent_wf(
     proc_perms: Map<ProcPtr, PointsTo<Process>>,
 ) -> bool {
     &&& forall|p_ptr: ProcPtr, child_p_ptr: ProcPtr|
-     //#![trigger proc_perms[p_ptr].value().children@.contains(child_p_ptr), proc_perms[child_p_ptr].value().depth, proc_perms[p_ptr].value().depth]
-    //#![trigger proc_tree_dom.contains(p_ptr), proc_perms[p_ptr].value().children@.contains(child_p_ptr), proc_tree_dom.contains(child_p_ptr)]
-    //#![trigger proc_perms[p_ptr].value().children@.contains(child_p_ptr), proc_perms[child_p_ptr].value().parent.unwrap()]
-    //  #![auto]
-
         #![trigger proc_perms[p_ptr].value().children@.contains(child_p_ptr)]
         proc_tree_dom.contains(p_ptr) && proc_perms[p_ptr].value().children@.contains(child_p_ptr)
             ==> proc_tree_dom.contains(child_p_ptr)
             && proc_perms[child_p_ptr].value().parent.unwrap() == p_ptr
             && proc_perms[child_p_ptr].value().depth == proc_perms[p_ptr].value().depth + 1
     &&& forall|p_ptr: ProcPtr|
-     //#![trigger proc_perms[p_ptr].value().parent]
-
         #![trigger proc_tree_dom.contains(p_ptr)]
         proc_tree_dom.contains(p_ptr) && proc_perms[p_ptr].value().parent.is_Some()
             ==> proc_tree_dom.contains(proc_perms[p_ptr].value().parent.unwrap())
@@ -1247,6 +1236,319 @@ pub proof fn new_proc_preserve_tree_inv_7(
     // assert(false);
     seq_push_lemma::<ProcPtr>();
     seq_push_unique_lemma::<ProcPtr>();
+}
+
+pub open spec fn remove_proc_ensures(
+    root_proc: ProcPtr,
+    proc_tree_dom: Set<ProcPtr>,
+    old_proc_perms: Map<ProcPtr, PointsTo<Process>>,
+    new_proc_perms: Map<ProcPtr, PointsTo<Process>>,
+    proc_ptr: ProcPtr,
+) -> bool {
+    &&& proc_tree_dom_subset_of_proc_dom(proc_tree_dom, old_proc_perms)
+    &&& proc_perms_wf(old_proc_perms)
+    &&& proc_perms_wf(new_proc_perms)
+    &&& proc_tree_wf(root_proc, proc_tree_dom, old_proc_perms)
+    &&& proc_tree_dom.contains(proc_ptr)
+    &&& old_proc_perms[proc_ptr].value().children@ == Seq::<ProcPtr>::empty()
+    &&& old_proc_perms[proc_ptr].value().depth != 0
+    &&& new_proc_perms.dom() == old_proc_perms.dom().remove(proc_ptr)
+    &&& forall|p_ptr: ProcPtr|
+        #![trigger proc_tree_dom.contains(p_ptr)]
+        proc_tree_dom.contains(p_ptr) && p_ptr != proc_ptr
+        ==> new_proc_perms[p_ptr].value().parent
+            =~= old_proc_perms[p_ptr].value().parent && new_proc_perms[p_ptr].value().parent_rev_ptr
+            =~= old_proc_perms[p_ptr].value().parent_rev_ptr
+            && (p_ptr != old_proc_perms[proc_ptr].value().parent.unwrap() ==> new_proc_perms[p_ptr].value().children =~= old_proc_perms[p_ptr].value().children)
+            && new_proc_perms[p_ptr].value().depth =~= old_proc_perms[p_ptr].value().depth
+            && new_proc_perms[p_ptr].value().uppertree_seq
+            =~= old_proc_perms[p_ptr].value().uppertree_seq
+    &&& forall|p_ptr: ProcPtr|
+        #![trigger old_proc_perms[proc_ptr].value().uppertree_seq@.contains(p_ptr)]
+        old_proc_perms[proc_ptr].value().uppertree_seq@.contains(p_ptr)
+            ==> new_proc_perms[p_ptr].value().subtree_set@
+            =~= old_proc_perms[p_ptr].value().subtree_set@.remove(proc_ptr)
+    &&& forall|p_ptr: ProcPtr|
+        #![trigger proc_tree_dom.contains(p_ptr)]
+        proc_tree_dom.remove(proc_ptr).contains(p_ptr)
+            && old_proc_perms[proc_ptr].value().uppertree_seq@.contains(p_ptr) == false
+            ==> new_proc_perms[p_ptr].value().subtree_set
+            =~= old_proc_perms[p_ptr].value().subtree_set
+    &&& new_proc_perms[old_proc_perms[proc_ptr].value().parent.unwrap()].value().children@ 
+        =~= old_proc_perms[old_proc_perms[proc_ptr].value().parent.unwrap()].value().children@.remove_value(proc_ptr)
+    &&&
+    forall|v:ProcPtr|
+    #![auto]
+    new_proc_perms[old_proc_perms[proc_ptr].value().parent.unwrap()].value().children@.contains(v) ==> 
+        old_proc_perms[old_proc_perms[proc_ptr].value().parent.unwrap()].value().children.get_node_ref(v) == 
+            new_proc_perms[old_proc_perms[proc_ptr].value().parent.unwrap()].value().children.get_node_ref(v)
+    &&& new_proc_perms[proc_ptr].value().children.unique()
+
+}
+
+pub proof fn remove_proc_preserve_tree_inv_1(
+    root_proc: ProcPtr,
+    proc_tree_dom: Set<ProcPtr>,
+    old_proc_perms: Map<ProcPtr, PointsTo<Process>>,
+    new_proc_perms: Map<ProcPtr, PointsTo<Process>>,
+    proc_ptr: ProcPtr,
+)
+    requires
+        remove_proc_ensures(
+            root_proc,
+            proc_tree_dom,
+            old_proc_perms,
+            new_proc_perms,
+            proc_ptr,
+        ),
+    ensures
+        proc_root_wf(
+            root_proc,
+            proc_tree_dom.remove(proc_ptr),
+            new_proc_perms,
+        ),
+{
+    seq_remove_lemma::<ProcPtr>();
+    seq_remove_lemma_2::<ProcPtr>();
+}
+
+pub proof fn remove_proc_preserve_tree_inv_2(
+    root_proc: ProcPtr,
+    proc_tree_dom: Set<ProcPtr>,
+    old_proc_perms: Map<ProcPtr, PointsTo<Process>>,
+    new_proc_perms: Map<ProcPtr, PointsTo<Process>>,
+    proc_ptr: ProcPtr,
+)
+    requires
+        remove_proc_ensures(
+            root_proc,
+            proc_tree_dom,
+            old_proc_perms,
+            new_proc_perms,
+            proc_ptr,
+        ),
+    ensures
+        proc_childern_parent_wf(
+            root_proc,
+            proc_tree_dom.remove(proc_ptr),
+            new_proc_perms,
+        ),
+{
+    seq_remove_lemma::<ProcPtr>();
+    seq_remove_lemma_2::<ProcPtr>();
+    old_proc_perms[old_proc_perms[proc_ptr].value().parent.unwrap()].value().children.unique_implys_no_duplicates();
+}
+
+pub proof fn remove_proc_preserve_tree_inv_3(
+    root_proc: ProcPtr,
+    proc_tree_dom: Set<ProcPtr>,
+    old_proc_perms: Map<ProcPtr, PointsTo<Process>>,
+    new_proc_perms: Map<ProcPtr, PointsTo<Process>>,
+    proc_ptr: ProcPtr,
+)
+    requires
+        remove_proc_ensures(
+            root_proc,
+            proc_tree_dom,
+            old_proc_perms,
+            new_proc_perms,
+            proc_ptr,
+        ),
+    ensures
+        proc_childern_depth_wf(
+            root_proc,
+            proc_tree_dom.remove(proc_ptr),
+            new_proc_perms,
+        ),
+{
+    seq_remove_lemma::<ProcPtr>();
+    seq_remove_lemma_2::<ProcPtr>();
+    old_proc_perms[old_proc_perms[proc_ptr].value().parent.unwrap()].value().children.unique_implys_no_duplicates();
+}
+
+pub proof fn remove_proc_preserve_tree_inv_4(
+    root_proc: ProcPtr,
+    proc_tree_dom: Set<ProcPtr>,
+    old_proc_perms: Map<ProcPtr, PointsTo<Process>>,
+    new_proc_perms: Map<ProcPtr, PointsTo<Process>>,
+    proc_ptr: ProcPtr,
+)
+    requires
+        remove_proc_ensures(
+            root_proc,
+            proc_tree_dom,
+            old_proc_perms,
+            new_proc_perms,
+            proc_ptr,
+        ),
+    ensures
+        proc_subtree_set_wf(
+            root_proc,
+            proc_tree_dom.remove(proc_ptr),
+            new_proc_perms,
+        ),
+{
+    seq_remove_lemma::<ProcPtr>();
+    seq_remove_lemma_2::<ProcPtr>();
+}
+
+pub proof fn remove_proc_preserve_tree_inv_5(
+    root_proc: ProcPtr,
+    proc_tree_dom: Set<ProcPtr>,
+    old_proc_perms: Map<ProcPtr, PointsTo<Process>>,
+    new_proc_perms: Map<ProcPtr, PointsTo<Process>>,
+    proc_ptr: ProcPtr,
+)
+    requires
+        remove_proc_ensures(
+            root_proc,
+            proc_tree_dom,
+            old_proc_perms,
+            new_proc_perms,
+            proc_ptr,
+        ),
+    ensures
+        proc_uppertree_seq_wf(
+            root_proc,
+            proc_tree_dom.remove(proc_ptr),
+            new_proc_perms,
+        ),
+{
+    seq_remove_lemma::<ProcPtr>();
+    seq_remove_lemma_2::<ProcPtr>();
+    old_proc_perms[old_proc_perms[proc_ptr].value().parent.unwrap()].value().children.unique_implys_no_duplicates();
+    no_child_imply_no_subtree(            
+        root_proc,
+        proc_tree_dom,
+        old_proc_perms,
+        proc_ptr,
+    );
+}
+
+pub proof fn remove_proc_preserve_tree_inv_6(
+    root_proc: ProcPtr,
+    proc_tree_dom: Set<ProcPtr>,
+    old_proc_perms: Map<ProcPtr, PointsTo<Process>>,
+    new_proc_perms: Map<ProcPtr, PointsTo<Process>>,
+    proc_ptr: ProcPtr,
+)
+    requires
+        remove_proc_ensures(
+            root_proc,
+            proc_tree_dom,
+            old_proc_perms,
+            new_proc_perms,
+            proc_ptr,
+        ),
+    ensures
+        proc_subtree_set_exclusive(
+            root_proc,
+            proc_tree_dom.remove(proc_ptr),
+            new_proc_perms,
+        ),
+{
+    seq_remove_lemma::<ProcPtr>();
+    seq_remove_lemma_2::<ProcPtr>();
+}
+
+pub proof fn remove_proc_preserve_tree_inv_7(
+    root_proc: ProcPtr,
+    proc_tree_dom: Set<ProcPtr>,
+    old_proc_perms: Map<ProcPtr, PointsTo<Process>>,
+    new_proc_perms: Map<ProcPtr, PointsTo<Process>>,
+    proc_ptr: ProcPtr,
+)
+    requires
+        remove_proc_ensures(
+            root_proc,
+            proc_tree_dom,
+            old_proc_perms,
+            new_proc_perms,
+            proc_ptr,
+        ),
+    ensures
+        procs_linkedlist_wf(
+            root_proc,
+            proc_tree_dom.remove(proc_ptr),
+            new_proc_perms,
+        ),
+{
+    seq_remove_lemma::<ProcPtr>();
+    seq_remove_lemma_2::<ProcPtr>();
+    old_proc_perms[old_proc_perms[proc_ptr].value().parent.unwrap()].value().children.unique_implys_no_duplicates();
+}
+
+pub proof fn remove_proc_preserve_tree_inv(
+    root_proc: ProcPtr,
+    proc_tree_dom: Set<ProcPtr>,
+    old_proc_perms: Map<ProcPtr, PointsTo<Process>>,
+    new_proc_perms: Map<ProcPtr, PointsTo<Process>>,
+    proc_ptr: ProcPtr,
+)
+    requires
+        remove_proc_ensures(
+            root_proc,
+            proc_tree_dom,
+            old_proc_perms,
+            new_proc_perms,
+            proc_ptr,
+        ),
+    ensures
+        proc_tree_wf(
+            root_proc,
+            proc_tree_dom.remove(proc_ptr),
+            new_proc_perms,
+        )
+{
+    remove_proc_preserve_tree_inv_1(            
+        root_proc,
+        proc_tree_dom,
+        old_proc_perms,
+        new_proc_perms,
+        proc_ptr,
+    );
+    remove_proc_preserve_tree_inv_2(            
+        root_proc,
+        proc_tree_dom,
+        old_proc_perms,
+        new_proc_perms,
+        proc_ptr,
+    );
+    remove_proc_preserve_tree_inv_3(            
+        root_proc,
+        proc_tree_dom,
+        old_proc_perms,
+        new_proc_perms,
+        proc_ptr,
+    );
+    remove_proc_preserve_tree_inv_4(            
+        root_proc,
+        proc_tree_dom,
+        old_proc_perms,
+        new_proc_perms,
+        proc_ptr,
+    );
+    remove_proc_preserve_tree_inv_5(            
+        root_proc,
+        proc_tree_dom,
+        old_proc_perms,
+        new_proc_perms,
+        proc_ptr,
+    );
+    remove_proc_preserve_tree_inv_6(            
+        root_proc,
+        proc_tree_dom,
+        old_proc_perms,
+        new_proc_perms,
+        proc_ptr,
+    );
+    remove_proc_preserve_tree_inv_7(            
+        root_proc,
+        proc_tree_dom,
+        old_proc_perms,
+        new_proc_perms,
+        proc_ptr,
+    );
 }
 
 //exec
