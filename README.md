@@ -50,12 +50,4 @@ sudo update-grub && sudo reboot
 
 ## TODO
 
-Wait for enum to add spec for syscall return value @Xiangdong.
-
-Move per CPU cache to MMU Manager @Xiangdong.
-
-Add PtRegs spec @Xiangdong.
-
-Finish proving pagetable of smallest step. @Xiangdong.
-
-Optimize for triggers? (from Verus floks) @Xiangdong. 
+Wire up internal storage linkedlist to enable killing endpoints. @Xiangdong
