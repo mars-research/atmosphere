@@ -580,6 +580,125 @@ pub proof fn proc_tree_wf_imply_childern_uppertree_specs(
     // );
 }
 
+pub proof fn proc_tree_wf_imply_uppertree_contains_no_self(
+    root_proc: ProcPtr,
+    proc_tree_dom: Set<ProcPtr>,
+    proc_perms: Map<ProcPtr, PointsTo<Process>>,
+    proc_ptr: ProcPtr
+)
+    requires
+        proc_tree_dom_subset_of_proc_dom(proc_tree_dom, proc_perms),
+        proc_perms_wf(proc_perms),
+        proc_tree_wf(root_proc, proc_tree_dom, proc_perms),
+        proc_tree_dom.contains(proc_ptr),
+    ensures
+         proc_perms[proc_ptr].value().uppertree_seq@.contains(proc_ptr) == false,
+{
+}
+
+pub proof fn proc_tree_wf_imply_root_with_no_child_has_empty_dom(
+    root_proc: ProcPtr,
+    proc_tree_dom: Set<ProcPtr>,
+    proc_perms: Map<ProcPtr, PointsTo<Process>>,
+)
+    requires
+        proc_tree_dom_subset_of_proc_dom(proc_tree_dom, proc_perms),
+        proc_perms_wf(proc_perms),
+        proc_tree_wf(root_proc, proc_tree_dom, proc_perms),
+        proc_perms[root_proc].value().children@ == Seq::<ProcPtr>::empty(),
+    ensures
+        proc_tree_dom =~= set!(root_proc),
+{
+    no_child_imply_no_subtree(            
+        root_proc,
+        proc_tree_dom,
+        proc_perms,
+        root_proc,
+    );
+    proc_tree_wf_imply_root_is_in_upper_tree(
+        root_proc,
+        proc_tree_dom,
+        proc_perms, 
+    );
+    assert(
+        forall|p_ptr: ProcPtr|
+            #![auto]
+            proc_tree_dom.contains(p_ptr) && p_ptr != root_proc
+            ==> 
+            proc_perms[p_ptr].value().uppertree_seq@[0] == root_proc
+    );    
+    assert(
+        forall|p_ptr: ProcPtr|
+            #![auto]
+            proc_tree_dom.contains(p_ptr) && p_ptr != root_proc
+            ==> 
+            proc_perms[p_ptr].value().uppertree_seq@.contains(root_proc)
+    );
+    assert(
+        forall|p_ptr: ProcPtr|
+            #![auto]
+            proc_tree_dom.contains(p_ptr) && p_ptr != root_proc
+            ==> 
+            proc_perms[root_proc].value().subtree_set@.contains(p_ptr)
+    );
+    assert(
+         forall|p_ptr: ProcPtr|
+            #![auto]
+            p_ptr != root_proc
+            ==> 
+            proc_tree_dom.contains(p_ptr) == false
+    );
+}
+
+pub proof fn proc_tree_wf_imply_root_is_in_upper_tree(
+    root_proc: ProcPtr,
+    proc_tree_dom: Set<ProcPtr>,
+    proc_perms: Map<ProcPtr, PointsTo<Process>>,
+)
+    requires
+        proc_tree_dom_subset_of_proc_dom(proc_tree_dom, proc_perms),
+        proc_perms_wf(proc_perms),
+        proc_tree_wf(root_proc, proc_tree_dom, proc_perms),
+        
+    ensures
+         forall|p_ptr: ProcPtr|
+            #![auto]
+            proc_tree_dom.contains(p_ptr) && proc_perms[p_ptr].value().depth != 0
+            ==> 
+            proc_perms[p_ptr].value().uppertree_seq@[0] == root_proc,
+{
+    assert(
+        forall|p_ptr: ProcPtr|
+            #![auto]
+            proc_tree_dom.contains(p_ptr) && proc_perms[p_ptr].value().depth != 0
+            ==> 
+            proc_perms[p_ptr].value().uppertree_seq@.contains(proc_perms[p_ptr].value().uppertree_seq@[0])
+    );
+}
+
+pub proof fn proc_tree_wf_imply_childern_has_parent(
+    root_proc: ProcPtr,
+    proc_tree_dom: Set<ProcPtr>,
+    proc_perms: Map<ProcPtr, PointsTo<Process>>,
+)
+    requires
+        proc_tree_dom_subset_of_proc_dom(proc_tree_dom, proc_perms),
+        proc_perms_wf(proc_perms),
+        proc_tree_wf(root_proc, proc_tree_dom, proc_perms),
+    ensures
+         forall|p_ptr: ProcPtr|
+            #![auto]
+            proc_tree_dom.contains(p_ptr) && proc_perms[p_ptr].value().depth != 0
+             ==> proc_perms[p_ptr].value().parent.is_Some()
+             && proc_tree_dom.contains(proc_perms[p_ptr].value().parent.unwrap())
+             && proc_perms[p_ptr].value().parent_rev_ptr.is_Some()
+             && proc_perms[proc_perms[p_ptr].value().parent.unwrap()].value().children@.contains(p_ptr)
+             && proc_perms[proc_perms[p_ptr].value().parent.unwrap()].value().children.get_node_ref(p_ptr)
+                == proc_perms[p_ptr].value().parent_rev_ptr.unwrap()
+{
+
+}
+
 pub proof fn proc_tree_inv(
     root_proc: ProcPtr,
     proc_tree_dom: Set<ProcPtr>,
@@ -1282,8 +1401,6 @@ pub open spec fn remove_proc_ensures(
     new_proc_perms[old_proc_perms[proc_ptr].value().parent.unwrap()].value().children@.contains(v) ==> 
         old_proc_perms[old_proc_perms[proc_ptr].value().parent.unwrap()].value().children.get_node_ref(v) == 
             new_proc_perms[old_proc_perms[proc_ptr].value().parent.unwrap()].value().children.get_node_ref(v)
-    &&& new_proc_perms[proc_ptr].value().children.unique()
-
 }
 
 pub proof fn remove_proc_preserve_tree_inv_1(
@@ -1486,13 +1603,49 @@ pub proof fn remove_proc_preserve_tree_inv(
     proc_ptr: ProcPtr,
 )
     requires
-        remove_proc_ensures(
-            root_proc,
-            proc_tree_dom,
-            old_proc_perms,
-            new_proc_perms,
-            proc_ptr,
-        ),
+        proc_tree_dom_subset_of_proc_dom(proc_tree_dom, old_proc_perms),
+        proc_perms_wf(old_proc_perms),
+        proc_perms_wf(new_proc_perms),
+        proc_tree_wf(root_proc, proc_tree_dom, old_proc_perms),
+        proc_tree_dom.contains(proc_ptr),
+        old_proc_perms[proc_ptr].value().children@ == Seq::<ProcPtr>::empty(),
+        old_proc_perms[proc_ptr].value().depth != 0,
+        new_proc_perms.dom() == old_proc_perms.dom().remove(proc_ptr),
+        forall|p_ptr: ProcPtr|
+            #![trigger proc_tree_dom.contains(p_ptr)]
+            proc_tree_dom.contains(p_ptr) && p_ptr != proc_ptr
+            ==> new_proc_perms[p_ptr].value().parent
+                =~= old_proc_perms[p_ptr].value().parent && new_proc_perms[p_ptr].value().parent_rev_ptr
+                =~= old_proc_perms[p_ptr].value().parent_rev_ptr
+                && (p_ptr != old_proc_perms[proc_ptr].value().parent.unwrap() ==> new_proc_perms[p_ptr].value().children =~= old_proc_perms[p_ptr].value().children)
+                && new_proc_perms[p_ptr].value().depth =~= old_proc_perms[p_ptr].value().depth
+                && new_proc_perms[p_ptr].value().uppertree_seq
+                =~= old_proc_perms[p_ptr].value().uppertree_seq,
+        forall|p_ptr: ProcPtr|
+            #![trigger old_proc_perms[proc_ptr].value().uppertree_seq@.contains(p_ptr)]
+            old_proc_perms[proc_ptr].value().uppertree_seq@.contains(p_ptr)
+                ==> new_proc_perms[p_ptr].value().subtree_set@
+                =~= old_proc_perms[p_ptr].value().subtree_set@.remove(proc_ptr),
+        forall|p_ptr: ProcPtr|
+            #![trigger proc_tree_dom.contains(p_ptr)]
+            proc_tree_dom.remove(proc_ptr).contains(p_ptr)
+                && old_proc_perms[proc_ptr].value().uppertree_seq@.contains(p_ptr) == false
+                ==> new_proc_perms[p_ptr].value().subtree_set
+                =~= old_proc_perms[p_ptr].value().subtree_set,
+        new_proc_perms[old_proc_perms[proc_ptr].value().parent.unwrap()].value().children@ 
+            =~= old_proc_perms[old_proc_perms[proc_ptr].value().parent.unwrap()].value().children@.remove_value(proc_ptr),
+        forall|v:ProcPtr|
+            #![auto]
+            new_proc_perms[old_proc_perms[proc_ptr].value().parent.unwrap()].value().children@.contains(v) ==> 
+                old_proc_perms[old_proc_perms[proc_ptr].value().parent.unwrap()].value().children.get_node_ref(v) == 
+                    new_proc_perms[old_proc_perms[proc_ptr].value().parent.unwrap()].value().children.get_node_ref(v),
+        // remove_proc_ensures(
+        //     root_proc,
+        //     proc_tree_dom,
+        //     old_proc_perms,
+        //     new_proc_perms,
+        //     proc_ptr,
+        // ),
     ensures
         proc_tree_wf(
             root_proc,

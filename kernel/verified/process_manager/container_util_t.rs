@@ -213,6 +213,59 @@ pub fn container_push_proc(
 }
 
 #[verifier(external_body)]
+pub fn container_remove_proc(
+    container_ptr: ContainerPtr,
+    container_perm: &mut Tracked<PointsTo<Container>>,
+    rev_ptr: SLLIndex,
+    p_ptr: Ghost<ProcPtr>,
+) -> (ret: ProcPtr)
+    requires
+        old(container_perm)@.is_init(),
+        old(container_perm)@.addr() == container_ptr,
+        old(container_perm)@.value().owned_procs.wf(),
+        old(container_perm)@.value().owned_procs.unique(),
+        old(container_perm)@.value().owned_procs@.contains(p_ptr@),
+        old(container_perm)@.value().owned_procs.get_node_ref(p_ptr@) == rev_ptr,
+    ensures
+        container_perm@.is_init(),
+        container_perm@.addr() == container_ptr,
+        // container_perm@.value().owned_procs =~= old(container_perm)@.value().owned_procs,
+        container_perm@.value().parent =~= old(container_perm)@.value().parent,
+        container_perm@.value().parent_rev_ptr =~= old(container_perm)@.value().parent_rev_ptr,
+        container_perm@.value().children =~= old(container_perm)@.value().children,
+        container_perm@.value().owned_endpoints =~= old(container_perm)@.value().owned_endpoints,
+        container_perm@.value().quota =~= old(container_perm)@.value().quota,
+        // container_perm@.value().mem_used =~= old(container_perm)@.value().mem_used,
+        container_perm@.value().owned_cpus =~= old(container_perm)@.value().owned_cpus,
+        container_perm@.value().owned_threads =~= old(container_perm)@.value().owned_threads,
+        container_perm@.value().scheduler =~= old(container_perm)@.value().scheduler,
+        container_perm@.value().depth =~= old(container_perm)@.value().depth,
+        container_perm@.value().uppertree_seq =~= old(container_perm)@.value().uppertree_seq,
+        container_perm@.value().subtree_set =~= old(container_perm)@.value().subtree_set,
+        container_perm@.value().can_have_children =~= old(
+            container_perm,
+        )@.value().can_have_children,
+        container_perm@.value().root_process =~= old(container_perm)@.value().root_process,
+        container_perm@.value().owned_procs.wf(),
+        container_perm@.value().owned_procs@ == old(container_perm)@.value().owned_procs@.remove_value(
+            p_ptr@,
+        ),
+        container_perm@.value().owned_procs@.len() == old(container_perm)@.value().owned_procs@.len() - 1,
+        container_perm@.value().owned_procs.unique(),
+        forall|v:ThreadPtr|
+            #![auto]
+            container_perm@.value().owned_procs@.contains(v) ==> 
+                old(container_perm)@.value().owned_procs.get_node_ref(v) == 
+                    container_perm@.value().owned_procs.get_node_ref(v),
+{
+    unsafe {
+        let uptr = container_ptr as *mut MaybeUninit<Container>;
+        let ret = (*uptr).assume_init_mut().owned_procs.remove(rev_ptr, p_ptr);
+        return ret;
+    }
+}
+
+#[verifier(external_body)]
 pub fn container_push_child(
     container_ptr: ContainerPtr,
     container_perm: &mut Tracked<PointsTo<Container>>,
@@ -442,6 +495,43 @@ pub fn container_set_owned_threads(
         container_perm@.value().root_process =~= old(container_perm)@.value().root_process,
         container_perm@.value().owned_threads =~= owned_threads,
 {
+}
+
+#[verifier(external_body)]
+pub fn container_set_root_proc(
+    container_ptr: ContainerPtr,
+    container_perm: &mut Tracked<PointsTo<Container>>,
+    root_proc: Option<ProcPtr>,
+)
+    requires
+        old(container_perm)@.is_init(),
+        old(container_perm)@.addr() == container_ptr,
+    ensures
+        container_perm@.is_init(),
+        container_perm@.addr() == container_ptr,
+        container_perm@.value().owned_procs =~= old(container_perm)@.value().owned_procs,
+        container_perm@.value().parent =~= old(container_perm)@.value().parent,
+        container_perm@.value().parent_rev_ptr =~= old(container_perm)@.value().parent_rev_ptr,
+        container_perm@.value().children =~= old(container_perm)@.value().children,
+        container_perm@.value().owned_endpoints =~= old(container_perm)@.value().owned_endpoints,
+        container_perm@.value().quota =~= old(container_perm)@.value().quota,
+        // container_perm@.value().mem_used =~= old(container_perm)@.value().mem_used,
+        container_perm@.value().owned_cpus =~= old(container_perm)@.value().owned_cpus,
+        container_perm@.value().scheduler =~= old(container_perm)@.value().scheduler,
+        container_perm@.value().owned_threads =~= old(container_perm)@.value().owned_threads,
+        container_perm@.value().depth =~= old(container_perm)@.value().depth,
+        container_perm@.value().uppertree_seq =~= old(container_perm)@.value().uppertree_seq,
+        container_perm@.value().subtree_set =~= old(container_perm)@.value().subtree_set,
+        container_perm@.value().can_have_children =~= old(
+            container_perm,
+        )@.value().can_have_children,
+        // container_perm@.value().root_process =~= old(container_perm)@.value().root_process,
+        container_perm@.value().root_process =~= root_proc,
+{
+    unsafe {
+        let uptr = container_ptr as *mut MaybeUninit<Container>;
+        (*uptr).assume_init_mut().root_process = root_proc;
+    }
 }
 
 #[verifier(external_body)]
