@@ -34,7 +34,6 @@ pub use log::info as println;
 use nvme_client::test_nvme_driver;
 use pci::scan_pci_devs;
 use constants::*;
-use mlx5_driver::{device, memory};
 
 fn test_sleep() {
     log::trace!("Sleeping for 100 ns");
@@ -102,7 +101,7 @@ extern "C" fn main(payload_base: *mut u8, payload_size: usize) -> isize {
     // test_nvme_driver();
 
     // Testing calling memory function from main
-    memory::create_contiguous_mapping(10, 0);
+//     memory::create_contiguous_mapping(10, 0);
 
     unsafe {
         asys::sys_print("end of system boot".as_ptr(), 18);

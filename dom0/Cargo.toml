@@ -15,7 +15,6 @@ nvme_driver = { path = "../nvme_driver" }
 ring_buffer = { path = "../ring_buffer" }
 ixgbe_driver = { path = "../ixgbe_driver" }
 redhttpd = { path = "../redhttpd" }
-mlx5_driver = { path = "../mlx5_driver" }
 
 libtime = { path = "../user/libtime" }
 constants = { path = "../constants" }
