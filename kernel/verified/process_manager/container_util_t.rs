@@ -317,6 +317,56 @@ pub fn container_push_child(
 }
 
 #[verifier(external_body)]
+pub fn container_remove_child(
+    container_ptr: ContainerPtr,
+    container_perm: &mut Tracked<PointsTo<Container>>,
+    rev_ptr: SLLIndex,
+    c_ptr: Ghost<ContainerPtr>,
+) -> (ret: ContainerPtr)
+    requires
+        old(container_perm)@.is_init(),
+        old(container_perm)@.addr() == container_ptr,
+        old(container_perm)@.value().children.wf(),
+        old(container_perm)@.value().children.unique(),
+        old(container_perm)@.value().children@.contains(c_ptr@),
+        old(container_perm)@.value().children.get_node_ref(c_ptr@) == rev_ptr,
+    ensures
+        container_perm@.is_init(),
+        container_perm@.addr() == container_ptr,
+        container_perm@.value().owned_procs =~= old(container_perm)@.value().owned_procs,
+        container_perm@.value().parent =~= old(container_perm)@.value().parent,
+        container_perm@.value().parent_rev_ptr =~= old(container_perm)@.value().parent_rev_ptr,
+        // container_perm@.value().children =~= old(container_perm)@.value().children,
+        container_perm@.value().owned_endpoints =~= old(container_perm)@.value().owned_endpoints,
+        container_perm@.value().quota =~= old(container_perm)@.value().quota,
+        container_perm@.value().owned_cpus =~= old(container_perm)@.value().owned_cpus,
+        container_perm@.value().owned_threads =~= old(container_perm)@.value().owned_threads,
+        container_perm@.value().scheduler =~= old(container_perm)@.value().scheduler,
+        container_perm@.value().depth =~= old(container_perm)@.value().depth,
+        container_perm@.value().uppertree_seq =~= old(container_perm)@.value().uppertree_seq,
+        container_perm@.value().subtree_set =~= old(container_perm)@.value().subtree_set,
+        container_perm@.value().can_have_children =~= old(
+            container_perm,
+        )@.value().can_have_children,
+        container_perm@.value().root_process =~= old(container_perm)@.value().root_process,
+        container_perm@.value().children.wf(),
+        container_perm@.value().children@ == old(container_perm)@.value().children@.remove_value(c_ptr@),
+        container_perm@.value().children.len() == old(container_perm)@.value().children.len() - 1,
+        container_perm@.value().children.unique(),
+        forall|v:ThreadPtr|
+            #![auto]
+            container_perm@.value().children@.contains(v) ==> 
+                old(container_perm)@.value().children.get_node_ref(v) == 
+                    container_perm@.value().children.get_node_ref(v),
+{
+    unsafe {
+        let uptr = container_ptr as *mut MaybeUninit<Container>;
+        let ret = (*uptr).assume_init_mut().children.remove(rev_ptr, c_ptr);
+        return ret;
+    }
+}
+
+#[verifier(external_body)]
 pub fn container_push_endpoint(
     container_ptr: ContainerPtr,
     container_perm: &mut Tracked<PointsTo<Container>>,
@@ -592,6 +642,21 @@ pub fn page_to_container(
 }
 
 #[verifier(external_body)]
+pub fn container_to_page(
+    container_ptr: ContainerPtr,
+    container_perm: Tracked<PointsTo<Container>>,
+) -> (ret: (PagePtr, Tracked<PagePerm4k>))
+    requires
+        container_perm@.is_init(),
+        container_perm@.addr() == container_ptr,
+    ensures
+        ret.1@.is_init(),
+        ret.0 == container_ptr,
+{
+    (container_ptr, Tracked::assume_new())
+}
+
+#[verifier(external_body)]
 pub fn page_to_container_tree_version(
     page_ptr: PagePtr,
     page_perm: Tracked<PagePerm4k>,
@@ -770,6 +835,67 @@ pub fn container_perms_update_subtree_set(
         perms@[new_container_ptr].value().subtree_set =~= old(
             perms,
         )@[new_container_ptr].value().subtree_set,
+{
+}
+
+#[verifier(external_body)]
+pub fn container_perms_subset_remove(
+    perms: &mut Tracked<Map<ContainerPtr, PointsTo<Container>>>,
+    uppertree_seq: Ghost<Seq<ContainerPtr>>,
+    container_ptr: ContainerPtr,
+)
+    ensures
+        old(perms)@.dom() =~= perms@.dom(),
+        forall|c_ptr: ContainerPtr|
+            #![trigger uppertree_seq@.contains(c_ptr)]
+            #![trigger perms@.dom().contains(c_ptr)]
+            #![trigger perms@[c_ptr]]
+            perms@.dom().contains(c_ptr) && uppertree_seq@.contains(c_ptr) == false
+                ==> perms@[c_ptr] =~= old(perms)@[c_ptr],
+        forall|c_ptr: ContainerPtr|
+            #![trigger perms@.dom().contains(c_ptr)]
+            #![trigger perms@[c_ptr]]
+            perms@.dom().contains(c_ptr) ==> perms@[c_ptr].is_init() =~= old(
+                perms,
+            )@[c_ptr].is_init() && perms@[c_ptr].addr() =~= old(perms)@[c_ptr].addr()
+                && perms@[c_ptr].value().parent =~= old(perms)@[c_ptr].value().parent
+                && perms@[c_ptr].value().parent_rev_ptr =~= old(
+                perms,
+            )@[c_ptr].value().parent_rev_ptr && perms@[c_ptr].value().children =~= old(
+                perms,
+            )@[c_ptr].value().children && perms@[c_ptr].value().depth =~= old(
+                perms,
+            )@[c_ptr].value().depth && perms@[c_ptr].value().uppertree_seq =~= old(
+                perms,
+            )@[c_ptr].value().uppertree_seq
+            // &&
+            // perms@[c_ptr].value().subtree_set =~= old(perms)@[c_ptr].value().subtree_set
+             && perms@[c_ptr].value().root_process =~= old(perms)@[c_ptr].value().root_process
+                && perms@[c_ptr].value().owned_procs =~= old(perms)@[c_ptr].value().owned_procs
+                && perms@[c_ptr].value().owned_endpoints =~= old(
+                perms,
+            )@[c_ptr].value().owned_endpoints && perms@[c_ptr].value().owned_threads =~= old(
+                perms,
+            )@[c_ptr].value().owned_threads && perms@[c_ptr].value().quota =~= old(
+                perms,
+            )@[c_ptr].value().quota
+            // &&
+            // perms@[c_ptr].value().mem_used =~= old(perms)@[c_ptr].value().mem_used
+             && perms@[c_ptr].value().owned_cpus =~= old(perms)@[c_ptr].value().owned_cpus
+                && perms@[c_ptr].value().scheduler =~= old(perms)@[c_ptr].value().scheduler
+                && perms@[c_ptr].value().can_have_children =~= old(
+                perms,
+            )@[c_ptr].value().can_have_children,
+        forall|c_ptr: ProcPtr|
+            #![trigger uppertree_seq@.contains(c_ptr)]
+            #![trigger perms@[c_ptr].value().subtree_set]
+            #![trigger old(perms)@[c_ptr].value().subtree_set]
+            uppertree_seq@.contains(c_ptr) ==> perms@[c_ptr].value().subtree_set@ =~= old(
+                perms,
+            )@[c_ptr].value().subtree_set@.remove(container_ptr),
+        perms@[container_ptr].value() =~= old(
+            perms,
+        )@[container_ptr].value(),
 {
 }
 

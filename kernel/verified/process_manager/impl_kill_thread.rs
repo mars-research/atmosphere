@@ -43,7 +43,7 @@ impl ProcessManager {
             ensures
             self.wf(),
     {
-        broadcast use ProcessManager::reveal_internal_wf;
+        broadcast use ProcessManager::reveal_process_manager_wf;
 
         let proc_ptr = self.get_thread(thread_ptr).owning_proc;
         let proc_rev_ptr = self.get_thread(thread_ptr).proc_rev_ptr;
@@ -144,7 +144,7 @@ impl ProcessManager {
             ensures
             self.wf(),
     {
-        broadcast use ProcessManager::reveal_internal_wf;
+        broadcast use ProcessManager::reveal_process_manager_wf;
 
         let proc_ptr = self.get_thread(thread_ptr).owning_proc;
         let proc_rev_ptr = self.get_thread(thread_ptr).proc_rev_ptr;
@@ -254,7 +254,7 @@ impl ProcessManager {
             ensures
             // self.wf(),
     {
-        broadcast use ProcessManager::reveal_internal_wf;
+        broadcast use ProcessManager::reveal_process_manager_wf;
 
         let proc_ptr = self.get_thread(thread_ptr).owning_proc;
         let proc_rev_ptr = self.get_thread(thread_ptr).proc_rev_ptr;

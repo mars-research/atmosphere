@@ -15,6 +15,7 @@ pub mod impl_new_thread;
 pub mod impl_drop_enpoints;
 pub mod impl_kill_thread;
 pub mod impl_kill_proc;
+pub mod impl_kill_container;
 pub mod proc_util_t;
 pub mod spec_impl;
 pub mod spec_util;

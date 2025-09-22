@@ -801,7 +801,7 @@ impl PageTable {
                 == self.l4_table@[self.cr3].value()[i]
     }
 
-    pub open   spec fn wf(&self) -> bool {
+    pub closed   spec fn wf(&self) -> bool {
         &&& self.wf_l4()
         &&& self.wf_l3()
         &&& self.wf_l2()
@@ -819,6 +819,28 @@ impl PageTable {
         &&& self.pcid_ioid_wf()
         &&& self.tlb_wf()
         &&& self.tlb_submap_of_mapping()
+    }
+
+        pub broadcast proof fn reveal_page_table_wf(&self)
+        ensures
+            #[trigger] self.wf() <==> {
+                &&& self.wf_l4()
+                &&& self.wf_l3()
+                &&& self.wf_l2()
+                &&& self.wf_l1()
+                &&& self.wf_mapping_4k()
+                &&& self.wf_mapping_2m()
+                &&& self.wf_mapping_1g()
+                &&& self.user_only()
+                &&& self.rwx_upper_level_entries()
+                &&& self.present_or_zero()
+                &&& self.table_pages_wf()
+                &&& self.kernel_entries_wf()
+                &&& self.pcid_ioid_wf()
+                &&& self.tlb_wf()
+                &&& self.tlb_submap_of_mapping()
+            },
+    {
     }
 
     // pub open   spec fn l4_kernel_entries_reserved(&self) -> bool

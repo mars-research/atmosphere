@@ -1016,7 +1016,9 @@ impl PageAllocator {
         }
         let tracked mut ret_perm = self.page_perms_2m.borrow_mut().tracked_remove(ret);
         assert(self.page_array_wf());
-        assert(self.free_pages_4k_wf());
+        assert(self.free_pages_4k_wf()) by {
+            page_ptr_lemma();
+        };;
         assert(self.free_pages_2m_wf()) by {
             page_ptr_2m_lemma();
         };

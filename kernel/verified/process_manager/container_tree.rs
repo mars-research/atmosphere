@@ -580,6 +580,26 @@ pub proof fn container_tree_wf_imply_childern_uppertree_specs(
     // );
 }
 
+pub proof fn container_tree_wf_imply_childern_have_parent(
+    root_container: ContainerPtr,
+    container_perms: Map<ContainerPtr, PointsTo<Container>>,
+)
+    requires
+        container_perms_wf(container_perms),
+        container_tree_wf(root_container, container_perms),
+    ensures
+        forall|c_ptr: ContainerPtr|
+        #![auto]
+        container_perms.dom().contains(c_ptr) && container_perms[c_ptr].value().depth != 0
+            ==> container_perms[c_ptr].value().parent.is_Some()
+            && container_perms.dom().contains(container_perms[c_ptr].value().parent.unwrap())
+            && container_perms[c_ptr].value().parent_rev_ptr.is_Some()
+            && container_perms[container_perms[c_ptr].value().parent.unwrap()].value().children@.contains(c_ptr)
+            && container_perms[container_perms[c_ptr].value().parent.unwrap()].value().children.get_node_ref(c_ptr)
+            == container_perms[c_ptr].value().parent_rev_ptr.unwrap()
+{
+}
+
 pub proof fn container_tree_inv(
     root_container: ContainerPtr,
     container_perms: Map<ContainerPtr, PointsTo<Container>>,

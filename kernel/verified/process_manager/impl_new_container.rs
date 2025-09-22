@@ -295,7 +295,7 @@ impl ProcessManager {
         proof {
             seq_push_lemma::<ThreadPtr>();
         }
-        broadcast use ProcessManager::reveal_internal_wf;
+        broadcast use ProcessManager::reveal_process_manager_wf;
 
         let old_container_ptr = self.get_thread(thread_ptr).owning_container;
         let mut old_quota = self.get_container(old_container_ptr).quota;

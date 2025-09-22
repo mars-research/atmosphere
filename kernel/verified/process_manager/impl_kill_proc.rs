@@ -38,7 +38,7 @@ impl ProcessManager {
         ensures
             self.wf(),
     {
-        broadcast use ProcessManager::reveal_internal_wf;
+        broadcast use ProcessManager::reveal_process_manager_wf;
 
         let container_ptr = self.get_proc(proc_ptr).owning_container;
         let container_rev_ptr = self.get_proc(proc_ptr).rev_ptr;
@@ -192,7 +192,7 @@ impl ProcessManager {
         ensures
             self.wf(),
     {
-        broadcast use ProcessManager::reveal_internal_wf;
+        broadcast use ProcessManager::reveal_process_manager_wf;
 
         let container_ptr = self.get_proc(proc_ptr).owning_container;
         let container_rev_ptr = self.get_proc(proc_ptr).rev_ptr;

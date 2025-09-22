@@ -835,7 +835,7 @@ impl ProcessManager {
         &&& self.process_trees_wf()
     }
 
-    pub broadcast proof fn reveal_internal_wf(&self)
+    pub broadcast proof fn reveal_process_manager_wf(&self)
         ensures
             #[trigger] self.internal_wf() <==> {
                 &&& self.cpus_wf()
@@ -1140,6 +1140,30 @@ impl ProcessManager {
                 self.proc_dom().contains(p_ptr_i) && self.proc_dom().contains(p_ptr_j) && p_ptr_i
                     != p_ptr_j ==> self.get_proc(p_ptr_i).pcid != self.get_proc(p_ptr_j).pcid,
     {
+    }
+
+    pub proof fn wf_imply_container_no_proc_to_no_thread(&self, container_ptr:ContainerPtr)
+        requires
+            self.wf(),
+            self.container_dom().contains(container_ptr),
+            self.get_container(container_ptr).owned_procs@ == Seq::<ProcPtr>::empty(),
+        ensures
+            self.get_container(container_ptr).owned_threads@ == Set::<ThreadPtr>::empty(),
+    {
+        assert(
+            forall|t_ptr:ThreadPtr|
+                #![auto]
+                self.get_container(container_ptr).owned_threads@.contains(t_ptr)
+                ==>
+                self.get_container(container_ptr).owned_procs@.contains(self.get_thread(t_ptr).owning_proc)
+        );
+        assert(
+            !(
+                exists|t_ptr:ThreadPtr|
+                    self.get_container(container_ptr).owned_threads@.contains(t_ptr)
+            )
+        );
+        assume(self.get_container(container_ptr).owned_threads@ == Set::<ThreadPtr>::empty());
     }
 
     // pub proof fn wf_imply_container_proc_disjoint(&self)

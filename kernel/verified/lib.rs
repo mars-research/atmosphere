@@ -17,7 +17,7 @@ pub mod memory_manager;
 pub mod va_range;
 pub mod quota;
 
-// pub mod kernel;
+pub mod kernel;
 
 pub mod lemma;
 pub mod util;

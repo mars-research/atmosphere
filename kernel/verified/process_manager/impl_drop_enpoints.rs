@@ -41,7 +41,7 @@ impl ProcessManager {
         ensures
             self.wf(),
     {
-        broadcast use ProcessManager::reveal_internal_wf;
+        broadcast use ProcessManager::reveal_process_manager_wf;
 
         let endpint_op = self.get_thread(thread_ptr).endpoint_descriptors.get(edp_idx);
         if endpint_op.is_none(){

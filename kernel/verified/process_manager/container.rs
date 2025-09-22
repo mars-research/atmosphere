@@ -15,6 +15,11 @@ pub struct Container {
     pub subtree_set: Ghost<Set<ContainerPtr>>,
     pub root_process: Option<ProcPtr>,
     pub owned_procs: StaticLinkedList<ProcPtr, CONTAINER_PROC_LIST_LEN>,
+    /// Right now we don't yet have linkedlist with unlimited length, 
+    /// so we cannot kill an endpoint and release all the blocked threads.
+    /// We we can do now to enable unconditional kill() is to add an invariant to
+    /// ensure that each endpoint can ONLY be referenced by threads in the subtree of the container.
+    /// So when we kill all the threads, all the endpoints are killed too. 
     pub owned_endpoints: Ghost<Set<EndpointPtr>>,
     pub owned_threads: Ghost<Set<ThreadPtr>>,
     // pub mem_quota: usize,

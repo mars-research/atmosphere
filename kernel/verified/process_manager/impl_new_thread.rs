@@ -70,7 +70,7 @@ impl ProcessManager {
                 ).get_container(container_ptr).owned_procs,
     {
         // proof{seq_push_lemma::<ThreadPtr>();}
-        broadcast use ProcessManager::reveal_internal_wf;
+        broadcast use ProcessManager::reveal_process_manager_wf;
 
         let container_ptr = self.get_proc(proc_ptr).owning_container;
         let old_mem_quota = self.get_container(container_ptr).quota.mem_4k;
@@ -297,7 +297,7 @@ impl ProcessManager {
         proof {
             seq_push_lemma::<ThreadPtr>();
         }
-        broadcast use ProcessManager::reveal_internal_wf;
+        broadcast use ProcessManager::reveal_process_manager_wf;
 
         let container_ptr = self.get_proc(proc_ptr).owning_container;
         let old_mem_quota = self.get_container(container_ptr).quota.mem_4k;
