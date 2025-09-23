@@ -539,6 +539,18 @@ impl PageTable {
         &&& forall|p: PageMapPtr|
             #![trigger self.l1_tables@.dom().contains(p), page_ptr_valid(p)]
             self.l1_tables@.dom().contains(p) ==> page_ptr_valid(p)
+        &&&
+        self.l4_table@.dom().disjoint(self.l3_tables@.dom())
+        &&&
+        self.l4_table@.dom().disjoint(self.l2_tables@.dom())
+        &&&
+        self.l4_table@.dom().disjoint(self.l1_tables@.dom())
+        &&&
+        self.l3_tables@.dom().disjoint(self.l2_tables@.dom())
+        &&&
+        self.l3_tables@.dom().disjoint(self.l1_tables@.dom())
+        &&&
+        self.l2_tables@.dom().disjoint(self.l1_tables@.dom())
     }
 
     pub open   spec fn no_self_mapping(&self) -> bool {
