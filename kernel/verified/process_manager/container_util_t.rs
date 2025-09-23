@@ -868,8 +868,8 @@ pub fn container_perms_subset_remove(
             )@[c_ptr].value().depth && perms@[c_ptr].value().uppertree_seq =~= old(
                 perms,
             )@[c_ptr].value().uppertree_seq
-            // &&
-            // perms@[c_ptr].value().subtree_set =~= old(perms)@[c_ptr].value().subtree_set
+            &&
+            (uppertree_seq@.contains(c_ptr) == false ==> perms@[c_ptr].value().subtree_set =~= old(perms)@[c_ptr].value().subtree_set)
              && perms@[c_ptr].value().root_process =~= old(perms)@[c_ptr].value().root_process
                 && perms@[c_ptr].value().owned_procs =~= old(perms)@[c_ptr].value().owned_procs
                 && perms@[c_ptr].value().owned_endpoints =~= old(

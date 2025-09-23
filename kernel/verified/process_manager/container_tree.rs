@@ -87,11 +87,6 @@ pub closed spec fn container_childern_parent_wf(
     container_perms: Map<ContainerPtr, PointsTo<Container>>,
 ) -> bool {
     &&& forall|c_ptr: ContainerPtr, child_c_ptr: ContainerPtr|
-     //#![trigger container_perms[c_ptr].value().children@.contains(child_c_ptr), container_perms[child_c_ptr].value().depth, container_perms[c_ptr].value().depth]
-    //#![trigger container_perms.dom().contains(c_ptr), container_perms[c_ptr].value().children@.contains(child_c_ptr), container_perms.dom().contains(child_c_ptr)]
-    //#![trigger container_perms[c_ptr].value().children@.contains(child_c_ptr), container_perms[child_c_ptr].value().parent.unwrap()]
-    //  #![auto]
-
         #![trigger container_perms[c_ptr].value().children@.contains(child_c_ptr)]
         container_perms.dom().contains(c_ptr) && container_perms[c_ptr].value().children@.contains(
             child_c_ptr,
@@ -100,8 +95,6 @@ pub closed spec fn container_childern_parent_wf(
             && container_perms[child_c_ptr].value().depth == container_perms[c_ptr].value().depth
             + 1
     &&& forall|c_ptr: ContainerPtr|
-     //#![trigger container_perms[c_ptr].value().parent]
-
         #![trigger container_perms.dom().contains(c_ptr)]
         container_perms.dom().contains(c_ptr) && container_perms[c_ptr].value().parent.is_Some()
             ==> container_perms.dom().contains(container_perms[c_ptr].value().parent.unwrap())
@@ -170,11 +163,6 @@ pub closed spec fn container_uppertree_seq_wf(
     container_perms: Map<ContainerPtr, PointsTo<Container>>,
 ) -> bool {
     &&& forall|c_ptr: ContainerPtr, u_ptr: ContainerPtr|
-     //#![trigger container_perms.dom().contains(c_ptr), container_perms[c_ptr].value().uppertree_seq@.contains(u_ptr), container_perms.dom().contains(u_ptr)]
-    //#![trigger container_perms[c_ptr].value().uppertree_seq@.subrange(0, container_perms[u_ptr].value().depth as int)]
-    //#![trigger container_perms[c_ptr].value().uppertree_seq@.index_of(u_ptr)]
-    //#![trigger container_perms[c_ptr].value().uppertree_seq@.contains(u_ptr)]
-
         #![trigger container_perms[c_ptr].value().uppertree_seq@.contains(u_ptr)]
         container_perms.dom().contains(c_ptr)
             && container_perms[c_ptr].value().uppertree_seq@.contains(u_ptr)
@@ -613,6 +601,23 @@ pub proof fn container_tree_inv(
             container_perms.dom().contains(c_ptr) ==> container_perms[c_ptr].value().children.wf(),
 {
 }
+
+pub proof fn container_childern_disjoint_inv(
+    root_container: ContainerPtr,
+    container_perms: Map<ContainerPtr, PointsTo<Container>>,
+    container_ptr: ContainerPtr
+)
+    requires
+        container_perms_wf(container_perms),
+        container_tree_wf(root_container, container_perms),
+        container_perms.dom().contains(container_ptr),
+    ensures
+        forall|c_ptr_i: ContainerPtr, child_c_ptr: ContainerPtr|
+        #![trigger container_perms[c_ptr_i].value().children@.contains(child_c_ptr)]
+        container_perms.dom().contains(c_ptr_i) 
+            && c_ptr_i != container_ptr && container_perms[container_ptr].value().children@.contains(child_c_ptr) 
+            ==> container_perms[c_ptr_i].value().children@.contains(child_c_ptr) == false
+{}
 
 pub proof fn container_subtree_disjoint_inv(
     root_container: ContainerPtr,
@@ -1212,40 +1217,37 @@ pub open spec fn remove_container_ensures(
     &&& old_container_perms[container_ptr].value().children@ == Seq::<ContainerPtr>::empty()
     &&& old_container_perms[container_ptr].value().parent.is_Some()
     &&& old_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children@.remove_value(container_ptr) ==
-        new_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children@
+            new_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children@
     &&& new_container_perms.dom() == old_container_perms.dom().remove(container_ptr)
     &&& forall|c_ptr: ContainerPtr|
-        #![trigger old_container_perms.dom().contains(c_ptr)]
-        old_container_perms.dom().contains(c_ptr) && c_ptr != container_ptr
-            ==> new_container_perms[c_ptr].value().parent
-            =~= old_container_perms[c_ptr].value().parent
-            && new_container_perms[c_ptr].value().parent_rev_ptr
-            =~= old_container_perms[c_ptr].value().parent_rev_ptr
-            && new_container_perms[c_ptr].value().children
-            =~= old_container_perms[c_ptr].value().children
-            && new_container_perms[c_ptr].value().depth =~= old_container_perms[c_ptr].value().depth
-            && new_container_perms[c_ptr].value().uppertree_seq
-            =~= old_container_perms[c_ptr].value().uppertree_seq
+            #![trigger old_container_perms.dom().contains(c_ptr)]
+            old_container_perms.dom().contains(c_ptr) && c_ptr != container_ptr
+                ==> new_container_perms[c_ptr].value().parent
+                =~= old_container_perms[c_ptr].value().parent
+                && new_container_perms[c_ptr].value().parent_rev_ptr
+                =~= old_container_perms[c_ptr].value().parent_rev_ptr
+                && (c_ptr != old_container_perms[container_ptr].value().parent.unwrap() ==>
+                new_container_perms[c_ptr].value().children
+                =~= old_container_perms[c_ptr].value().children)
+                && new_container_perms[c_ptr].value().depth =~= old_container_perms[c_ptr].value().depth
+                && new_container_perms[c_ptr].value().uppertree_seq
+                =~= old_container_perms[c_ptr].value().uppertree_seq
     &&& forall|c_ptr: ContainerPtr|
-        #![trigger old_container_perms[container_ptr].value().uppertree_seq@.contains(c_ptr)]
-        old_container_perms[container_ptr].value().uppertree_seq@.contains(c_ptr)
-            ==> new_container_perms[c_ptr].value().subtree_set@
-            =~= old_container_perms[c_ptr].value().subtree_set@.remove(c_ptr)
+            #![trigger old_container_perms[container_ptr].value().uppertree_seq@.contains(c_ptr)]
+            old_container_perms[container_ptr].value().uppertree_seq@.contains(c_ptr)
+                ==> new_container_perms[c_ptr].value().subtree_set@
+                =~= old_container_perms[c_ptr].value().subtree_set@.remove(container_ptr)
     &&& forall|c_ptr: ContainerPtr|
-        #![trigger old_container_perms.dom().contains(c_ptr)]
-    //#![trigger old_container_perms[c_ptr].value().subtree_set]
-    //#![trigger new_container_perms[c_ptr].value().subtree_set]
-
-        old_container_perms.dom().contains(c_ptr)
-            && old_container_perms[container_ptr].value().uppertree_seq@.contains(c_ptr) == false 
-            ==> new_container_perms[c_ptr].value().subtree_set
-                =~= old_container_perms[c_ptr].value().subtree_set
-    &&&
-    forall|v:ContainerPtr|
-        #![auto]
-        new_container_perms[container_ptr].value().children@.contains(v) ==> 
-            old_container_perms[container_ptr].value().children.get_node_ref(v) == 
-                new_container_perms[container_ptr].value().children.get_node_ref(v)
+            #![trigger old_container_perms.dom().contains(c_ptr)]
+            new_container_perms.dom().contains(c_ptr)
+                && old_container_perms[container_ptr].value().uppertree_seq@.contains(c_ptr) == false 
+                ==> new_container_perms[c_ptr].value().subtree_set
+                    =~= old_container_perms[c_ptr].value().subtree_set
+    &&& forall|v:ContainerPtr|
+            #![auto]
+            new_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children@.contains(v) ==> 
+                old_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children.get_node_ref(v) == 
+                    new_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children.get_node_ref(v)
 }
 
 pub proof fn remove_container_preserve_tree_inv_1(
@@ -1294,7 +1296,22 @@ pub proof fn remove_container_preserve_tree_inv_2(
 {
     seq_remove_lemma::<ContainerPtr>();
     seq_remove_lemma_2::<ContainerPtr>();
-    new_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children.unique_implys_no_duplicates();
+    old_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children.unique_implys_no_duplicates();
+    assert(forall|c_ptr: ContainerPtr, child_c_ptr: ContainerPtr|
+        #![trigger new_container_perms[c_ptr].value().children@.contains(child_c_ptr)]
+        new_container_perms.dom().contains(c_ptr) && new_container_perms[c_ptr].value().children@.contains(
+            child_c_ptr,
+        ) ==> new_container_perms.dom().contains(child_c_ptr)
+            && new_container_perms[child_c_ptr].value().parent.unwrap() == c_ptr
+            && new_container_perms[child_c_ptr].value().depth == new_container_perms[c_ptr].value().depth
+            + 1);
+    assert( forall|c_ptr: ContainerPtr|
+        #![trigger new_container_perms.dom().contains(c_ptr)]
+        new_container_perms.dom().contains(c_ptr) && new_container_perms[c_ptr].value().parent.is_Some()
+            ==> new_container_perms.dom().contains(new_container_perms[c_ptr].value().parent.unwrap())
+            && new_container_perms[new_container_perms[c_ptr].value().parent.unwrap()].value().children@.contains(
+        c_ptr)
+    );
 }
 
 pub proof fn remove_container_preserve_tree_inv_3(
@@ -1319,6 +1336,7 @@ pub proof fn remove_container_preserve_tree_inv_3(
 {
     seq_remove_lemma::<ContainerPtr>();
     seq_remove_lemma_2::<ContainerPtr>();
+    old_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children.unique_implys_no_duplicates();
 }
 
 pub proof fn remove_container_preserve_tree_inv_4(
@@ -1343,6 +1361,7 @@ pub proof fn remove_container_preserve_tree_inv_4(
 {
     seq_remove_lemma::<ContainerPtr>();
     seq_remove_lemma_2::<ContainerPtr>();
+    old_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children.unique_implys_no_duplicates();
 }
 
 pub proof fn remove_container_preserve_tree_inv_5(
@@ -1367,7 +1386,7 @@ pub proof fn remove_container_preserve_tree_inv_5(
 {
     seq_remove_lemma::<ContainerPtr>();
     seq_remove_lemma_2::<ContainerPtr>();
-    new_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children.unique_implys_no_duplicates();
+    old_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children.unique_implys_no_duplicates();
 
 }
 
@@ -1393,8 +1412,12 @@ pub proof fn remove_container_preserve_tree_inv_6(
 {
     seq_remove_lemma::<ContainerPtr>();
     seq_remove_lemma_2::<ContainerPtr>();
-    new_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children.unique_implys_no_duplicates();
-
+    old_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children.unique_implys_no_duplicates();
+    no_child_imply_no_subtree(
+        root_container,
+        old_container_perms,
+        container_ptr,
+    );
 }
 
 pub proof fn remove_container_preserve_tree_inv_7(
@@ -1428,12 +1451,55 @@ pub proof fn remove_container_preserve_tree_inv(
     container_ptr: ContainerPtr,
 )
     requires
-        remove_container_ensures(
-            root_container,
-            old_container_perms,
-            new_container_perms,
-            container_ptr,
-        ),
+        // remove_container_ensures(
+        //     root_container,
+        //     old_container_perms,
+        //     new_container_perms,
+        //     container_ptr,
+        // ),
+    container_perms_wf(old_container_perms),
+     container_perms_wf(new_container_perms),
+     container_tree_wf(root_container, old_container_perms),
+     old_container_perms.dom().contains(container_ptr),
+     container_ptr != root_container,
+     old_container_perms[container_ptr].value().children@ == Seq::<ContainerPtr>::empty(),
+     old_container_perms[container_ptr].value().parent.is_Some(),
+     old_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children@.remove_value(container_ptr) ==
+        new_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children@,
+     new_container_perms.dom() == old_container_perms.dom().remove(container_ptr),
+     forall|c_ptr: ContainerPtr|
+        #![trigger old_container_perms.dom().contains(c_ptr)]
+        old_container_perms.dom().contains(c_ptr) && c_ptr != container_ptr
+            ==> new_container_perms[c_ptr].value().parent
+            =~= old_container_perms[c_ptr].value().parent
+            && new_container_perms[c_ptr].value().parent_rev_ptr
+            =~= old_container_perms[c_ptr].value().parent_rev_ptr
+            && (c_ptr != old_container_perms[container_ptr].value().parent.unwrap() ==>
+            new_container_perms[c_ptr].value().children
+            =~= old_container_perms[c_ptr].value().children)
+            && new_container_perms[c_ptr].value().depth =~= old_container_perms[c_ptr].value().depth
+            && new_container_perms[c_ptr].value().uppertree_seq
+            =~= old_container_perms[c_ptr].value().uppertree_seq,
+     forall|c_ptr: ContainerPtr|
+        #![trigger old_container_perms[container_ptr].value().uppertree_seq@.contains(c_ptr)]
+        old_container_perms[container_ptr].value().uppertree_seq@.contains(c_ptr)
+            ==> new_container_perms[c_ptr].value().subtree_set@
+            =~= old_container_perms[c_ptr].value().subtree_set@.remove(container_ptr),
+     forall|c_ptr: ContainerPtr|
+        #![trigger old_container_perms.dom().contains(c_ptr)]
+    //#![trigger old_container_perms[c_ptr].value().subtree_set]
+    //#![trigger new_container_perms[c_ptr].value().subtree_set]
+
+        new_container_perms.dom().contains(c_ptr)
+            && old_container_perms[container_ptr].value().uppertree_seq@.contains(c_ptr) == false 
+            ==> new_container_perms[c_ptr].value().subtree_set
+                =~= old_container_perms[c_ptr].value().subtree_set,
+    
+    forall|v:ContainerPtr|
+        #![auto]
+        new_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children@.contains(v) ==> 
+            old_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children.get_node_ref(v) == 
+                new_container_perms[old_container_perms[container_ptr].value().parent.unwrap()].value().children.get_node_ref(v),
     ensures
         container_tree_wf(
             root_container,

@@ -34,8 +34,10 @@ impl ProcessManager {
             old(self).container_dom().contains(container_ptr),
             old(self).get_container(container_ptr).owned_cpus@ == Set::<CpuId>::empty(),
             old(self).get_container(container_ptr).owned_procs@ == Seq::<ThreadPtr>::empty(),
+            old(self).get_container(container_ptr).children@ == Seq::<ContainerPtr>::empty(),
             // old(self).get_container(container_ptr).owned_endpoints@ == Set::<EndpointPtr>::empty(),
             old(self).get_container(container_ptr).depth != 0,
+            old(self).root_container != container_ptr,
         ensures
             // self.wf(),
     {
@@ -64,15 +66,41 @@ impl ProcessManager {
 
         let mut parent_container_perm = Tracked(self.container_perms.borrow_mut().tracked_remove(parent_container_ptr));
         container_remove_child(parent_container_ptr, &mut parent_container_perm, parent_rev_ptr, Ghost(container_ptr));
+        proof {
+            self.container_perms.borrow_mut().tracked_insert(parent_container_ptr, parent_container_perm.get());
+        }
 
-        assert(self.container_perms_wf());
-        // assert(self.container_tree_wf()) by {
-        //     container_no_change_to_tree_fields_imply_wf(
-        //         self.root_container,
-        //         old(self).container_perms@,
-        //         self.container_perms@,
-        //     );
-        // };
+        assert(self.container_perms_wf()) by {
+            seq_remove_lemma::<ContainerPtr>();
+            seq_remove_lemma_2::<ContainerPtr>();
+            container_childern_disjoint_inv(self.root_container, old(self).container_perms@, parent_container_ptr);
+            old(self).container_perms@[parent_container_ptr].value().children.unique_implys_no_duplicates();
+        };
+        assert(self.container_tree_wf()) by {
+            seq_remove_lemma::<ContainerPtr>();
+            seq_remove_lemma_2::<ContainerPtr>();
+            assume(old(self).get_container(container_ptr).uppertree_seq@.contains(container_ptr) == false);
+            assume(forall|c_ptr:ContainerPtr| #![auto] old(self).get_container(container_ptr).uppertree_seq@.contains(c_ptr)
+                    ==>
+                    old(self).container_dom().contains(c_ptr)
+                    &&
+                    self.container_dom().contains(c_ptr)
+                );
+            assert(old(self).get_container(container_ptr).uppertree_seq@.contains(container_ptr) == false) by {
+                        // proc_tree_wf_imply_uppertree_contains_no_self(
+                        //     old(self).get_container(container_ptr).root_process.unwrap(),
+                        //     old(self).get_container(container_ptr).owned_procs@.to_set(),
+                        //     old(self).process_perms@,
+                        //     proc_ptr,
+                        // );
+                    };
+            remove_container_preserve_tree_inv(
+                self.root_container,
+                old(self).container_perms@,
+                self.container_perms@,
+                container_ptr,
+            );
+        };
         assert(self.container_fields_wf());
         assert(self.proc_perms_wf()) by {
         };
@@ -94,7 +122,8 @@ impl ProcessManager {
         assert(self.process_fields_wf()) by {
         };
         assert(self.cpus_wf());
-        assert(self.container_cpu_wf());
+        assert(self.container_cpu_wf()) by {
+        };
         assert(self.memory_disjoint());
         assert(self.container_perms_wf());
         assert(self.processes_container_wf()) by {
