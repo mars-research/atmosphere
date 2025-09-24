@@ -56,15 +56,6 @@ impl Array<Option<PageTable>, PCID_MAX> {
             self@[pcid as int].unwrap().mapping_1g() =~= old(
                 self,
             )@[pcid as int].unwrap().mapping_1g(),
-            self@[pcid as int].unwrap().mapped_4k_pages() =~= old(
-                self,
-            )@[pcid as int].unwrap().mapped_4k_pages(),
-            self@[pcid as int].unwrap().mapped_2m_pages() =~= old(
-                self,
-            )@[pcid as int].unwrap().mapped_2m_pages(),
-            self@[pcid as int].unwrap().mapped_1g_pages() =~= old(
-                self,
-            )@[pcid as int].unwrap().mapped_1g_pages(),
             self@[pcid as int].unwrap().spec_resolve_mapping_l4(target_l4i).is_Some(),
             self@[pcid as int].unwrap().spec_resolve_mapping_l4(target_l4i).get_Some_0().addr
                 == page_map_ptr,
@@ -130,15 +121,6 @@ impl Array<Option<PageTable>, PCID_MAX> {
             self@[pcid as int].unwrap().mapping_1g() =~= old(
                 self,
             )@[pcid as int].unwrap().mapping_1g(),
-            self@[pcid as int].unwrap().mapped_4k_pages() =~= old(
-                self,
-            )@[pcid as int].unwrap().mapped_4k_pages(),
-            self@[pcid as int].unwrap().mapped_2m_pages() =~= old(
-                self,
-            )@[pcid as int].unwrap().mapped_2m_pages(),
-            self@[pcid as int].unwrap().mapped_1g_pages() =~= old(
-                self,
-            )@[pcid as int].unwrap().mapped_1g_pages(),
             self@[pcid as int].unwrap().spec_resolve_mapping_l4(target_l4i) == old(
                 self,
             )@[pcid as int].unwrap().spec_resolve_mapping_l4(target_l4i),
@@ -226,15 +208,6 @@ impl Array<Option<PageTable>, PCID_MAX> {
             self@[pcid as int].unwrap().mapping_1g() =~= old(
                 self,
             )@[pcid as int].unwrap().mapping_1g(),
-            self@[pcid as int].unwrap().mapped_4k_pages() =~= old(
-                self,
-            )@[pcid as int].unwrap().mapped_4k_pages(),
-            self@[pcid as int].unwrap().mapped_2m_pages() =~= old(
-                self,
-            )@[pcid as int].unwrap().mapped_2m_pages(),
-            self@[pcid as int].unwrap().mapped_1g_pages() =~= old(
-                self,
-            )@[pcid as int].unwrap().mapped_1g_pages(),
             self@[pcid as int].unwrap().spec_resolve_mapping_1g_l3(target_l4i, target_l3i) == old(
                 self,
             )@[pcid as int].unwrap().spec_resolve_mapping_1g_l3(target_l4i, target_l3i),
@@ -335,13 +308,6 @@ impl Array<Option<PageTable>, PCID_MAX> {
             self@[pcid as int].unwrap().mapping_1g() =~= old(
                 self,
             )@[pcid as int].unwrap().mapping_1g(),
-            // self@[pcid as int].unwrap().mapped_4k_pages() =~= old(self)@[pcid as int].unwrap().mapped_4k_pages(),
-            self@[pcid as int].unwrap().mapped_2m_pages() =~= old(
-                self,
-            )@[pcid as int].unwrap().mapped_2m_pages(),
-            self@[pcid as int].unwrap().mapped_1g_pages() =~= old(
-                self,
-            )@[pcid as int].unwrap().mapped_1g_pages(),
             self@[pcid as int].unwrap().kernel_entries =~= old(
                 self,
             )@[pcid as int].unwrap().kernel_entries,
@@ -402,15 +368,6 @@ impl Array<Option<PageTable>, PCID_MAX> {
             self@[ioid as int].unwrap().mapping_1g() =~= old(
                 self,
             )@[ioid as int].unwrap().mapping_1g(),
-            self@[ioid as int].unwrap().mapped_4k_pages() =~= old(
-                self,
-            )@[ioid as int].unwrap().mapped_4k_pages(),
-            self@[ioid as int].unwrap().mapped_2m_pages() =~= old(
-                self,
-            )@[ioid as int].unwrap().mapped_2m_pages(),
-            self@[ioid as int].unwrap().mapped_1g_pages() =~= old(
-                self,
-            )@[ioid as int].unwrap().mapped_1g_pages(),
             self@[ioid as int].unwrap().spec_resolve_mapping_l4(target_l4i).is_Some(),
             self@[ioid as int].unwrap().spec_resolve_mapping_l4(target_l4i).get_Some_0().addr
                 == page_map_ptr,
@@ -476,15 +433,6 @@ impl Array<Option<PageTable>, PCID_MAX> {
             self@[ioid as int].unwrap().mapping_1g() =~= old(
                 self,
             )@[ioid as int].unwrap().mapping_1g(),
-            self@[ioid as int].unwrap().mapped_4k_pages() =~= old(
-                self,
-            )@[ioid as int].unwrap().mapped_4k_pages(),
-            self@[ioid as int].unwrap().mapped_2m_pages() =~= old(
-                self,
-            )@[ioid as int].unwrap().mapped_2m_pages(),
-            self@[ioid as int].unwrap().mapped_1g_pages() =~= old(
-                self,
-            )@[ioid as int].unwrap().mapped_1g_pages(),
             self@[ioid as int].unwrap().spec_resolve_mapping_l4(target_l4i) == old(
                 self,
             )@[ioid as int].unwrap().spec_resolve_mapping_l4(target_l4i),
@@ -572,15 +520,6 @@ impl Array<Option<PageTable>, PCID_MAX> {
             self@[ioid as int].unwrap().mapping_1g() =~= old(
                 self,
             )@[ioid as int].unwrap().mapping_1g(),
-            self@[ioid as int].unwrap().mapped_4k_pages() =~= old(
-                self,
-            )@[ioid as int].unwrap().mapped_4k_pages(),
-            self@[ioid as int].unwrap().mapped_2m_pages() =~= old(
-                self,
-            )@[ioid as int].unwrap().mapped_2m_pages(),
-            self@[ioid as int].unwrap().mapped_1g_pages() =~= old(
-                self,
-            )@[ioid as int].unwrap().mapped_1g_pages(),
             self@[ioid as int].unwrap().spec_resolve_mapping_1g_l3(target_l4i, target_l3i) == old(
                 self,
             )@[ioid as int].unwrap().spec_resolve_mapping_1g_l3(target_l4i, target_l3i),
@@ -681,13 +620,6 @@ impl Array<Option<PageTable>, PCID_MAX> {
             self@[ioid as int].unwrap().mapping_1g() =~= old(
                 self,
             )@[ioid as int].unwrap().mapping_1g(),
-            // self@[ioid as int].unwrap().mapped_4k_pages() =~= old(self)@[ioid as int].unwrap().mapped_4k_pages(),
-            self@[ioid as int].unwrap().mapped_2m_pages() =~= old(
-                self,
-            )@[ioid as int].unwrap().mapped_2m_pages(),
-            self@[ioid as int].unwrap().mapped_1g_pages() =~= old(
-                self,
-            )@[ioid as int].unwrap().mapped_1g_pages(),
             self@[ioid as int].unwrap().kernel_entries =~= old(
                 self,
             )@[ioid as int].unwrap().kernel_entries,

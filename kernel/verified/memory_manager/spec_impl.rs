@@ -557,15 +557,6 @@ impl MemoryManager {
             self.get_pagetable_by_pcid(target_pcid).unwrap().mapping_1g() =~= old(
                 self,
             ).get_pagetable_by_pcid(target_pcid).unwrap().mapping_1g(),
-            self.get_pagetable_by_pcid(target_pcid).unwrap().mapped_4k_pages() =~= old(
-                self,
-            ).get_pagetable_by_pcid(target_pcid).unwrap().mapped_4k_pages(),
-            self.get_pagetable_by_pcid(target_pcid).unwrap().mapped_2m_pages() =~= old(
-                self,
-            ).get_pagetable_by_pcid(target_pcid).unwrap().mapped_2m_pages(),
-            self.get_pagetable_by_pcid(target_pcid).unwrap().mapped_1g_pages() =~= old(
-                self,
-            ).get_pagetable_by_pcid(target_pcid).unwrap().mapped_1g_pages(),
             self.get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_l4(
                 target_l4i,
             ).is_Some(),
@@ -717,15 +708,6 @@ impl MemoryManager {
             self.get_iommu_table_by_ioid(target_ioid).unwrap().mapping_1g() =~= old(
                 self,
             ).get_iommu_table_by_ioid(target_ioid).unwrap().mapping_1g(),
-            self.get_iommu_table_by_ioid(target_ioid).unwrap().mapped_4k_pages() =~= old(
-                self,
-            ).get_iommu_table_by_ioid(target_ioid).unwrap().mapped_4k_pages(),
-            self.get_iommu_table_by_ioid(target_ioid).unwrap().mapped_2m_pages() =~= old(
-                self,
-            ).get_iommu_table_by_ioid(target_ioid).unwrap().mapped_2m_pages(),
-            self.get_iommu_table_by_ioid(target_ioid).unwrap().mapped_1g_pages() =~= old(
-                self,
-            ).get_iommu_table_by_ioid(target_ioid).unwrap().mapped_1g_pages(),
             self.get_iommu_table_by_ioid(target_ioid).unwrap().spec_resolve_mapping_l4(
                 target_l4i,
             ).is_Some(),
@@ -958,15 +940,6 @@ impl MemoryManager {
             self.get_pagetable_by_pcid(target_pcid).unwrap().mapping_1g() =~= old(
                 self,
             ).get_pagetable_by_pcid(target_pcid).unwrap().mapping_1g(),
-            self.get_pagetable_by_pcid(target_pcid).unwrap().mapped_4k_pages() =~= old(
-                self,
-            ).get_pagetable_by_pcid(target_pcid).unwrap().mapped_4k_pages(),
-            self.get_pagetable_by_pcid(target_pcid).unwrap().mapped_2m_pages() =~= old(
-                self,
-            ).get_pagetable_by_pcid(target_pcid).unwrap().mapped_2m_pages(),
-            self.get_pagetable_by_pcid(target_pcid).unwrap().mapped_1g_pages() =~= old(
-                self,
-            ).get_pagetable_by_pcid(target_pcid).unwrap().mapped_1g_pages(),
             self.get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_l4(target_l4i)
                 == old(self).get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_l4(
                 target_l4i,
@@ -1129,15 +1102,6 @@ impl MemoryManager {
             self.get_iommu_table_by_ioid(target_ioid).unwrap().mapping_1g() =~= old(
                 self,
             ).get_iommu_table_by_ioid(target_ioid).unwrap().mapping_1g(),
-            self.get_iommu_table_by_ioid(target_ioid).unwrap().mapped_4k_pages() =~= old(
-                self,
-            ).get_iommu_table_by_ioid(target_ioid).unwrap().mapped_4k_pages(),
-            self.get_iommu_table_by_ioid(target_ioid).unwrap().mapped_2m_pages() =~= old(
-                self,
-            ).get_iommu_table_by_ioid(target_ioid).unwrap().mapped_2m_pages(),
-            self.get_iommu_table_by_ioid(target_ioid).unwrap().mapped_1g_pages() =~= old(
-                self,
-            ).get_iommu_table_by_ioid(target_ioid).unwrap().mapped_1g_pages(),
             self.get_iommu_table_by_ioid(target_ioid).unwrap().spec_resolve_mapping_l4(target_l4i)
                 == old(self).get_iommu_table_by_ioid(target_ioid).unwrap().spec_resolve_mapping_l4(
                 target_l4i,
@@ -1499,15 +1463,6 @@ impl MemoryManager {
             self.get_pagetable_by_pcid(target_pcid).unwrap().mapping_1g() =~= old(
                 self,
             ).get_pagetable_by_pcid(target_pcid).unwrap().mapping_1g(),
-            self.get_pagetable_by_pcid(target_pcid).unwrap().mapped_4k_pages() =~= old(
-                self,
-            ).get_pagetable_by_pcid(target_pcid).unwrap().mapped_4k_pages(),
-            self.get_pagetable_by_pcid(target_pcid).unwrap().mapped_2m_pages() =~= old(
-                self,
-            ).get_pagetable_by_pcid(target_pcid).unwrap().mapped_2m_pages(),
-            self.get_pagetable_by_pcid(target_pcid).unwrap().mapped_1g_pages() =~= old(
-                self,
-            ).get_pagetable_by_pcid(target_pcid).unwrap().mapped_1g_pages(),
             self.get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_1g_l3(
                 target_l4i,
                 target_l3i,
@@ -1692,15 +1647,6 @@ impl MemoryManager {
             self.get_iommu_table_by_ioid(target_ioid).unwrap().mapping_1g() =~= old(
                 self,
             ).get_iommu_table_by_ioid(target_ioid).unwrap().mapping_1g(),
-            self.get_iommu_table_by_ioid(target_ioid).unwrap().mapped_4k_pages() =~= old(
-                self,
-            ).get_iommu_table_by_ioid(target_ioid).unwrap().mapped_4k_pages(),
-            self.get_iommu_table_by_ioid(target_ioid).unwrap().mapped_2m_pages() =~= old(
-                self,
-            ).get_iommu_table_by_ioid(target_ioid).unwrap().mapped_2m_pages(),
-            self.get_iommu_table_by_ioid(target_ioid).unwrap().mapped_1g_pages() =~= old(
-                self,
-            ).get_iommu_table_by_ioid(target_ioid).unwrap().mapped_1g_pages(),
             self.get_iommu_table_by_ioid(target_ioid).unwrap().spec_resolve_mapping_1g_l3(
                 target_l4i,
                 target_l3i,
