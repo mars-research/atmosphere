@@ -304,7 +304,8 @@ impl PageTable {
                 == p
             //L3 tables unique within
         &&& forall|p: PageMapPtr, l3i: L3Index, l3j: L3Index|
-            #![trigger self.l3_tables@.dom().contains(p), self.l3_tables@[p].value()[l3i].addr, self.l3_tables@[p].value()[l3j].addr, self.l3_tables@[p].value()[l3i].perm.ps, self.l3_tables@[p].value()[l3j].perm.ps, self.l3_tables@[p].value()[l3i].addr, self.l3_tables@[p].value()[l3j].addr]
+            // #![trigger self.l3_tables@.dom().contains(p), self.l3_tables@[p].value()[l3i].addr, self.l3_tables@[p].value()[l3j].addr, self.l3_tables@[p].value()[l3i].perm.ps, self.l3_tables@[p].value()[l3j].perm.ps, self.l3_tables@[p].value()[l3i].addr, self.l3_tables@[p].value()[l3j].addr]
+            #![trigger self.l3_tables@[p].value()[l3i].addr, self.l3_tables@[p].value()[l3j].addr]
             self.l3_tables@.dom().contains(p) && l3i != l3j && 0 <= l3i < 512 && 0 <= l3j < 512
                 && self.l3_tables@[p].value()[l3i].perm.present
                 && self.l3_tables@[p].value()[l3j].perm.present
@@ -313,7 +314,8 @@ impl PageTable {
                 != self.l3_tables@[p].value()[l3j].addr
             //L3 tables are disjoint
         &&& forall|pi: PageMapPtr, pj: PageMapPtr, l3i: L3Index, l3j: L3Index|
-            #![trigger self.l3_tables@.dom().contains(pi), self.l3_tables@.dom().contains(pj), self.l3_tables@[pi].value()[l3i].addr, self.l3_tables@[pj].value()[l3j].addr, self.l3_tables@[pi].value()[l3i].perm.ps, self.l3_tables@[pj].value()[l3j].perm.ps, self.l3_tables@[pi].value()[l3i].perm.present, self.l3_tables@[pj].value()[l3j].perm.present]
+            // #![trigger self.l3_tables@.dom().contains(pi), self.l3_tables@.dom().contains(pj), self.l3_tables@[pi].value()[l3i].addr, self.l3_tables@[pj].value()[l3j].addr, self.l3_tables@[pi].value()[l3i].perm.ps, self.l3_tables@[pj].value()[l3j].perm.ps, self.l3_tables@[pi].value()[l3i].perm.present, self.l3_tables@[pj].value()[l3j].perm.present]
+            #![trigger self.l3_tables@[pi].value()[l3i].addr, self.l3_tables@[pj].value()[l3j].addr]
             pi != pj && self.l3_tables@.dom().contains(pi) && self.l3_tables@.dom().contains(pj)
                 && 0 <= l3i < 512 && 0 <= l3j < 512 && self.l3_tables@[pi].value()[l3i].perm.present
                 && self.l3_tables@[pj].value()[l3j].perm.present
