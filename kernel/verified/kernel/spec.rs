@@ -37,6 +37,8 @@ impl Kernel {
         &&& self.page_alloc.allocated_pages_2m() =~= Set::empty()
         &&& self.page_alloc.allocated_pages_1g() =~= Set::empty()
         &&& self.page_alloc.container_map_4k@.dom() =~= self.proc_man.container_dom()
+        &&& self.page_alloc.container_map_2m@.dom() =~= self.proc_man.container_dom()
+        &&& self.page_alloc.container_map_1g@.dom() =~= self.proc_man.container_dom()
     }
 
     pub open spec fn page_mapping_wf(&self) -> bool {

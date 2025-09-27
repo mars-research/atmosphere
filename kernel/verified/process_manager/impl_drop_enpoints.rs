@@ -25,6 +25,7 @@ use crate::trap::Registers;
 use crate::process_manager::container_tree::*;
 use crate::process_manager::process_tree::*;
 use crate::process_manager::spec_impl::*;
+use crate::process_manager::spec_util::*;
 
 impl ProcessManager {
     pub fn drop_endpoint(
@@ -40,6 +41,21 @@ impl ProcessManager {
                 old(self).get_thread(thread_ptr).blocking_endpoint_index.unwrap() != edp_idx,
         ensures
             self.wf(),
+            
+            ret.is_Some() ==> self.page_closure() =~= old(self).page_closure().remove(ret.unwrap().0),
+            ret.is_Some() ==> old(self).page_closure().contains(ret.unwrap().0),
+            ret.is_Some() ==> ret.unwrap().0 == ret.unwrap().1@.addr(),
+            ret.is_Some() ==> ret.unwrap().1@.is_init(),
+            ret.is_Some() ==> old(self).container_dom().contains(ret.unwrap().0) == false,
+            ret.is_None() ==> self.page_closure() =~= old(self).page_closure(),
+            ret.is_None() ==> containers_unchanged(*old(self), *self),
+            ret.is_Some() ==> {
+                &&&
+                self.container_dom() == old(self).container_dom()
+                &&&
+                containers_unchanged_except(*old(self), *self, set![old(self).get_endpoint(old(self).get_thread(thread_ptr).endpoint_descriptors[edp_idx as int].unwrap()).owning_container])
+            },
+            processes_unchanged(*old(self), *self),
     {
         broadcast use ProcessManager::reveal_process_manager_wf;
 

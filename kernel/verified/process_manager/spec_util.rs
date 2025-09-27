@@ -25,7 +25,7 @@ use crate::process_manager::container_tree::*;
 use crate::process_manager::process_tree::*;
 use crate::quota::*;
 
-    impl ProcessManager{
+
         pub open spec fn containers_unchanged(old: ProcessManager, new: ProcessManager) -> bool 
         {
             &&&
@@ -40,7 +40,7 @@ use crate::quota::*;
         {
             forall|container_ptr: ContainerPtr|
                 #![trigger old.get_container(container_ptr)]
-                old.container_dom().contains(container_ptr) && changed.contains(container_ptr)
+                old.container_dom().contains(container_ptr) && !changed.contains(container_ptr)
                     ==> new.get_container(container_ptr) =~= old.get_container(
                     container_ptr,
                 )
@@ -66,6 +66,6 @@ use crate::quota::*;
                     cpu_id,
                 )
         }
-    }
+    
 
 }
