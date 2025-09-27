@@ -1247,7 +1247,7 @@ impl PageTable {
                 target_l3i,
                 target_l2i,
             ).unwrap().addr == target_l1_p,
-            forall|i: L4Index| #![auto] 0 <= i < 512 ==> old(self).spec_resolve_mapping_4k_l1(
+            forall|i: L1Index| #![auto] 0 <= i < 512 ==> old(self).spec_resolve_mapping_4k_l1(
                 target_l4i,
                 target_l3i,
                 target_l2i,
@@ -1445,12 +1445,12 @@ impl PageTable {
                 target_l4i,
                 target_l3i,
             ).unwrap().addr == target_l2_p,
-            forall|i: L3Index| #![auto] 0 <= i < 512 ==> old(self).spec_resolve_mapping_l2(
+            forall|i: L2Index| #![auto] 0 <= i < 512 ==> old(self).spec_resolve_mapping_l2(
                 target_l4i,
                 target_l3i,
                 i
             ).is_None(),
-            forall|i: L3Index| #![auto] 0 <= i < 512 ==> old(self).spec_resolve_mapping_2m_l2(
+            forall|i: L2Index| #![auto] 0 <= i < 512 ==> old(self).spec_resolve_mapping_2m_l2(
                 target_l4i,
                 target_l3i,
                 i
@@ -1636,6 +1636,212 @@ impl PageTable {
             broadcast use PageTable::reveal_page_table_disjoint_wf;
             broadcast use PageTable::reveal_page_table_mappings_wf;
             broadcast use PageTable::reveal_page_table_addtional_wf;
+        };
+        return ret;
+    }
+
+    pub fn remove_l4_entry(
+        &mut self,
+        target_l4i: L4Index,
+        target_l3_p: PageMapPtr,
+    ) -> (ret:(PageMapPtr, Tracked<PointsTo<PageMap>>))
+        requires
+            old(self).wf(),
+            old(self).kernel_l4_end <= target_l4i < 512,
+            old(self).spec_resolve_mapping_l4(target_l4i).is_Some(),
+            old(self).spec_resolve_mapping_l4(target_l4i).get_Some_0().addr
+                == target_l3_p,
+            forall|i: L3Index| #![auto] 0 <= i < 512 ==> old(self).spec_resolve_mapping_l3(
+                target_l4i,
+                i
+            ).is_None(),
+            forall|i: L3Index| #![auto] 0 <= i < 512 ==> old(self).spec_resolve_mapping_1g_l3(
+                target_l4i,
+                i
+            ).is_None(),
+        ensures
+            // self.wf(),
+            // self.kernel_l4_end == old(self).kernel_l4_end,
+            // self.page_closure() =~= old(self).page_closure().remove(target_l3_p),
+            // self.mapping_2m() == old(self).mapping_2m(),
+            // self.mapping_4k() =~= old(self).mapping_4k(),
+            // self.mapping_1g() =~= old(self).mapping_1g(),
+            // self.kernel_entries =~= old(self).kernel_entries,
+            // ret.0 == target_l3_p,
+            // ret.1@.is_init(),
+            // ret.1@.addr() == target_l3_p,
+    {
+        broadcast use PageTable::reveal_page_table_wf;
+        broadcast use PageTable::reveal_page_table_levels_wf;
+        // broadcast use PageTable::reveal_page_table_disjoint_wf;
+        // broadcast use PageTable::reveal_page_table_mappings_wf;
+        // broadcast use PageTable::reveal_page_table_addtional_wf;
+
+        let tracked mut l4_perm = self.l4_table.borrow_mut().tracked_remove(self.cr3);
+        page_map_set(
+            self.cr3,
+            Tracked(&mut l4_perm),
+            target_l4i,
+            PageEntry {
+                addr: 0,
+                perm: PageEntryPerm {
+                    present: false,
+                    ps: false,
+                    write: false,
+                    execute_disable: false,
+                    user: false,
+                },
+            },
+        );
+        proof {
+            self.l4_table.borrow_mut().tracked_insert(self.cr3, l4_perm);
+            self.l3_rev_map@ = self.l3_rev_map@.remove(
+                target_l3_p,
+            );
+        }
+        let tracked mut l3_perm = self.l3_tables.borrow_mut().tracked_remove(target_l3_p);
+        let ret = (target_l3_p, Tracked(l3_perm));
+        assert(self.levels_wf()) by {
+        assert(self.wf_l4()) by {
+            broadcast use PageTable::reveal_page_table_disjoint_wf;
+            broadcast use PageTable::reveal_page_table_mappings_wf;
+            broadcast use PageTable::reveal_page_table_addtional_wf;
+            assert(forall|i: L4Index|
+            #![auto]
+            old(self).l4_table@.dom().contains(self.cr3) && self.kernel_l4_end <= i < 512 && i != target_l4i
+                && old(self).l4_table@[self.cr3].value()[i].perm.present
+                && !old(self).l4_table@[self.cr3].value()[i].perm.ps ==>
+                    old(self).l4_table@[self.cr3].value()[i].addr != target_l3_p);
+        };
+        assert(self.wf_l3()) by {
+            broadcast use PageTable::reveal_page_table_disjoint_wf;
+            broadcast use PageTable::reveal_page_table_mappings_wf;
+            broadcast use PageTable::reveal_page_table_addtional_wf;
+            assert(forall|l4i: L4Index|
+                #![trigger self.spec_resolve_mapping_l4(l4i)]
+                #![trigger old(self).spec_resolve_mapping_l4(l4i)]
+                self.kernel_l4_end <= l4i < 512 && !(target_l4i == l4i)
+                 ==> self.spec_resolve_mapping_l4(l4i) =~= old(
+                    self,
+                ).spec_resolve_mapping_l4(l4i));
+            // assert(forall|p: PageMapPtr, i: L3Index|
+            // #![auto]
+            // old(self).l3_tables@.dom().contains(p) && 0 <= i < 512 && p != target_l3_p
+            //     && old(self).l3_tables@[p].value()[i].perm.present
+            //     && !old(self).l3_tables@[p].value()[i].perm.ps ==>
+            //         old(self).l3_tables@[p].value()[i].addr != target_l2_p);
+        };
+        assert(self.wf_l2()) by {
+            broadcast use PageTable::reveal_page_table_disjoint_wf;
+            broadcast use PageTable::reveal_page_table_mappings_wf;
+            broadcast use PageTable::reveal_page_table_addtional_wf;
+            assert(forall|l4i: L4Index, l3i: L3Index|
+                #![trigger self.spec_resolve_mapping_l3(l4i,l3i)]
+                #![trigger old(self).spec_resolve_mapping_l3(l4i,l3i)]
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && !(target_l4i == l4i)
+                 ==> self.spec_resolve_mapping_l3(l4i, l3i) =~= old(
+                    self,
+                ).spec_resolve_mapping_l3(l4i, l3i));
+        };
+        assert(self.wf_l1()) by {
+            broadcast use PageTable::reveal_page_table_disjoint_wf;
+            broadcast use PageTable::reveal_page_table_mappings_wf;
+            broadcast use PageTable::reveal_page_table_addtional_wf;
+            assert(forall|l4i: L4Index, l3i: L3Index|
+                #![trigger self.spec_resolve_mapping_l3(l4i,l3i)]
+                #![trigger old(self).spec_resolve_mapping_l3(l4i,l3i)]
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && !(target_l4i == l4i)
+                 ==> self.spec_resolve_mapping_l3(l4i, l3i) =~= old(
+                    self,
+                ).spec_resolve_mapping_l3(l4i, l3i));
+            
+            assert(forall|l4i: L4Index, l3i: L3Index, l2i: L2Index|
+                #![trigger self.spec_resolve_mapping_l2(l4i,l3i,l2i)]
+                #![trigger old(self).spec_resolve_mapping_l2(l4i,l3i,l2i)]
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && !(target_l4i == l4i)
+                 ==> self.spec_resolve_mapping_l2(l4i, l3i,l2i) =~= old(
+                    self,
+                ).spec_resolve_mapping_l2(l4i, l3i,l2i));
+        };
+        };
+        // assert(self.disjoint_l4()) by { broadcast use PageTable::reveal_page_table_disjoint_wf; };
+        // assert(self.disjoint_l3()) by { broadcast use PageTable::reveal_page_table_disjoint_wf; };
+        // assert(self.disjoint_l2()) by { broadcast use PageTable::reveal_page_table_disjoint_wf; };
+        assert(self.disjoint_wf()) by { broadcast use PageTable::reveal_page_table_disjoint_wf; };
+        // // assert(self.user_only());
+        // // assert(self.rwx_upper_level_entries());
+        // // assert(self.present_or_zero());
+        // // assert(self.table_pages_wf());
+        assert(self.wf_mapping_4k())
+        by {
+            broadcast use PageTable::reveal_page_table_mappings_wf;
+            broadcast use PageTable::reveal_page_table_disjoint_wf;
+            assert(forall|l4i: L4Index, l3i: L3Index|
+                #![trigger self.spec_resolve_mapping_l3(l4i,l3i)]
+                #![trigger old(self).spec_resolve_mapping_l3(l4i,l3i)]
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && !(
+                    target_l4i
+                == l4i)
+                ==> self.spec_resolve_mapping_l3(l4i, l3i) =~= old(
+                    self,
+                ).spec_resolve_mapping_l3(l4i, l3i));
+            assert(forall|l4i: L4Index, l3i: L3Index, l2i: L2Index|
+                #![trigger self.spec_resolve_mapping_l2(l4i,l3i,l2i)]
+                #![trigger old(self).spec_resolve_mapping_l2(l4i,l3i,l2i)]
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && !(
+                    target_l4i == l4i)
+                ==> self.spec_resolve_mapping_l2(l4i, l3i,l2i) =~= old(
+                    self,
+                ).spec_resolve_mapping_l2(l4i, l3i,l2i));
+            assert(forall|l4i: L4Index, l3i: L3Index, l2i: L2Index, l1i: L1Index|
+                #![trigger self.spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i)]
+                #![trigger old(self).spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i)]
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l1i < 512 ==> old(
+                    self,
+                ).spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i) == 
+                self.spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i));
+        };
+        assert(self.wf_mapping_2m()) by {
+            broadcast use PageTable::reveal_page_table_mappings_wf;
+            broadcast use PageTable::reveal_page_table_disjoint_wf;
+            assert(forall|l4i: L4Index, l3i: L3Index|
+                #![trigger self.spec_resolve_mapping_l3(l4i,l3i)]
+                #![trigger old(self).spec_resolve_mapping_l3(l4i,l3i)]
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && !(
+                    target_l4i == l4i)
+                ==> self.spec_resolve_mapping_l3(l4i, l3i) =~= old(
+                    self,
+                ).spec_resolve_mapping_l3(l4i, l3i));
+            assert(forall|l4i: L4Index, l3i: L3Index, l2i: L2Index|
+                #![trigger self.spec_resolve_mapping_2m_l2(l4i,l3i,l2i)]
+                #![trigger old(self).spec_resolve_mapping_2m_l2(l4i,l3i,l2i)]
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && !(
+                    target_l4i == l4i)
+                ==> self.spec_resolve_mapping_2m_l2(l4i, l3i,l2i) =~= old(
+                    self,
+                ).spec_resolve_mapping_2m_l2(l4i, l3i,l2i));
+        };
+        assert(self.wf_mapping_1g()) by {
+            broadcast use PageTable::reveal_page_table_mappings_wf;
+            broadcast use PageTable::reveal_page_table_disjoint_wf;
+            assert(forall|l4i: L4Index, l3i: L3Index|
+                #![trigger self.spec_resolve_mapping_1g_l3(l4i,l3i)]
+                #![trigger old(self).spec_resolve_mapping_1g_l3(l4i,l3i)]
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && l4i != 
+                    target_l4i ==> old(self).spec_resolve_mapping_1g_l3(l4i, l3i)
+                    =~= self.spec_resolve_mapping_1g_l3(l4i, l3i));
+        };
+        assert(self.mappings_wf()) by {
+            broadcast use PageTable::reveal_page_table_mappings_wf;
+        }
+        
+        assert(self.additonal_wf()) by {broadcast use PageTable::reveal_page_table_addtional_wf;}
+        assert(self.page_closure() =~= old(self).page_closure().remove(target_l3_p)) by {
+            broadcast use PageTable::reveal_page_table_wf;
+            broadcast use PageTable::reveal_page_table_levels_wf;
+            broadcast use PageTable::reveal_page_table_disjoint_wf;
+            // broadcast use PageTable::reveal_page_table_mappings_wf;
+            // broadcast use PageTable::reveal_page_table_addtional_wf;
         };
         return ret;
     }

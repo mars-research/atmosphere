@@ -428,7 +428,7 @@ impl PageTable {
             //     self.l2_tables@[pi].value()[l2i].perm.ps, self.l2_tables@[pj].value()[l2j].perm.ps, 
             //     self.l2_tables@[pi].value()[l2i].addr,
             //     self.l2_tables@[pj].value()[l2j].addr]
-            #![auto]
+            #![trigger self.l2_tables@[pi].value()[l2i].addr, self.l2_tables@[pj].value()[l2j].addr]
             self.l2_tables@.dom().contains(pi) && self.l2_tables@.dom().contains(pj)
                 && 0 <= l2i < 512 && 0 <= l2j < 512 && self.l2_tables@[pi].value()[l2i].perm.present
                 && self.l2_tables@[pj].value()[l2j].perm.present
