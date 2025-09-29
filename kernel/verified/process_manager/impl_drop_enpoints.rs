@@ -64,6 +64,7 @@ impl ProcessManager {
             self.get_thread(thread_ptr).blocking_endpoint_index
                 =~= old(self).get_thread(thread_ptr).blocking_endpoint_index,
             old(self).get_thread(thread_ptr).state == self.get_thread(thread_ptr).state,
+            old(self).get_thread(thread_ptr).owning_proc == self.get_thread(thread_ptr).owning_proc,
     {
         broadcast use ProcessManager::reveal_process_manager_wf;
 

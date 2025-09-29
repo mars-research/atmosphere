@@ -40,7 +40,7 @@ use crate::quota::*;
         {
             forall|container_ptr: ContainerPtr|
                 #![trigger old.get_container(container_ptr)]
-                old.container_dom().contains(container_ptr) && !changed.contains(container_ptr)
+                new.container_dom().contains(container_ptr) && !changed.contains(container_ptr)
                     ==> new.get_container(container_ptr) =~= old.get_container(
                     container_ptr,
                 )
@@ -49,7 +49,7 @@ use crate::quota::*;
         {
             forall|container_ptr: ContainerPtr|
                 #![trigger old.get_container(container_ptr)]
-                old.container_dom().contains(container_ptr) 
+                new.container_dom().contains(container_ptr) 
                     ==> 
                     {
                         &&& new.get_container(container_ptr).parent =~= old.get_container(container_ptr).parent
@@ -64,7 +64,7 @@ use crate::quota::*;
         {
             forall|container_ptr: ContainerPtr|
                 #![trigger old.get_container(container_ptr)]
-                old.container_dom().contains(container_ptr) 
+                new.container_dom().contains(container_ptr) 
                     ==> 
                     {
                         &&& new.get_container(container_ptr).root_process =~= old.get_container(container_ptr).root_process
@@ -84,11 +84,49 @@ use crate::quota::*;
                 )
         }
 
+        pub open spec fn processes_unchanged_expect(old:ProcessManager, new: ProcessManager, changed: Set<ProcPtr>) -> bool {
+            &&&
+            forall|proc_ptr: ProcPtr|
+                #![trigger old.get_proc(proc_ptr)]
+                new.proc_dom().contains(proc_ptr) && changed.contains(proc_ptr) == false
+                    ==> new.get_proc(proc_ptr) =~= old.get_proc(
+                    proc_ptr,
+                )
+        }
+
+        pub open spec fn process_tree_unchanged(old: ProcessManager, new: ProcessManager) -> bool 
+        {
+            forall|p_ptr: ProcPtr|
+                #![trigger old.get_proc(p_ptr)]
+                new.proc_dom().contains(p_ptr) 
+                    ==> 
+                    {
+                        &&& new.get_proc(p_ptr).parent =~= old.get_proc(p_ptr).parent
+                        &&& new.get_proc(p_ptr).children =~= old.get_proc(p_ptr).children
+                        &&& new.get_proc(p_ptr).uppertree_seq =~= old.get_proc(p_ptr).uppertree_seq
+                        &&& new.get_proc(p_ptr).subtree_set =~= old.get_proc(p_ptr).subtree_set
+                        &&& new.get_proc(p_ptr).depth =~= old.get_proc(p_ptr).depth
+                    }
+        }
+
+        pub open spec fn process_mem_unchanged(old: ProcessManager, new: ProcessManager) -> bool 
+        {
+            forall|p_ptr: ProcPtr|
+                #![trigger old.get_proc(p_ptr)]
+                new.proc_dom().contains(p_ptr) 
+                    ==> 
+                    {
+                        &&& new.get_proc(p_ptr).pcid =~= old.get_proc(p_ptr).pcid
+                        &&& new.get_proc(p_ptr).ioid =~= old.get_proc(p_ptr).ioid
+                    }
+        }
+
+
         pub open spec fn threads_unchanged_except(old: ProcessManager, new: ProcessManager, changed: Set<ThreadPtr>) -> bool 
         {
             forall|t_ptr: ThreadPtr|
                 #![trigger old.get_thread(t_ptr)]
-                old.thread_dom().contains(t_ptr) && !changed.contains(t_ptr)
+                new.thread_dom().contains(t_ptr) && !changed.contains(t_ptr)
                     ==> new.get_thread(t_ptr) =~= old.get_thread(
                     t_ptr,
                 )

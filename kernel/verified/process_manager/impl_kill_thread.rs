@@ -25,6 +25,7 @@ use crate::trap::Registers;
 use crate::process_manager::container_tree::*;
 use crate::process_manager::process_tree::*;
 use crate::process_manager::spec_impl::*;
+use crate::process_manager::spec_util::*;
 
 impl ProcessManager {
     pub fn kill_scheduled_thread(
@@ -42,6 +43,21 @@ impl ProcessManager {
             old(self).get_thread(thread_ptr).state == ThreadState::SCHEDULED,
         ensures
             self.wf(),
+            self.thread_dom() == old(self).thread_dom().remove(thread_ptr),
+            threads_unchanged_except(*old(self), *self, set![]),
+            self.proc_dom() == old(self).proc_dom(),
+            process_tree_unchanged(*old(self), *self),
+            self.container_dom() == old(self).container_dom(),
+            containers_tree_unchanged(*old(self), *self),
+            self.get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads@ == 
+              old(self).get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads@.remove_value(thread_ptr),  
+            
+            process_mem_unchanged(*old(self), *self),
+            self.page_closure() =~= old(self).page_closure().remove(ret.0),
+            old(self).page_closure().contains(ret.0),
+            ret.0 == ret.1@.addr(),
+            ret.1@.is_init(),
+            old(self).container_dom().contains(ret.0) == false,
     {
         broadcast use ProcessManager::reveal_process_manager_wf;
         
@@ -141,8 +157,23 @@ impl ProcessManager {
                 ==>
                 old(self).get_thread(thread_ptr).endpoint_descriptors@[edp_idx as int].is_None(),
             old(self).get_thread(thread_ptr).state == ThreadState::RUNNING,
-            ensures
+        ensures
             self.wf(),
+            self.thread_dom() == old(self).thread_dom().remove(thread_ptr),
+            threads_unchanged_except(*old(self), *self, set![]),
+            self.proc_dom() == old(self).proc_dom(),
+            process_tree_unchanged(*old(self), *self),
+            self.container_dom() == old(self).container_dom(),
+            containers_tree_unchanged(*old(self), *self),
+            self.get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads@ == 
+              old(self).get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads@.remove_value(thread_ptr),  
+
+            process_mem_unchanged(*old(self), *self),
+            self.page_closure() =~= old(self).page_closure().remove(ret.0),
+            old(self).page_closure().contains(ret.0),
+            ret.0 == ret.1@.addr(),
+            ret.1@.is_init(),
+            old(self).container_dom().contains(ret.0) == false,
     {
         broadcast use ProcessManager::reveal_process_manager_wf;
 
@@ -253,6 +284,36 @@ impl ProcessManager {
                 old(self).get_thread(thread_ptr).endpoint_descriptors@[edp_idx as int].is_None(),
         ensures
             self.wf(),
+            self.thread_dom() == old(self).thread_dom().remove(thread_ptr),
+            threads_unchanged_except(*old(self), *self, set![]),
+            self.proc_dom() == old(self).proc_dom(),
+            process_tree_unchanged(*old(self), *self),
+            self.container_dom() == old(self).container_dom(),
+            containers_tree_unchanged(*old(self), *self),
+            self.get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads@ == 
+              old(self).get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads@.remove_value(thread_ptr), 
+
+                        
+            process_mem_unchanged(*old(self), *self),
+            ret.1.is_Some() ==> {
+                &&& self.page_closure() =~= old(self).page_closure().remove(ret.0.0).remove(ret.1.unwrap().0)
+                &&& old(self).page_closure().contains(ret.0.0)
+                &&& ret.0.0 == ret.0.1@.addr()
+                &&& ret.0.1@.is_init()
+                &&& old(self).container_dom().contains(ret.0.0) == false
+                &&& old(self).page_closure().contains(ret.1.unwrap().0)
+                &&& ret.1.unwrap().0 == ret.1.unwrap().1@.addr()
+                &&& ret.1.unwrap().1@.is_init()
+                &&& old(self).container_dom().contains(ret.1.unwrap().0) == false
+                &&& ret.0.0 != ret.1.unwrap().0
+            },
+            ret.1.is_None() ==> {
+                &&& self.page_closure() =~= old(self).page_closure().remove(ret.0.0)
+                &&& old(self).page_closure().contains(ret.0.0)
+                &&& ret.0.0 == ret.0.1@.addr()
+                &&& ret.0.1@.is_init()
+                &&& old(self).container_dom().contains(ret.0.0) == false
+            },
     {
         broadcast use ProcessManager::reveal_process_manager_wf;
 

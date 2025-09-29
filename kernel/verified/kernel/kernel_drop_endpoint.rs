@@ -26,6 +26,7 @@ impl Kernel {
                 =~= old(self).get_thread(thread_ptr).endpoint_descriptors@.update(edp_idx as int, None),
             old(self).get_thread(thread_ptr).state == self.get_thread(thread_ptr).state,
             self.get_thread(thread_ptr).blocking_endpoint_index == old(self).get_thread(thread_ptr).blocking_endpoint_index,
+            old(self).get_thread(thread_ptr).owning_proc == self.get_thread(thread_ptr).owning_proc,
     {
         let page_op = self.proc_man.drop_endpoint(thread_ptr, edp_idx);
 

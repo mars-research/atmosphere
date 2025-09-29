@@ -30,7 +30,7 @@ impl Kernel {
 
     pub open spec fn get_proc(&self, p_ptr: ProcPtr) -> &Process
         recommends
-            self.wf(),
+            self.proc_man.wf(),
             self.proc_dom().contains(p_ptr),
     {
         self.proc_man.get_proc(p_ptr)
@@ -38,7 +38,7 @@ impl Kernel {
 
     pub open spec fn get_thread(&self, t_ptr: ThreadPtr) -> &Thread
         recommends
-            self.wf(),
+            self.proc_man.wf(),
             self.thread_dom().contains(t_ptr),
     {
         self.proc_man.get_thread(t_ptr)
@@ -46,7 +46,7 @@ impl Kernel {
 
     pub open spec fn get_container(&self, c_ptr: ContainerPtr) -> &Container
         recommends
-            self.wf(),
+            self.proc_man.wf(),
             self.container_dom().contains(c_ptr),
     {
         self.proc_man.get_container(c_ptr)

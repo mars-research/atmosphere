@@ -11,7 +11,15 @@ impl Kernel {
             old(self).wf(),
             old(self).thread_dom().contains(thread_ptr),
         ensures
-            // self.wf(),
+            self.wf(),
+            self.thread_dom() == old(self).thread_dom().remove(thread_ptr),
+            threads_unchanged_except(old(self).proc_man, self.proc_man, set![]),
+            self.proc_dom() == old(self).proc_dom(),
+            process_tree_unchanged(old(self).proc_man, self.proc_man),
+            self.container_dom() == old(self).container_dom(),
+            containers_tree_unchanged(old(self).proc_man, self.proc_man),
+            self.get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads@ == 
+              old(self).get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads@.remove_value(thread_ptr), 
     {
 
         let thread_state = self.proc_man.get_thread(thread_ptr).state;
@@ -43,6 +51,7 @@ impl Kernel {
                     (thread_state == ThreadState::BLOCKED && blocking_endpoint_index == Some(j))
                     ||
                     self.get_thread(thread_ptr).endpoint_descriptors@[j as int].is_None(),
+                old(self).get_thread(thread_ptr).owning_proc == self.get_thread(thread_ptr).owning_proc,
         {
             match thread_state {
                 ThreadState::BLOCKED => {
@@ -58,13 +67,61 @@ impl Kernel {
 
         match self.proc_man.get_thread(thread_ptr).state {
             ThreadState::SCHEDULED => {
-                self.proc_man.kill_scheduled_thread(thread_ptr);
+                let (page_ptr, page_perm) = self.proc_man.kill_scheduled_thread(thread_ptr);
+                self.page_alloc.free_page_4k(page_ptr, page_perm);
+                assert(self.memory_wf()) by {
+                    assert(self.mem_man.page_closure() + self.proc_man.page_closure()
+                    == self.page_alloc.allocated_pages_4k());
+                assert(self.page_alloc.mapped_pages_2m() =~= Set::empty());
+                assert(self.page_alloc.mapped_pages_1g() =~= Set::empty());
+                assert(self.page_alloc.allocated_pages_2m() =~= Set::empty());
+                assert(self.page_alloc.allocated_pages_1g() =~= Set::empty());
+                assert(self.page_alloc.container_map_4k@.dom() =~= self.proc_man.container_dom());
+                assert(self.page_alloc.container_map_2m@.dom() =~= self.proc_man.container_dom());
+                assert(self.page_alloc.container_map_1g@.dom() =~= self.proc_man.container_dom());
+                };
+                assert(self.page_mapping_wf());
+                assert(self.mapping_wf());
+                assert(self.pcid_ioid_wf());
             },
             ThreadState::BLOCKED => {
-                self.proc_man.kill_blocked_thread(thread_ptr);
+                let ((page_ptr, page_perm), page_op) = self.proc_man.kill_blocked_thread(thread_ptr);
+                self.page_alloc.free_page_4k(page_ptr, page_perm);
+                if let Some((page_ptr2, page_perm2)) = page_op{
+                    self.page_alloc.free_page_4k(page_ptr2, page_perm2);
+                }
+                assert(self.memory_wf()) by {
+                    assert(self.mem_man.page_closure() + self.proc_man.page_closure()
+                    == self.page_alloc.allocated_pages_4k());
+                assert(self.page_alloc.mapped_pages_2m() =~= Set::empty());
+                assert(self.page_alloc.mapped_pages_1g() =~= Set::empty());
+                assert(self.page_alloc.allocated_pages_2m() =~= Set::empty());
+                assert(self.page_alloc.allocated_pages_1g() =~= Set::empty());
+                assert(self.page_alloc.container_map_4k@.dom() =~= self.proc_man.container_dom());
+                assert(self.page_alloc.container_map_2m@.dom() =~= self.proc_man.container_dom());
+                assert(self.page_alloc.container_map_1g@.dom() =~= self.proc_man.container_dom());
+                };
+                assert(self.page_mapping_wf());
+                assert(self.mapping_wf());
+                assert(self.pcid_ioid_wf());
             },
             ThreadState::RUNNING => {
-                self.proc_man.kill_running_thread(thread_ptr);
+                let (page_ptr, page_perm) = self.proc_man.kill_running_thread(thread_ptr);
+                self.page_alloc.free_page_4k(page_ptr, page_perm);
+                assert(self.memory_wf()) by {
+                    assert(self.mem_man.page_closure() + self.proc_man.page_closure()
+                    == self.page_alloc.allocated_pages_4k());
+                assert(self.page_alloc.mapped_pages_2m() =~= Set::empty());
+                assert(self.page_alloc.mapped_pages_1g() =~= Set::empty());
+                assert(self.page_alloc.allocated_pages_2m() =~= Set::empty());
+                assert(self.page_alloc.allocated_pages_1g() =~= Set::empty());
+                assert(self.page_alloc.container_map_4k@.dom() =~= self.proc_man.container_dom());
+                assert(self.page_alloc.container_map_2m@.dom() =~= self.proc_man.container_dom());
+                assert(self.page_alloc.container_map_1g@.dom() =~= self.proc_man.container_dom());
+                };
+                assert(self.page_mapping_wf());
+                assert(self.mapping_wf());
+                assert(self.pcid_ioid_wf());
             },
         
         }
