@@ -51,6 +51,8 @@ impl ProcessManager {
             containers_tree_unchanged(*old(self), *self),
             self.get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads@ == 
               old(self).get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads@.remove_value(thread_ptr),  
+            self.get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads.len() == 
+              old(self).get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads.len() - 1,  
             
             process_mem_unchanged(*old(self), *self),
             self.page_closure() =~= old(self).page_closure().remove(ret.0),
@@ -167,6 +169,8 @@ impl ProcessManager {
             containers_tree_unchanged(*old(self), *self),
             self.get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads@ == 
               old(self).get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads@.remove_value(thread_ptr),  
+            self.get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads.len() == 
+              old(self).get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads.len() - 1,  
 
             process_mem_unchanged(*old(self), *self),
             self.page_closure() =~= old(self).page_closure().remove(ret.0),
@@ -292,6 +296,8 @@ impl ProcessManager {
             containers_tree_unchanged(*old(self), *self),
             self.get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads@ == 
               old(self).get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads@.remove_value(thread_ptr), 
+            self.get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads.len() == 
+              old(self).get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads.len() - 1,  
 
                         
             process_mem_unchanged(*old(self), *self),

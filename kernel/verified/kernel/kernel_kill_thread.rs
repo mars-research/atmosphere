@@ -20,6 +20,8 @@ impl Kernel {
             containers_tree_unchanged(old(self).proc_man, self.proc_man),
             self.get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads@ == 
               old(self).get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads@.remove_value(thread_ptr), 
+            self.get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads.len() == 
+              old(self).get_proc(old(self).get_thread(thread_ptr).owning_proc).owned_threads.len() - 1,  
     {
 
         let thread_state = self.proc_man.get_thread(thread_ptr).state;
@@ -125,6 +127,44 @@ impl Kernel {
             },
         
         }
+    }
+
+    pub fn kernel_proc_kill_all_threads(&mut self, proc_ptr: ProcPtr)
+        requires
+            old(self).wf(),
+            old(self).proc_dom().contains(proc_ptr),
+        ensures
+            self.wf(),
+            self.proc_dom().contains(proc_ptr),
+            self.get_proc(proc_ptr).owned_threads.len() == 0,
+
+            self.proc_dom() == old(self).proc_dom(),
+            process_tree_unchanged(old(self).proc_man, self.proc_man),
+            self.container_dom() == old(self).container_dom(),
+            containers_tree_unchanged(old(self).proc_man, self.proc_man),
+    {
+        let num_threads = self.proc_man.get_proc(proc_ptr).owned_threads.len();
+        assert(self.get_proc(proc_ptr).owned_threads.len()  == num_threads) by {
+            broadcast use ProcessManager::reveal_process_manager_wf;
+            };
+        for i in 0..num_threads
+            invariant
+            self.wf(),
+            self.proc_dom().contains(proc_ptr),
+            self.get_proc(proc_ptr).owned_threads.len() == num_threads - i,
+
+            self.proc_dom() == old(self).proc_dom(),
+            process_tree_unchanged(old(self).proc_man, self.proc_man),
+            self.container_dom() == old(self).container_dom(),
+            containers_tree_unchanged(old(self).proc_man, self.proc_man),
+        {
+            let thread_ptr = self.proc_man.get_proc(proc_ptr).owned_threads.get_head();
+            assert(self.proc_man.get_proc(proc_ptr).owned_threads@.contains(thread_ptr)); // Why....
+            assert(self.thread_dom().contains(thread_ptr)) by {broadcast use ProcessManager::reveal_process_manager_wf;};
+            assert(self.get_thread(thread_ptr).owning_proc == proc_ptr) by {broadcast use ProcessManager::reveal_process_manager_wf;};
+            self.kernel_kill_thread(thread_ptr);
+        }
+
     }
 }
 
