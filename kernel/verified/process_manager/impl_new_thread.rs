@@ -203,12 +203,8 @@ impl ProcessManager {
             old(self).get_endpoint_by_endpoint_idx(thread_ptr, endpoint_index).is_Some() || old(
                 self,
             ).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).is_Some(),
-            old(self).get_endpoint_by_endpoint_idx(
-                thread_ptr,
-                endpoint_index,
-            ).unwrap().rf_counter_is_full() == false || old(self).get_endpoint(
-                old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap(),
-            ).rf_counter_is_full() == false,
+            old(self).get_endpoint_by_endpoint_idx(thread_ptr,endpoint_index).unwrap().rf_counter_is_full() == false 
+                || old(self).get_endpoint(old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap()).rf_counter_is_full() == false,
             page_perm@.is_init(),
             page_perm@.addr() == page_ptr,
         ensures
@@ -218,12 +214,7 @@ impl ProcessManager {
             self.endpoint_dom() == old(self).endpoint_dom(),
             self.container_dom() == old(self).container_dom(),
             self.thread_dom() == old(self).thread_dom().insert(ret),
-            old(self).get_container(
-                old(self).get_thread(thread_ptr).owning_container,
-            ).quota.spec_subtract_mem_4k(
-                self.get_container(self.get_thread(thread_ptr).owning_container).quota,
-                1,
-            ),
+            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).quota.spec_subtract_mem_4k(self.get_container(self.get_thread(thread_ptr).owning_container).quota,1),
             old(self).get_proc(proc_ptr).pcid =~= self.get_proc(proc_ptr).pcid,
             old(self).get_proc(proc_ptr).ioid =~= self.get_proc(proc_ptr).ioid,
             forall|p_ptr: ProcPtr|
@@ -232,13 +223,8 @@ impl ProcessManager {
                     =~= old(self).get_proc(p_ptr),
             forall|container_ptr: ContainerPtr|
                 #![trigger self.get_container(container_ptr)]
-                self.container_dom().contains(container_ptr) && container_ptr != self.get_thread(
-                    thread_ptr,
-                ).owning_container ==> self.get_container(container_ptr) =~= old(
-                    self,
-                ).get_container(container_ptr) && self.get_container(
-                    container_ptr,
-                ).owned_threads@.contains(ret) == false,
+                self.container_dom().contains(container_ptr) && container_ptr != self.get_thread(thread_ptr).owning_container 
+                ==> self.get_container(container_ptr) =~= old(self).get_container(container_ptr) && self.get_container(container_ptr).owned_threads@.contains(ret) == false,
             forall|t_ptr: ThreadPtr|
                 #![trigger old(self).get_thread(t_ptr)]
                 old(self).thread_dom().contains(t_ptr) ==> old(self).get_thread(t_ptr)
@@ -294,9 +280,9 @@ impl ProcessManager {
                 old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap(),
             ).queue_state,
     {
-        proof {
-            seq_push_lemma::<ThreadPtr>();
-        }
+        // proof {
+        //     seq_push_lemma::<ThreadPtr>();
+        // }
         broadcast use ProcessManager::reveal_process_manager_wf;
 
         let container_ptr = self.get_proc(proc_ptr).owning_container;
@@ -397,6 +383,7 @@ impl ProcessManager {
         assert(self.container_perms_wf());
         assert(self.processes_container_wf());
         assert(self.threads_process_wf()) by {
+            seq_push_lemma::<ThreadPtr>();
             assert(forall|p_ptr: ProcPtr|
                 #![auto]
                 self.process_perms@.dom().contains(p_ptr) && p_ptr != proc_ptr ==> old(
@@ -409,7 +396,9 @@ impl ProcessManager {
         assert(self.threads_endpoint_descriptors_wf());
         assert(self.endpoints_queue_wf());
         assert(self.endpoints_container_wf());
-        assert(self.schedulers_wf());
+        assert(self.schedulers_wf()) by {
+            seq_push_lemma::<ThreadPtr>();
+        };
         assert(self.pcid_ioid_wf());
         assert(self.threads_cpu_wf());
         assert(self.threads_container_wf()) by {

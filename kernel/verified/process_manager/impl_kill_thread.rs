@@ -35,16 +35,16 @@ impl ProcessManager {
             old(self).wf(),
             old(self).thread_dom().contains(thread_ptr),
             forall|edp_idx:EndpointIdx|
-            #![auto]
-            0 <= edp_idx < MAX_NUM_ENDPOINT_DESCRIPTORS
-            ==>
-            old(self).get_thread(thread_ptr).endpoint_descriptors@[edp_idx as int].is_None(),
+                #![auto]
+                0 <= edp_idx < MAX_NUM_ENDPOINT_DESCRIPTORS 
+                ==>
+                old(self).get_thread(thread_ptr).endpoint_descriptors@[edp_idx as int].is_None(),
             old(self).get_thread(thread_ptr).state == ThreadState::SCHEDULED,
-            ensures
+        ensures
             self.wf(),
     {
         broadcast use ProcessManager::reveal_process_manager_wf;
-
+        
         let proc_ptr = self.get_thread(thread_ptr).owning_proc;
         let proc_rev_ptr = self.get_thread(thread_ptr).proc_rev_ptr;
 
@@ -136,10 +136,10 @@ impl ProcessManager {
             old(self).wf(),
             old(self).thread_dom().contains(thread_ptr),
             forall|edp_idx:EndpointIdx|
-            #![auto]
-            0 <= edp_idx < MAX_NUM_ENDPOINT_DESCRIPTORS
-            ==>
-            old(self).get_thread(thread_ptr).endpoint_descriptors@[edp_idx as int].is_None(),
+                #![auto]
+                0 <= edp_idx < MAX_NUM_ENDPOINT_DESCRIPTORS 
+                ==>
+                old(self).get_thread(thread_ptr).endpoint_descriptors@[edp_idx as int].is_None(),
             old(self).get_thread(thread_ptr).state == ThreadState::RUNNING,
             ensures
             self.wf(),
@@ -245,14 +245,14 @@ impl ProcessManager {
             old(self).get_thread(thread_ptr).state == ThreadState::BLOCKED,
             old(self).get_thread(thread_ptr).blocking_endpoint_index.is_Some(),
             forall|edp_idx:EndpointIdx|
-            #![auto]
-            0 <= edp_idx < MAX_NUM_ENDPOINT_DESCRIPTORS
-            &&
-            edp_idx != old(self).get_thread(thread_ptr).blocking_endpoint_index.unwrap()
-            ==>
-            old(self).get_thread(thread_ptr).endpoint_descriptors@[edp_idx as int].is_None(),
-            ensures
-            // self.wf(),
+                #![auto]
+                0 <= edp_idx < MAX_NUM_ENDPOINT_DESCRIPTORS 
+                ==>
+                old(self).get_thread(thread_ptr).blocking_endpoint_index == Some(edp_idx)
+                ||
+                old(self).get_thread(thread_ptr).endpoint_descriptors@[edp_idx as int].is_None(),
+        ensures
+            self.wf(),
     {
         broadcast use ProcessManager::reveal_process_manager_wf;
 

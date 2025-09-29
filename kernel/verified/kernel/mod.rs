@@ -22,7 +22,8 @@ pub mod syscall_send_empty_try_schedule;
 pub mod syscall_send_endpoint;
 pub mod syscall_send_pages;
 pub mod util_syscalls;
-pub mod thread_remove_endpoint;
+pub mod kernel_drop_endpoint;
+pub mod kernel_kill_thread;
 
 pub use spec::*;
 pub use spec_util::*;

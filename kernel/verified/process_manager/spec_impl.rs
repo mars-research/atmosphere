@@ -661,11 +661,12 @@ impl ProcessManager {
         // #![trigger self.thread_perms@[t_ptr].value().ipc_payload]
 
             #![trigger self.thread_perms@.dom().contains(t_ptr)]
-            self.thread_perms@.dom().contains(t_ptr) ==> self.thread_perms@[t_ptr].is_init()
+            self.thread_perms@.dom().contains(t_ptr) ==> 
+                self.thread_perms@[t_ptr].is_init()
                 && self.thread_perms@[t_ptr].addr() == t_ptr
-                && self.thread_perms@[t_ptr].value().endpoint_descriptors.wf() && (
-            self.thread_perms@[t_ptr].value().ipc_payload.get_payload_as_va_range().is_Some()
-                ==> self.thread_perms@[t_ptr].value().ipc_payload.get_payload_as_va_range().unwrap().wf())
+                && self.thread_perms@[t_ptr].value().endpoint_descriptors.wf() 
+                && (self.thread_perms@[t_ptr].value().ipc_payload.get_payload_as_va_range().is_Some()
+                    ==> self.thread_perms@[t_ptr].value().ipc_payload.get_payload_as_va_range().unwrap().wf())
     }
 
     pub open spec fn threads_container_wf(&self) -> bool {
@@ -728,7 +729,7 @@ impl ProcessManager {
                 == e_ptr
     }
 
-    pub open spec fn endpoints_queue_wf(&self) -> bool {
+        pub open spec fn endpoints_queue_wf(&self) -> bool {
         &&& forall|t_ptr: ThreadPtr|
             #![trigger self.thread_perms@[t_ptr].value().state]
             #![trigger self.thread_perms@[t_ptr].value().blocking_endpoint_ptr]

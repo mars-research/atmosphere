@@ -45,6 +45,32 @@ use crate::quota::*;
                     container_ptr,
                 )
         }
+        pub open spec fn containers_tree_unchanged(old: ProcessManager, new: ProcessManager) -> bool 
+        {
+            forall|container_ptr: ContainerPtr|
+                #![trigger old.get_container(container_ptr)]
+                old.container_dom().contains(container_ptr) 
+                    ==> 
+                    {
+                        &&& new.get_container(container_ptr).parent =~= old.get_container(container_ptr).parent
+                        &&& new.get_container(container_ptr).children =~= old.get_container(container_ptr).children
+                        &&& new.get_container(container_ptr).uppertree_seq =~= old.get_container(container_ptr).uppertree_seq
+                        &&& new.get_container(container_ptr).subtree_set =~= old.get_container(container_ptr).subtree_set
+                        &&& new.get_container(container_ptr).depth =~= old.get_container(container_ptr).depth
+                    }
+        }
+
+        pub open spec fn containers_owned_proc_unchanged(old: ProcessManager, new: ProcessManager) -> bool 
+        {
+            forall|container_ptr: ContainerPtr|
+                #![trigger old.get_container(container_ptr)]
+                old.container_dom().contains(container_ptr) 
+                    ==> 
+                    {
+                        &&& new.get_container(container_ptr).root_process =~= old.get_container(container_ptr).root_process
+                        &&& new.get_container(container_ptr).owned_procs =~= old.get_container(container_ptr).owned_procs
+                    }
+        }
 
         pub open spec fn processes_unchanged(old:ProcessManager, new: ProcessManager) -> bool {
             &&&
@@ -55,6 +81,16 @@ use crate::quota::*;
                 old.proc_dom().contains(proc_ptr)
                     ==> new.get_proc(proc_ptr) =~= old.get_proc(
                     proc_ptr,
+                )
+        }
+
+        pub open spec fn threads_unchanged_except(old: ProcessManager, new: ProcessManager, changed: Set<ThreadPtr>) -> bool 
+        {
+            forall|t_ptr: ThreadPtr|
+                #![trigger old.get_thread(t_ptr)]
+                old.thread_dom().contains(t_ptr) && !changed.contains(t_ptr)
+                    ==> new.get_thread(t_ptr) =~= old.get_thread(
+                    t_ptr,
                 )
         }
         pub open spec fn cpus_unchanged(old:ProcessManager, new: ProcessManager) -> bool {
