@@ -6,8 +6,9 @@ use crate::define::*;
 // use crate::allocator::page::*;
 // use crate::array::*;
 // use crate::slinkedlist::spec_impl_u::*;
-// use crate::util::page_ptr_util_u::*;
+use crate::util::page_ptr_util_u::*;
 use crate::allocator::page_allocator_spec_impl::*;
+use vstd::simple_pptr::*;
 
 impl PageAllocator {
     #[verifier(external_body)]
@@ -317,5 +318,25 @@ impl PageAllocator {
         self.page_array.ar[index].owning_container = owning_container_op;
     }
 }
+
+#[verifier(external_body)]
+pub fn merge_4k_pages_to_2m_page(target_page_idx:usize, page_perms: Tracked<Map<usize, PagePerm4k>>) -> (ret: Tracked<PagePerm2m>)
+    requires
+        target_page_idx + 512 <= NUM_PAGES,
+        forall|i:usize|
+            #![auto]
+            0<=i<512 
+            ==>
+            page_perms@.dom().contains(i)
+            &&
+            page_perms@[i].is_init()
+            &&
+            page_perms@[i].addr() == page_index2page_ptr((target_page_idx + i) as usize),
+    ensures
+        ret@.is_init(),
+        ret@.addr() == page_index2page_ptr(target_page_idx),
+    {
+        Tracked::assume_new()
+    }
 
 } // verus!

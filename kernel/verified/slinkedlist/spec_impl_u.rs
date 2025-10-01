@@ -353,6 +353,7 @@ impl<T: Copy, const N: usize> StaticLinkedList<T, N> {
                     old(self).get_node_ref(v) == 
                         self.get_node_ref(v),
             self.get_node_ref(*new_value) == free_node_index,
+            self.unique(),
     {
         proof {
             seq_push_lemma::<SLLIndex>();
@@ -945,6 +946,7 @@ impl<T: Copy, const N: usize> StaticLinkedList<T, N> {
         ensures
             self.wf(),
             self.len() == old(self).len() - 1,
+            self@.len() == old(self)@.len() - 1,
             self.unique(),
             self@ =~= old(self)@.remove_value(ret),
             ret == v@,

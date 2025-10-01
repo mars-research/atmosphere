@@ -357,7 +357,7 @@ pub proof fn page_ptr_page_index_truncate_lemma()
 }
 
 #[verifier(external_body)]
-pub proof fn page_ptr_lemma()
+pub proof fn page_ptr_lemma1()
     ensures
         forall|pa: PagePtr|
             #![trigger page_ptr_valid(pa)]
