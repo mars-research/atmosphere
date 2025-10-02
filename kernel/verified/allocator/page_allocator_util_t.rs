@@ -339,4 +339,24 @@ pub fn merge_4k_pages_to_2m_page(target_page_idx:usize, page_perms: Tracked<Map<
         Tracked::assume_new()
     }
 
+#[verifier(external_body)]
+pub fn split_2m_pages_to_pages(target_page_idx:usize, page_perm: Tracked<PagePerm2m>) -> (ret: Tracked<Map<usize, PagePerm4k>>)
+    requires
+        page_perm@.is_init(),
+        page_perm@.addr() == page_index2page_ptr(target_page_idx),
+    ensures
+        forall|i:usize|
+            #![trigger ret@.dom().contains(i)]
+            #![trigger ret@[i]]
+            target_page_idx<=i<512 + target_page_idx 
+            ==>
+            ret@.dom().contains(i)
+            &&
+            ret@[i].is_init()
+            &&
+            ret@[i].addr() == page_index2page_ptr(i),
+    {
+        Tracked::assume_new()
+    }
+
 } // verus!
