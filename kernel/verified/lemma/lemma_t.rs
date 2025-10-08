@@ -44,6 +44,15 @@ pub proof fn set_insert_lemma<A>()
 {
 }
 
+#[verifier(external_body)]
+pub proof fn set_add_lemma<A>()
+    ensures
+        forall|s1: Set<A>|  s1 + Set::<A>::empty() == s1,
+        forall|s1: Set<A>, s2: Set<A>, diff: Set<A>| 
+            diff.subset_of(s1) ==> (s1 - diff) + (s2 + diff) == s1 + s2
+{
+}
+
 //TODO: @Xiangdong prove this
 #[verifier(external_body)]
 pub proof fn page_ptr_lemma()

@@ -84,6 +84,25 @@ use crate::quota::*;
                 )
         }
 
+        pub open spec fn processes_fields_unchanged(old:ProcessManager, new: ProcessManager) -> bool {
+            &&&
+            forall|proc_ptr: ProcPtr|
+                #![trigger old.get_proc(proc_ptr)]
+                new.proc_dom().contains(proc_ptr)
+                    ==> 
+                    new.get_proc(proc_ptr).pcid =~= old.get_proc(proc_ptr).pcid
+                    &&
+                    new.get_proc(proc_ptr).ioid =~= old.get_proc(proc_ptr).ioid
+                    &&
+                    new.get_proc(proc_ptr).owned_threads =~= old.get_proc(proc_ptr).owned_threads
+                    &&
+                    new.get_proc(proc_ptr).dmd_paging_mode =~= old.get_proc(proc_ptr).dmd_paging_mode
+                    &&
+                    new.get_proc(proc_ptr).depth =~= old.get_proc(proc_ptr).depth
+                    &&
+                    new.get_proc(proc_ptr).parent =~= old.get_proc(proc_ptr).parent
+        }
+
         pub open spec fn processes_unchanged_expect(old:ProcessManager, new: ProcessManager, changed: Set<ProcPtr>) -> bool {
             &&&
             forall|proc_ptr: ProcPtr|
@@ -121,6 +140,15 @@ use crate::quota::*;
                     }
         }
 
+        pub open spec fn threads_unchanged(old: ProcessManager, new: ProcessManager) -> bool 
+        {
+            forall|t_ptr: ThreadPtr|
+                #![trigger old.get_thread(t_ptr)]
+                new.thread_dom().contains(t_ptr) 
+                    ==> new.get_thread(t_ptr) =~= old.get_thread(
+                    t_ptr,
+                )
+        }
 
         pub open spec fn threads_unchanged_except(old: ProcessManager, new: ProcessManager, changed: Set<ThreadPtr>) -> bool 
         {

@@ -2267,6 +2267,75 @@ impl MemoryManager {
         new_pcid
     }
 
+pub fn free_page_table(&mut self, proc_ptr: ProcPtr, pcid: Pcid)
+        requires
+            old(self).wf(),
+            old(self).pcid_active(pcid),
+            old(self).pcid_to_proc_ptr(pcid) == proc_ptr,
+            0 <= pcid < PCID_MAX,
+            old(self).get_pagetable_by_pcid(pcid).unwrap().is_empty(),
+        ensures
+            self.wf(),
+            self.kernel_entries =~= old(self).kernel_entries,
+            self.kernel_entries_ghost =~= old(self).kernel_entries_ghost,
+            // self.free_pcids =~= old(self).free_pcids,
+            self.page_tables =~= old(self).page_tables,
+            self.page_table_pages =~= old(self).page_table_pages,
+            self.free_ioids =~= old(self).free_ioids,
+            self.iommu_tables =~= old(self).iommu_tables,
+            self.iommu_table_pages =~= old(self).iommu_table_pages,
+            self.root_table =~= old(self).root_table,
+            self.root_table_cache =~= old(self).root_table_cache,
+            self.pci_bitmap =~= old(self).pci_bitmap,
+            self.page_table_pages@.dom() =~= old(self).page_table_pages@.dom(),
+            forall|p: Pcid|
+                #![trigger self.pcid_active(p)]
+                p != pcid ==> self.pcid_active(p) == old(self).pcid_active(p),
+            forall|i: IOid|
+                #![trigger self.ioid_active(i)]
+                self.ioid_active(i) == old(self).ioid_active(i),
+            forall|p: Pcid|
+                #![trigger self.pcid_active(p)]
+                #![trigger self.get_pagetable_mapping_by_pcid(p)]
+                self.pcid_active(p) && p != pcid ==> old(self).get_pagetable_mapping_by_pcid(p)
+                    == self.get_pagetable_mapping_by_pcid(p),
+            forall|i: IOid|
+                #![trigger self.ioid_active(i)]
+                #![trigger self.get_iommu_table_mapping_by_ioid(i)]
+                self.ioid_active(i) ==> old(self).get_iommu_table_mapping_by_ioid(i)
+                    == self.get_iommu_table_mapping_by_ioid(i),
+            forall|p: Pcid|
+                #![trigger self.pcid_active(p)]
+                #![trigger self.pcid_to_proc_ptr(p)]
+                self.pcid_active(p) && p != pcid ==> old(self).pcid_to_proc_ptr(p)
+                    == self.pcid_to_proc_ptr(p),
+            forall|i: IOid|
+                #![trigger self.ioid_active(i)]
+                #![trigger self.ioid_to_proc_ptr(i)]
+                self.ioid_active(i) ==> old(self).ioid_to_proc_ptr(i) == self.ioid_to_proc_ptr(i),
+            self.pcid_active(pcid) == false,
+    {
+        assume(self.free_pcids.len() < PCID_MAX);
+        self.free_pcids.push_unique(pcid);
+        self.pcid_to_proc_ptr.set(pcid, None);
+        assert(self.pagetables_wf()) by {
+            seq_push_lemma::<Pcid>();
+            seq_push_unique_lemma::<Pcid>();
+            seq_update_lemma::<Option<PageTable>>();
+        };
+        assert(self.iommutables_wf());
+        assert(self.pagetable_iommu_table_disjoint());
+        assert(self.root_table_wf());
+        assert(self.root_table_cache_wf());
+        assert(self.kernel_entries_wf());
+        assert(self.pcid_to_proc_wf()) by {
+            seq_push_lemma::<Pcid>();
+            seq_push_unique_lemma::<Pcid>();
+            seq_update_lemma::<ProcPtr>();
+        };
+        assert(self.ioid_to_proc_wf());
+    }
+
     pub fn alloc_iommu_table(&mut self, new_proc_ptr: ProcPtr) -> (ret: IOid)
         requires
             old(self).wf(),

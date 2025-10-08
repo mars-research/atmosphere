@@ -23,6 +23,7 @@ use crate::trap::Registers;
 use crate::process_manager::container_tree::*;
 use crate::process_manager::process_tree::*;
 use crate::process_manager::spec_impl::*;
+use crate::process_manager::spec_util::*;
 
 impl ProcessManager {
     pub fn kill_process_none_root(
@@ -37,6 +38,24 @@ impl ProcessManager {
             old(self).get_proc(proc_ptr).depth != 0,
         ensures
             self.wf(),
+            self.container_dom() == old(self).container_dom(),
+            containers_tree_unchanged(*old(self), *self),
+            self.proc_dom() == old(self).proc_dom().remove(proc_ptr),
+            processes_fields_unchanged(*old(self), *self),
+            self.thread_dom() == old(self).thread_dom(),
+            threads_unchanged(*old(self), *self),
+            self.page_closure() =~= old(self).page_closure().remove(ret.0),
+            old(self).page_closure().contains(ret.0),
+            ret.0 == ret.1@.addr(),
+            ret.1@.is_init(),
+            old(self).container_dom().contains(ret.0) == false,
+            self.get_proc(old(self).get_proc(proc_ptr).parent.unwrap()).children@ =~= 
+                old(self).get_proc(old(self).get_proc(proc_ptr).parent.unwrap()).children@.remove_value(proc_ptr),
+            self.get_proc(old(self).get_proc(proc_ptr).parent.unwrap()).children.len() == 
+                old(self).get_proc(old(self).get_proc(proc_ptr).parent.unwrap()).children.len() - 1,
+            forall|p_ptr:ProcPtr| #![auto] self.proc_dom().contains(p_ptr) && p_ptr != old(self).get_proc(proc_ptr).parent.unwrap()
+                ==>
+                self.get_proc(p_ptr).children == old(self).get_proc(p_ptr).children,
     {
         broadcast use ProcessManager::reveal_process_manager_wf;
 
@@ -191,6 +210,21 @@ impl ProcessManager {
             old(self).get_container(old(self).get_proc(proc_ptr).owning_container).root_process == Some(proc_ptr),
         ensures
             self.wf(),
+            self.container_dom() == old(self).container_dom(),
+            containers_tree_unchanged(*old(self), *self),
+            self.proc_dom() == old(self).proc_dom().remove(proc_ptr),
+            processes_fields_unchanged(*old(self), *self),
+            self.thread_dom() == old(self).thread_dom(),
+            threads_unchanged(*old(self), *self),
+            self.page_closure() =~= old(self).page_closure().remove(ret.0),
+            old(self).page_closure().contains(ret.0),
+            ret.0 == ret.1@.addr(),
+            ret.1@.is_init(),
+            old(self).container_dom().contains(ret.0) == false,
+            self.get_proc(old(self).get_proc(proc_ptr).parent.unwrap()).children@ =~= 
+                old(self).get_proc(old(self).get_proc(proc_ptr).parent.unwrap()).children@.remove_value(proc_ptr),
+            self.get_proc(old(self).get_proc(proc_ptr).parent.unwrap()).children.len() == 
+                old(self).get_proc(old(self).get_proc(proc_ptr).parent.unwrap()).children.len() - 1,
     {
         broadcast use ProcessManager::reveal_process_manager_wf;
 

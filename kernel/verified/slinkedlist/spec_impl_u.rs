@@ -32,6 +32,7 @@ impl<T, const N: usize> StaticLinkedList<T, N> {
         ensures
             l == self.value_list_len,
             self.wf() ==> l == self.len(),
+            self.wf() ==> l == self@.len(),
     {
         self.value_list_len
     }

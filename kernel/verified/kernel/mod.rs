@@ -24,6 +24,7 @@ pub mod syscall_send_pages;
 pub mod util_syscalls;
 pub mod kernel_drop_endpoint;
 pub mod kernel_kill_thread;
+pub mod kernel_kill_proc;
 
 pub use spec::*;
 pub use spec_util::*;
