@@ -236,6 +236,26 @@ pub proof fn proc_subtree_inv(
 {
 }
 
+pub proof fn proc_tree_wf_imply_root_depth(
+    root_proc: ProcPtr,
+    proc_tree_dom: Set<ProcPtr>,
+    proc_perms: Map<ProcPtr, PointsTo<Process>>,
+)
+    requires
+        proc_tree_dom_subset_of_proc_dom(proc_tree_dom, proc_perms),
+        proc_perms_wf(proc_perms),
+        proc_tree_wf(root_proc, proc_tree_dom, proc_perms),
+    ensures
+        proc_perms[root_proc].value().depth == 0,
+        forall|p_ptr: ProcPtr|
+            #![auto]
+            proc_tree_dom.contains(p_ptr) && proc_perms[p_ptr].value().depth == 0
+            ==> 
+            p_ptr == root_proc,
+{
+
+}
+
 pub proof fn same_or_deeper_depth_imply_none_ancestor(
     root_proc: ProcPtr,
     proc_tree_dom: Set<ProcPtr>,
@@ -566,7 +586,7 @@ pub proof fn proc_tree_wf_imply_childern_uppertree_specs(
                 parent_p_ptr,
             ) ==> proc_perms.dom().contains(parent_p_ptr),
         forall|p_ptr: ProcPtr|
-            #![auto]
+            #![trigger proc_perms[p_ptr].value().uppertree_seq@.contains(p_ptr)]
             proc_tree_dom.contains(p_ptr) ==> proc_perms[p_ptr].value().uppertree_seq@.contains(
                 p_ptr,
             ) == false,

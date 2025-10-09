@@ -56,8 +56,18 @@ impl ProcessManager {
             forall|p_ptr:ProcPtr| #![auto] self.proc_dom().contains(p_ptr) && p_ptr != old(self).get_proc(proc_ptr).parent.unwrap()
                 ==>
                 self.get_proc(p_ptr).children == old(self).get_proc(p_ptr).children,
+            forall|p_p_ptr:ProcPtr|
+                #![trigger self.get_proc(p_p_ptr)]
+                old(self).get_proc(proc_ptr).uppertree_seq@.contains(p_p_ptr) 
+                ==>
+                self.get_proc(p_p_ptr).subtree_set@ =~= 
+                    old(self).get_proc(p_p_ptr).subtree_set@.remove(proc_ptr),     
+            forall|p_ptr:ProcPtr|  #![auto] self.proc_dom().contains(p_ptr)
+                ==>
+                self.get_proc(p_ptr).uppertree_seq == old(self).get_proc(p_ptr).uppertree_seq,   
     {
         broadcast use ProcessManager::reveal_process_manager_wf;
+
 
         let container_ptr = self.get_proc(proc_ptr).owning_container;
         let container_rev_ptr = self.get_proc(proc_ptr).rev_ptr;
@@ -194,6 +204,28 @@ impl ProcessManager {
         assert(self.threads_cpu_wf());
         assert(self.threads_container_wf());
 
+        assert(forall|p_ptr:ProcPtr|
+            #![auto]
+            old(self).get_proc(proc_ptr).uppertree_seq@.contains(p_ptr)
+            ==>
+            old(self).proc_dom().contains(p_ptr)
+        )by{
+            assert(old(self).get_container(container_ptr).owned_procs@.contains(proc_ptr));
+            proc_tree_wf_imply_childern_uppertree_specs(
+                old(self).get_container(container_ptr).root_process.unwrap(),
+                old(self).get_container(container_ptr).owned_procs@.to_set(),
+                old(self).process_perms@,
+            );
+        };
+        assert(old(self).get_proc(proc_ptr).uppertree_seq@.contains(proc_ptr) == false) by{
+            assert(old(self).get_container(container_ptr).owned_procs@.contains(proc_ptr));
+            proc_tree_wf_imply_childern_uppertree_specs(
+                old(self).get_container(container_ptr).root_process.unwrap(),
+                old(self).get_container(container_ptr).owned_procs@.to_set(),
+                old(self).process_perms@,
+            );
+        }
+
         proc_to_page(proc_ptr, proc_perm)
     }
 
@@ -207,7 +239,7 @@ impl ProcessManager {
             old(self).proc_dom().contains(proc_ptr),
             old(self).get_proc(proc_ptr).owned_threads@ == Seq::<ThreadPtr>::empty(),
             old(self).get_proc(proc_ptr).children@ == Seq::<ProcPtr>::empty(),
-            old(self).get_container(old(self).get_proc(proc_ptr).owning_container).root_process == Some(proc_ptr),
+            old(self).get_proc(proc_ptr).depth == 0,
         ensures
             self.wf(),
             self.container_dom() == old(self).container_dom(),
@@ -221,12 +253,24 @@ impl ProcessManager {
             ret.0 == ret.1@.addr(),
             ret.1@.is_init(),
             old(self).container_dom().contains(ret.0) == false,
-            self.get_proc(old(self).get_proc(proc_ptr).parent.unwrap()).children@ =~= 
-                old(self).get_proc(old(self).get_proc(proc_ptr).parent.unwrap()).children@.remove_value(proc_ptr),
-            self.get_proc(old(self).get_proc(proc_ptr).parent.unwrap()).children.len() == 
-                old(self).get_proc(old(self).get_proc(proc_ptr).parent.unwrap()).children.len() - 1,
+            forall|p_ptr:ProcPtr| #![auto] self.proc_dom().contains(p_ptr)
+                ==>
+                self.get_proc(p_ptr).children == old(self).get_proc(p_ptr).children,
+            forall|p_p_ptr:ProcPtr|
+                #![trigger self.get_proc(p_p_ptr)]
+                old(self).get_proc(proc_ptr).uppertree_seq@.contains(p_p_ptr) 
+                ==>
+                self.get_proc(p_p_ptr).subtree_set@ =~= 
+                    old(self).get_proc(p_p_ptr).subtree_set@.remove(proc_ptr),     
+            forall|p_ptr:ProcPtr|  #![auto] self.proc_dom().contains(p_ptr)
+                ==>
+                self.get_proc(p_ptr).uppertree_seq == old(self).get_proc(p_ptr).uppertree_seq,   
     {
         broadcast use ProcessManager::reveal_process_manager_wf;
+
+        proof{
+            self.proc_tree_root_inv(proc_ptr);
+        }
 
         let container_ptr = self.get_proc(proc_ptr).owning_container;
         let container_rev_ptr = self.get_proc(proc_ptr).rev_ptr;

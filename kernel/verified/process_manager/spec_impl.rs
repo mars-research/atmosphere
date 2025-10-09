@@ -1203,6 +1203,24 @@ impl ProcessManager {
     {
         // assert(false);
     }
+
+    pub proof fn proc_tree_root_inv(&self, proc_ptr:ProcPtr)
+        requires
+            self.wf(),
+            self.proc_dom().contains(proc_ptr),
+        ensures
+            self.get_proc(proc_ptr).depth == 0
+                ==>
+            self.get_container(self.get_proc(proc_ptr).owning_container).root_process.unwrap() == proc_ptr,
+    {
+        assert(self.container_dom().contains(self.get_proc(proc_ptr).owning_container));
+        proc_tree_wf_imply_root_depth(
+            self.get_container(self.get_proc(proc_ptr).owning_container).root_process.unwrap(),
+            self.get_container(self.get_proc(proc_ptr).owning_container).owned_procs@.to_set(),
+            self.process_perms@,
+        );
+        assert(self.get_container(self.get_proc(proc_ptr).owning_container).owned_procs@.to_set().contains(proc_ptr));
+    }
 }
 
 //exec

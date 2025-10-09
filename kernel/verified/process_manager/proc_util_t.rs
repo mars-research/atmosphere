@@ -413,6 +413,7 @@ pub fn proc_perms_remove_subtree_set(
             )@[p_ptr].value().dmd_paging_mode,
         forall|p_ptr: ProcPtr|
             #![trigger uppertree_seq@.contains(p_ptr)]
+            #![trigger perms@[p_ptr].value()]
             #![trigger perms@[p_ptr].value().subtree_set]
             #![trigger old(perms)@[p_ptr].value().subtree_set]
             uppertree_seq@.contains(p_ptr) ==> perms@[p_ptr].value().subtree_set@ =~= 
