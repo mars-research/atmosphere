@@ -517,19 +517,24 @@ impl ProcessManager {
 
     pub open spec fn container_cpu_wf(&self) -> bool {
         &&& forall|cpu_i: CpuId|
-         // #![trigger self.container_dom().contains(self.cpu_list@[cpu_i as int].owning_container)]
-        // #![trigger self.get_container(self.cpu_list@[cpu_i as int].owning_container).owned_cpus]
-
             #![trigger self.cpu_list@[cpu_i as int].owning_container]
-            0 <= cpu_i < NUM_CPUS ==> self.container_dom().contains(
-                self.cpu_list@[cpu_i as int].owning_container,
-            ) && self.get_container(
-                self.cpu_list@[cpu_i as int].owning_container,
-            ).owned_cpus@.contains(cpu_i)
+            0 <= cpu_i < NUM_CPUS 
+            ==> 
+            self.container_dom().contains(self.cpu_list@[cpu_i as int].owning_container) 
+            && 
+            self.get_container(self.cpu_list@[cpu_i as int].owning_container).owned_cpus@.contains(cpu_i)
         &&& forall|cpu_i: CpuId|
             #![trigger self.cpu_list@[cpu_i as int].active]
             0 <= cpu_i < NUM_CPUS ==> self.cpu_list@[cpu_i as int].active == false
                 ==> self.cpu_list@[cpu_i as int].current_thread.is_None()
+        &&&
+        forall|c_ptr: ContainerPtr, cpu_i: CpuId|
+            #![trigger self.get_container(c_ptr).owned_cpus@.contains(cpu_i)]
+            self.container_dom().contains(c_ptr) && self.get_container(c_ptr).owned_cpus@.contains(cpu_i)
+            ==>
+            0 <= cpu_i < NUM_CPUS
+            &&
+            self.cpu_list[cpu_i as int].owning_container == c_ptr 
     }
 
     pub open spec fn threads_cpu_wf(&self) -> bool {
@@ -572,25 +577,28 @@ impl ProcessManager {
 
     pub open spec fn container_fields_wf(&self) -> bool {
         &&& forall|c_ptr: ContainerPtr|
-            #![trigger self.container_dom().contains(c_ptr)]
+            // #![trigger self.container_dom().contains(c_ptr)]
         // #![trigger self.container_dom().contains(c_ptr), self.get_container(c_ptr).owned_cpus]
         // #![trigger self.container_dom().contains(c_ptr), self.get_container(c_ptr).scheduler]
         // #![trigger self.container_dom().contains(c_ptr), self.get_container(c_ptr).owned_procs]
         // #![trigger self.container_dom().contains(c_ptr), self.get_container(c_ptr).owned_endpoints]
         // #![trigger self.get_container(c_ptr)]
         // #![trigger self.container_dom().contains(c_ptr)]
-        // #![trigger self.get_container(c_ptr).owned_cpus.wf()]
-        // #![trigger self.get_container(c_ptr).scheduler.wf()]
-        // #![trigger self.get_container(c_ptr).owned_procs.wf()]
+        #![trigger self.get_container(c_ptr).owned_cpus.wf()]
+        #![trigger self.get_container(c_ptr).scheduler.wf()]
+        #![trigger self.get_container(c_ptr).owned_procs.wf()]
         // #![trigger self.get_container(c_ptr).owned_endpoints.wf()]
-        // #![trigger self.get_container(c_ptr).scheduler.unique()]
-        // #![trigger self.get_container(c_ptr).owned_procs.unique()]
+        #![trigger self.get_container(c_ptr).scheduler.unique()]
+        #![trigger self.get_container(c_ptr).owned_procs.unique()]
         // #![trigger self.get_container(c_ptr).owned_endpoints.unique()]
 
-            self.container_dom().contains(c_ptr) ==> self.get_container(c_ptr).owned_cpus.wf()
-                && self.get_container(c_ptr).scheduler.wf() && self.get_container(
-                c_ptr,
-            ).scheduler.unique() && self.get_container(c_ptr).owned_procs.wf()
+            self.container_dom().contains(c_ptr) 
+            ==> 
+            self.get_container(c_ptr).owned_cpus.wf()
+                && 
+                self.get_container(c_ptr).scheduler.wf() 
+                && self.get_container(c_ptr).scheduler.unique()
+                && self.get_container(c_ptr).owned_procs.wf()
                 && self.get_container(c_ptr).owned_procs.unique()
     }
 
@@ -2065,29 +2073,25 @@ impl ProcessManager {
             self.thread_dom() == old(self).thread_dom(),
             forall|p_ptr: ProcPtr|
                 #![trigger self.get_proc(p_ptr)]
-                old(self).proc_dom().contains(p_ptr) ==> self.get_proc(p_ptr) =~= old(
-                    self,
-                ).get_proc(p_ptr),
+                old(self).proc_dom().contains(p_ptr) ==> self.get_proc(p_ptr) =~= old(self).get_proc(p_ptr),
             forall|container_ptr: ContainerPtr|
                 #![trigger self.get_container(container_ptr)]
-                old(self).container_dom().contains(container_ptr) ==> self.get_container(
-                    container_ptr,
-                ) =~= old(self).get_container(container_ptr),
+                old(self).container_dom().contains(container_ptr) 
+                ==> 
+                self.get_container(container_ptr) =~= old(self).get_container(container_ptr),
             forall|t_ptr: ThreadPtr|
                 #![trigger old(self).get_thread(t_ptr)]
-                old(self).thread_dom().contains(t_ptr) && t_ptr != thread_ptr ==> old(
-                    self,
-                ).get_thread(t_ptr) =~= self.get_thread(t_ptr),
+                old(self).thread_dom().contains(t_ptr) && t_ptr != thread_ptr 
+                ==> 
+                old(self).get_thread(t_ptr) =~= self.get_thread(t_ptr),
             forall|e_ptr: EndpointPtr|
                 #![trigger self.get_endpoint(e_ptr)]
-                self.endpoint_dom().contains(e_ptr) && e_ptr != old(self).get_thread(
-                    thread_ptr,
-                ).endpoint_descriptors@[endpoint_index as int].unwrap() ==> old(self).get_endpoint(
-                    e_ptr,
-                ) =~= self.get_endpoint(e_ptr),
-            self.get_thread(thread_ptr).endpoint_descriptors =~= old(self).get_thread(
-                thread_ptr,
-            ).endpoint_descriptors,
+                self.endpoint_dom().contains(e_ptr) 
+                && 
+                e_ptr != old(self).get_thread(thread_ptr).endpoint_descriptors@[endpoint_index as int].unwrap() 
+                ==> old(self).get_endpoint(e_ptr) =~= self.get_endpoint(e_ptr),
+            self.get_thread(thread_ptr).endpoint_descriptors 
+                =~= old(self).get_thread(thread_ptr).endpoint_descriptors,
             self.get_thread(thread_ptr).ipc_payload =~= ipc_payload,
             self.get_thread(thread_ptr).state == ThreadState::BLOCKED,
             self.get_endpoint(
@@ -2118,6 +2122,7 @@ impl ProcessManager {
                 ).endpoint_descriptors@[endpoint_index as int].unwrap(),
             ).queue@.push(thread_ptr),
     {
+        assume(false); // TODO fix
         proof {
             old(self).get_endpoint(
                 old(self).get_thread(

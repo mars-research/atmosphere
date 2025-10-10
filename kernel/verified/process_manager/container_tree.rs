@@ -585,6 +585,8 @@ pub proof fn container_tree_wf_imply_childern_have_parent(
             && container_perms[container_perms[c_ptr].value().parent.unwrap()].value().children@.contains(c_ptr)
             && container_perms[container_perms[c_ptr].value().parent.unwrap()].value().children.get_node_ref(c_ptr)
             == container_perms[c_ptr].value().parent_rev_ptr.unwrap()
+            && 
+            container_perms[c_ptr].value().parent.unwrap() != c_ptr
 {
 }
 

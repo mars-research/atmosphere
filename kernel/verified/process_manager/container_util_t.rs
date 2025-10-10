@@ -477,6 +477,88 @@ pub fn container_set_quota_mem_4k(
 }
 
 #[verifier(external_body)]
+pub fn container_insert_cpu(
+    container_ptr: ContainerPtr,
+    container_perm: &mut Tracked<PointsTo<Container>>,
+    cpu_id: CpuId,
+)
+    requires
+        old(container_perm)@.is_init(),
+        old(container_perm)@.addr() == container_ptr,
+        0 <= cpu_id < NUM_CPUS,
+        old(container_perm)@.value().owned_cpus@.contains(cpu_id) == false,
+    ensures
+        container_perm@.is_init(),
+        container_perm@.addr() == container_ptr,
+        container_perm@.value().owned_procs =~= old(container_perm)@.value().owned_procs,
+        container_perm@.value().parent =~= old(container_perm)@.value().parent,
+        container_perm@.value().parent_rev_ptr =~= old(container_perm)@.value().parent_rev_ptr,
+        container_perm@.value().children =~= old(container_perm)@.value().children,
+        container_perm@.value().owned_endpoints =~= old(container_perm)@.value().owned_endpoints,
+        // container_perm@.value().quota =~= old(container_perm)@.value().quota,
+        // container_perm@.value().mem_used =~= old(container_perm)@.value().mem_used,
+        // container_perm@.value().owned_cpus =~= old(container_perm)@.value().owned_cpus,
+        container_perm@.value().scheduler =~= old(container_perm)@.value().scheduler,
+        container_perm@.value().owned_threads =~= old(container_perm)@.value().owned_threads,
+        container_perm@.value().depth =~= old(container_perm)@.value().depth,
+        container_perm@.value().uppertree_seq =~= old(container_perm)@.value().uppertree_seq,
+        container_perm@.value().subtree_set =~= old(container_perm)@.value().subtree_set,
+        container_perm@.value().can_have_children =~= old(
+            container_perm,
+        )@.value().can_have_children,
+        container_perm@.value().root_process =~= old(container_perm)@.value().root_process,
+        container_perm@.value().root_process =~= old(container_perm)@.value().root_process,
+        container_perm@.value().owned_cpus.wf(),
+        container_perm@.value().owned_cpus@ =~= old(container_perm)@.value().owned_cpus@.insert(cpu_id),
+{
+    unsafe {
+        let uptr = container_ptr as *mut MaybeUninit<Container>;
+        (*uptr).assume_init_mut().owned_cpus.insert(cpu_id);
+    }
+}
+
+#[verifier(external_body)]
+pub fn container_remove_cpu(
+    container_ptr: ContainerPtr,
+    container_perm: &mut Tracked<PointsTo<Container>>,
+    cpu_id: CpuId,
+)
+    requires
+        old(container_perm)@.is_init(),
+        old(container_perm)@.addr() == container_ptr,
+        0 <= cpu_id < NUM_CPUS,
+        old(container_perm)@.value().owned_cpus@.contains(cpu_id),
+    ensures
+        container_perm@.is_init(),
+        container_perm@.addr() == container_ptr,
+        container_perm@.value().owned_procs =~= old(container_perm)@.value().owned_procs,
+        container_perm@.value().parent =~= old(container_perm)@.value().parent,
+        container_perm@.value().parent_rev_ptr =~= old(container_perm)@.value().parent_rev_ptr,
+        container_perm@.value().children =~= old(container_perm)@.value().children,
+        container_perm@.value().owned_endpoints =~= old(container_perm)@.value().owned_endpoints,
+        // container_perm@.value().quota =~= old(container_perm)@.value().quota,
+        // container_perm@.value().mem_used =~= old(container_perm)@.value().mem_used,
+        // container_perm@.value().owned_cpus =~= old(container_perm)@.value().owned_cpus,
+        container_perm@.value().scheduler =~= old(container_perm)@.value().scheduler,
+        container_perm@.value().owned_threads =~= old(container_perm)@.value().owned_threads,
+        container_perm@.value().depth =~= old(container_perm)@.value().depth,
+        container_perm@.value().uppertree_seq =~= old(container_perm)@.value().uppertree_seq,
+        container_perm@.value().subtree_set =~= old(container_perm)@.value().subtree_set,
+        container_perm@.value().can_have_children =~= old(
+            container_perm,
+        )@.value().can_have_children,
+        container_perm@.value().root_process =~= old(container_perm)@.value().root_process,
+        container_perm@.value().root_process =~= old(container_perm)@.value().root_process,
+        container_perm@.value().owned_cpus.wf(),
+        container_perm@.value().owned_cpus@ =~= old(container_perm)@.value().owned_cpus@.remove(cpu_id),
+{
+    unsafe {
+        let uptr = container_ptr as *mut MaybeUninit<Container>;
+        (*uptr).assume_init_mut().owned_cpus.remove(cpu_id);
+    }
+}
+
+#[verifier(external_body)]
 pub fn container_set_quota(
     container_ptr: ContainerPtr,
     container_perm: &mut Tracked<PointsTo<Container>>,
