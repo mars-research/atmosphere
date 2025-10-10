@@ -50,6 +50,12 @@ sudo update-grub && sudo reboot
 
 ## TODO
 
-Wire up internal storage linkedlist to enable killing endpoints. @Xiangdong
+Add invariants about endpoints being shared only within the container subtree.
 
-Add invariants about endpoints being shared only within the container subtree. @Xiangdong
+Wire up IPI for killing threads and TLB flush. 
+
+Wire up hugepages. 
+
+Kill container. 
+
+Bring back verification for Kernel init(). 
