@@ -59,3 +59,5 @@ Wire up hugepages.
 Kill container. 
 
 Bring back verification for Kernel init(). 
+
+Adjust triggers in ProcessManager
