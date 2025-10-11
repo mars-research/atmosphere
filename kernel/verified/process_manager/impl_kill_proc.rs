@@ -22,7 +22,7 @@ use core::mem::MaybeUninit;
 use crate::trap::Registers;
 use crate::process_manager::container_tree::*;
 use crate::process_manager::process_tree::*;
-use crate::process_manager::spec_impl::*;
+use crate::process_manager::spec_proof::*;
 use crate::process_manager::spec_util::*;
 
 impl ProcessManager {

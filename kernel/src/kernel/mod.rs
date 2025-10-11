@@ -16,7 +16,7 @@ static KERNEL: Mutex<Option<Kernel>> = Mutex::new(None);
 
 use vstd::prelude::*;
 
-use verified::process_manager::spec_impl::ProcessManager;
+use verified::process_manager::spec_proof::ProcessManager;
 use verified::memory_manager::MemoryManager;
 use verified::allocator::page_allocator_spec_impl::PageAllocator;
 use verified::process_manager::container::Container;

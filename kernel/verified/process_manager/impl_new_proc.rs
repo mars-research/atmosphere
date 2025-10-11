@@ -22,7 +22,7 @@ use core::mem::MaybeUninit;
 use crate::trap::Registers;
 use crate::process_manager::container_tree::*;
 use crate::process_manager::process_tree::*;
-use crate::process_manager::spec_impl::*;
+use crate::process_manager::spec_proof::*;
 
 impl ProcessManager {
     pub fn new_proc_with_endpoint(

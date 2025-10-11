@@ -11,7 +11,7 @@ use crate::process_manager::container::*;
 use crate::process_manager::thread::*;
 use crate::process_manager::cpu::*;
 use vstd::simple_pptr::PPtr;
-use crate::process_manager::spec_impl::*;
+use crate::process_manager::spec_proof::*;
 use crate::process_manager::thread_util_t::*;
 use crate::process_manager::proc_util_t::*;
 use crate::process_manager::container_util_t::*;

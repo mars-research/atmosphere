@@ -4,7 +4,7 @@ use crate::define::*;
 use crate::kernel::Kernel;
 use crate::va_range::*;
 use crate::process_manager::spec_util::*;
-use crate::process_manager::spec_impl::*;
+use crate::process_manager::spec_proof::*;
 
 use vstd::set::group_set_axioms;
 use vstd::set_lib::*;
