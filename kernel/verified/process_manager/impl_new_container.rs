@@ -46,30 +46,17 @@ impl ProcessManager {
             old(self).page_closure().contains(page_ptr_1) == false,
             old(self).page_closure().contains(page_ptr_2) == false,
             old(self).page_closure().contains(page_ptr_3) == false,
-            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).depth
-                != usize::MAX,
-            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).quota.mem_4k
-                - 3 >= new_quota.mem_4k,
-            old(self).get_container(
-                old(self).get_thread(thread_ptr).owning_container,
-            ).quota.spec_greater(new_quota),
-            old(self).get_container(
-                old(self).get_thread(thread_ptr).owning_container,
-            ).children.len() < CONTAINER_CHILD_LIST_LEN,
+            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).depth != usize::MAX,
+            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).quota.mem_4k - 3 >= new_quota.mem_4k,
+            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).quota.spec_greater(new_quota),
+            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).children.len() < CONTAINER_CHILD_LIST_LEN,
             0 <= endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS,
-            old(self).get_endpoint_by_endpoint_idx(thread_ptr, endpoint_index).is_Some() || old(
-                self,
-            ).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).is_Some(),
-            old(self).get_endpoint_by_endpoint_idx(
-                thread_ptr,
-                endpoint_index,
-            ).unwrap().rf_counter_is_full() == false || old(self).get_endpoint(
-                old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap(),
-            ).rf_counter_is_full() == false,
+            old(self).get_endpoint_by_endpoint_idx(thread_ptr, endpoint_index).is_Some() || old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).is_Some(),
+            old(self).get_endpoint_by_endpoint_idx(thread_ptr,endpoint_index).unwrap().rf_counter_is_full() == false 
+            || old(self).get_endpoint(old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap(),).rf_counter_is_full() == false,
             forall|p_ptr_i: ProcPtr|
                 #![trigger old(self).proc_dom().contains(p_ptr_i) ]
-                old(self).proc_dom().contains(p_ptr_i) ==> old(self).get_proc(p_ptr_i).pcid
-                    != new_pcid,
+                old(self).proc_dom().contains(p_ptr_i) ==> old(self).get_proc(p_ptr_i).pcid != new_pcid,
             page_perm_1@.is_init(),
             page_perm_1@.addr() == page_ptr_1,
             page_perm_2@.is_init(),
@@ -295,7 +282,8 @@ impl ProcessManager {
         proof {
             seq_push_lemma::<ThreadPtr>();
         }
-        broadcast use ProcessManager::reveal_process_manager_wf;
+        broadcast use ProcessManager::reveal_specs_to_wf;
+        broadcast use ProcessManager::reveal_wf_to_memory_disjoint;
 
         let old_container_ptr = self.get_thread(thread_ptr).owning_container;
         let mut old_quota = self.get_container(old_container_ptr).quota;
@@ -314,6 +302,7 @@ impl ProcessManager {
                 page_ptr_1,
             ) == false && self.get_container(c_ptr).uppertree_seq@.contains(page_ptr_1) == false
                 && self.get_container(c_ptr).uppertree_seq@.contains(c_ptr) == false) by {
+            broadcast use ProcessManager::reveal_wf_to_container_tree_wf;
             container_tree_wf_imply_childern_uppertree_specs(
                 self.root_container,
                 self.container_perms@,
@@ -410,6 +399,11 @@ impl ProcessManager {
             self.thread_perms.borrow_mut().tracked_insert(new_thread_ptr, thread_perm.get());
         }
 
+        assert(self.endpoint_dom().contains(endpoint_ptr)) by {
+            broadcast use ProcessManager::reveal_wf_to_threads_endpoint_descriptors_wf;
+        }        
+        assert(self.get_endpoint(endpoint_ptr).get_owning_threads().contains((new_thread_ptr,0)) == false) by {
+            broadcast use ProcessManager::reveal_wf_to_threads_endpoint_descriptors_wf;};
         let mut endpoint_perm = Tracked(
             self.endpoint_perms.borrow_mut().tracked_remove(endpoint_ptr),
         );
@@ -423,6 +417,7 @@ impl ProcessManager {
             seq_push_unique_lemma::<usize>();
         };
         assert(self.container_tree_wf()) by {
+            broadcast use ProcessManager::reveal_wf_to_container_tree_wf;
             // assert(self.get_container(new_container_ptr).uppertree_seq =~= new_upper_tree_ghost);
             seq_push_lemma::<usize>();
             seq_push_unique_lemma::<usize>();
@@ -443,7 +438,8 @@ impl ProcessManager {
             seq_push_unique_lemma::<usize>();
         };
         assert(self.process_trees_wf()) by {
-            //     // seq_to_set_lemma::<ProcPtr>();
+            broadcast use ProcessManager::reveal_wf_to_processes_container_wf;
+            broadcast use ProcessManager::reveal_wf_to_process_trees_wf;
             seq_push_lemma::<usize>();
             seq_push_unique_lemma::<usize>();
 
@@ -480,33 +476,82 @@ impl ProcessManager {
         };
 
         assert(self.container_fields_wf());
-        assert(self.process_fields_wf()) by {};
-        assert(self.cpus_wf());
-        assert(self.container_cpu_wf());
-        assert(self.memory_disjoint());
+        assert(self.process_fields_wf());
+        assert(self.cpus_wf()) by {broadcast use ProcessManager::reveal_wf_to_cpus_wf;};
+        assert(self.container_cpu_wf()) by {broadcast use ProcessManager::reveal_wf_to_container_cpu_wf;};
+        assert(self.memory_disjoint()) by {broadcast use ProcessManager::reveal_wf_to_memory_disjoint;};
         assert(self.container_perms_wf());
         assert(self.processes_container_wf()) by {
+            broadcast use ProcessManager::reveal_wf_to_processes_container_wf;
             seq_push_lemma::<usize>();
             seq_push_unique_lemma::<usize>();
         };
         assert(self.threads_process_wf()) by {
+            broadcast use ProcessManager::reveal_wf_to_threads_process_wf;
             seq_push_lemma::<usize>();
             seq_push_unique_lemma::<usize>();
         };
         assert(self.threads_perms_wf());
         assert(self.endpoint_perms_wf());
-        assert(self.threads_endpoint_descriptors_wf());
-        assert(self.endpoints_queue_wf());
-        assert(self.endpoints_container_wf());
-        assert(self.schedulers_wf()) by {
-            seq_push_lemma::<usize>();
-            seq_push_unique_lemma::<usize>();
+        assert(self.threads_endpoint_descriptors_wf()) by {broadcast use ProcessManager::reveal_wf_to_threads_endpoint_descriptors_wf;};
+        assert(self.endpoints_queue_wf()) by {broadcast use ProcessManager::reveal_wf_to_endpoints_queue_wf;};
+        assert(self.endpoints_container_wf()) by { broadcast use ProcessManager::reveal_wf_to_endpoints_container_wf;};
+        assert(self.schedulers_wf()) by { 
+            broadcast use ProcessManager::reveal_wf_to_schedulers_wf;
+            broadcast use ProcessManager::reveal_wf_to_threads_container_wf;
         };
-        assert(self.pcid_ioid_wf());
-        assert(self.threads_cpu_wf());
-        assert(self.threads_container_wf()) by {
+        assert(self.pcid_ioid_wf()) by { broadcast use ProcessManager::reveal_wf_to_pcid_ioid_wf;};
+        assert(self.threads_cpu_wf()) by { broadcast use ProcessManager::reveal_wf_to_threads_cpu_wf;};
+        assert(self.threads_container_wf()) by { 
+            broadcast use ProcessManager::reveal_wf_to_threads_container_wf;
             seq_push_lemma::<usize>();
-            seq_push_unique_lemma::<usize>();
+            seq_push_unique_lemma::<usize>();};
+        assert(self.endpoints_within_subtree())  by {
+            seq_push_lemma::<usize>();
+            broadcast use ProcessManager::reveal_wf_to_endpoints_within_subtree;
+            broadcast use ProcessManager::reveal_wf_to_threads_endpoint_descriptors_wf;
+            assert(
+                (
+                    old_container_ptr == old(self).get_endpoint(endpoint_ptr).owning_container
+                    ||
+                    old(self).get_container(old(self).get_endpoint(endpoint_ptr).owning_container).subtree_set@.contains(old_container_ptr)
+                )
+            );
+            assert(self.get_container(old_container_ptr).subtree_set@.contains(new_container_ptr)) by {
+                    in_child_imply_in_subtree(
+                    self.root_container,
+                    self.container_perms@,
+                    old_container_ptr,
+                    new_container_ptr
+                );
+            }
+            assert(
+                old(self).get_endpoint(endpoint_ptr).owning_container != old_container_ptr 
+                ==> 
+                // old(self).get_container(old(self).get_endpoint(endpoint_ptr).owning_container).subtree_set@.contains(old_container_ptr)
+                // &&
+                    self.get_container(old(self).get_endpoint(endpoint_ptr).owning_container).subtree_set@.contains(new_container_ptr)
+            )by {
+                if old(self).get_endpoint(endpoint_ptr).owning_container != old_container_ptr {
+                    in_subtree_impy_in_subsubtree(
+                        self.root_container,
+                        self.container_perms@,
+                        old(self).get_endpoint(endpoint_ptr).owning_container,
+                        old_container_ptr,
+                        new_container_ptr
+                    );
+                }
+            };
+            // assume(
+            //     self.get_container(old(self).get_endpoint(endpoint_ptr).owning_container).subtree_set@.contains(new_container_ptr)
+            // );
+
+            // in_child_imply_in_subtree(
+            //     self.root_container,
+            //     self.container_perms@,
+            //     old_container_ptr,
+            //     new_container_ptr
+            // );
         };
 
     }

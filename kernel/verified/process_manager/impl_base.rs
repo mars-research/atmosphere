@@ -1574,17 +1574,19 @@ impl ProcessManager {
             src_thread_ptr != dst_thread_ptr,
             0 <= src_endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS,
             0 <= dst_endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS,
-            old(self).get_thread(
-                src_thread_ptr,
-            ).endpoint_descriptors@[src_endpoint_index as int].is_Some(),
-            old(self).get_endpoint(
-                old(self).get_thread(
-                    src_thread_ptr,
-                ).endpoint_descriptors@[src_endpoint_index as int].unwrap(),
-            ).rf_counter != usize::MAX,
-            old(self).get_thread(
-                dst_thread_ptr,
-            ).endpoint_descriptors@[dst_endpoint_index as int].is_None(),
+            old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].is_Some(),
+            old(self).get_endpoint(old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap()).rf_counter 
+                != usize::MAX,
+            old(self).get_thread(dst_thread_ptr).endpoint_descriptors@[dst_endpoint_index as int].is_None(),
+            ( 
+                old(self).get_endpoint(old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap()).owning_container
+                    == old(self).get_thread(dst_thread_ptr).owning_container
+                ||
+                old(self).get_container(old(self).get_endpoint(old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap()).owning_container).subtree_set@.contains(
+                    old(self).get_thread(dst_thread_ptr).owning_container
+                )
+            ),
+                
         ensures
             self.wf(),
             self.page_closure() =~= old(self).page_closure(),
@@ -1652,24 +1654,26 @@ impl ProcessManager {
                 ).endpoint_descriptors@[src_endpoint_index as int].unwrap(),
             ).queue_state,
     {
-        broadcast use ProcessManager::reveal_process_manager_wf;
+        broadcast use ProcessManager::reveal_specs_to_wf;
         
-        let src_endpoint_ptr = self.get_thread(src_thread_ptr).endpoint_descriptors.get(
-            src_endpoint_index,
-        ).unwrap();
+        let src_endpoint_ptr = self.get_thread(src_thread_ptr).endpoint_descriptors.get(src_endpoint_index).unwrap();
 
-        let mut dst_thread_perm = Tracked(
-            self.thread_perms.borrow_mut().tracked_remove(dst_thread_ptr),
-        );
+        let mut dst_thread_perm = Tracked(self.thread_perms.borrow_mut().tracked_remove(dst_thread_ptr));
         thread_set_endpoint_descriptor(
             dst_thread_ptr,
             &mut dst_thread_perm,
             dst_endpoint_index,
-            Some(src_endpoint_ptr),
+            Some(src_endpoint_ptr)
         );
         proof {
             self.thread_perms.borrow_mut().tracked_insert(dst_thread_ptr, dst_thread_perm.get());
         }
+
+        assert(self.endpoint_dom().contains(src_endpoint_ptr)) by {
+            broadcast use ProcessManager::reveal_wf_to_threads_endpoint_descriptors_wf;
+        };
+        assert(self.get_endpoint(src_endpoint_ptr).get_owning_threads().contains((dst_thread_ptr,dst_endpoint_index)) == false) by {
+            broadcast use ProcessManager::reveal_wf_to_threads_endpoint_descriptors_wf;};
 
         let mut src_endpoint_perm = Tracked(
             self.endpoint_perms.borrow_mut().tracked_remove(src_endpoint_ptr),
@@ -1689,6 +1693,7 @@ impl ProcessManager {
 
         assert(self.container_perms_wf());
         assert(self.container_tree_wf()) by {
+            broadcast use ProcessManager::reveal_wf_to_container_tree_wf;
             container_no_change_to_tree_fields_imply_wf(
                 self.root_container,
                 old(self).container_perms@,
@@ -1698,6 +1703,8 @@ impl ProcessManager {
         assert(self.container_fields_wf());
         assert(self.proc_perms_wf());
         assert(self.process_trees_wf()) by {
+            broadcast use ProcessManager::reveal_wf_to_process_trees_wf;
+            broadcast use ProcessManager::reveal_wf_to_processes_container_wf;
             assert forall|c_ptr: ContainerPtr|
                 #![trigger self.container_dom().contains(c_ptr)]
                 #![trigger self.process_tree_wf(c_ptr)]
@@ -1719,15 +1726,16 @@ impl ProcessManager {
                     p_ptr,
                 ));
         };
-        assert(self.cpus_wf());
-        assert(self.container_cpu_wf());
-        assert(self.memory_disjoint());
+        assert(self.cpus_wf()) by { broadcast use ProcessManager::reveal_wf_to_cpus_wf; };
+        assert(self.container_cpu_wf()) by { broadcast use ProcessManager::reveal_wf_to_container_cpu_wf; };
+        assert(self.memory_disjoint()) by { broadcast use ProcessManager::reveal_wf_to_memory_disjoint; };
         assert(self.container_perms_wf());
-        assert(self.processes_container_wf());
-        assert(self.threads_process_wf());
+        assert(self.processes_container_wf()) by { broadcast use ProcessManager::reveal_wf_to_processes_container_wf; };
+        assert(self.threads_process_wf()) by { broadcast use ProcessManager::reveal_wf_to_threads_process_wf; };
         assert(self.threads_perms_wf());
         assert(self.endpoint_perms_wf());
         assert(self.threads_endpoint_descriptors_wf()) by {
+            broadcast use ProcessManager::reveal_wf_to_threads_endpoint_descriptors_wf;
             seq_update_lemma::<Option<EndpointPtr>>();
             assert(forall|t_ptr: ThreadPtr, e_idx: EndpointIdx|
                 #![trigger self.thread_perms@[t_ptr].value().endpoint_descriptors@[e_idx as int]]
@@ -1751,15 +1759,17 @@ impl ProcessManager {
             // assert(self.thread_perms@[dst_thread_ptr].value().endpoint_descriptors@[dst_endpoint_index as int ] =~= Some(src_endpoint_ptr));
         };
         assert(self.endpoints_queue_wf()) by {
+            broadcast use ProcessManager::reveal_wf_to_endpoints_queue_wf;
             seq_push_lemma::<usize>();
             seq_push_unique_lemma::<usize>();
             seq_update_lemma::<Option<EndpointPtr>>();
         };
-        assert(self.endpoints_container_wf());
-        assert(self.schedulers_wf());
-        assert(self.pcid_ioid_wf());
-        assert(self.threads_cpu_wf());
-        assert(self.threads_container_wf());
+        assert(self.endpoints_container_wf()) by { broadcast use ProcessManager::reveal_wf_to_endpoints_container_wf;};
+        assert(self.schedulers_wf()) by { broadcast use ProcessManager::reveal_wf_to_schedulers_wf;};
+        assert(self.pcid_ioid_wf()) by { broadcast use ProcessManager::reveal_wf_to_pcid_ioid_wf;};
+        assert(self.threads_cpu_wf()) by { broadcast use ProcessManager::reveal_wf_to_threads_cpu_wf;};
+        assert(self.threads_container_wf()) by { broadcast use ProcessManager::reveal_wf_to_threads_container_wf;};
+        assert(self.endpoints_within_subtree())  by { broadcast use ProcessManager::reveal_wf_to_endpoints_within_subtree;};
     }
 
     pub fn new_endpoint(

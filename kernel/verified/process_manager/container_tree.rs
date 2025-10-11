@@ -16,46 +16,46 @@ pub open spec fn container_perms_wf(
 ) -> bool {
     &&& forall|c_ptr: ContainerPtr|
         #![trigger container_perms.dom().contains(c_ptr)]
-    //#![trigger container_perms[c_ptr].is_init()]
+    // #![trigger container_perms[c_ptr].is_init()]
 
         container_perms.dom().contains(c_ptr) ==> container_perms[c_ptr].is_init()
     &&& forall|c_ptr: ContainerPtr|
         #![trigger container_perms.dom().contains(c_ptr)]
-    //#![trigger container_perms[c_ptr].addr()]
+    // #![trigger container_perms[c_ptr].addr()]
 
         container_perms.dom().contains(c_ptr) ==> container_perms[c_ptr].addr() == c_ptr
     &&& forall|c_ptr: ContainerPtr|
         #![trigger container_perms.dom().contains(c_ptr)]
-    //#![trigger container_perms[c_ptr].value().children.wf()]
+    // #![trigger container_perms[c_ptr].value().children.wf()]
 
         container_perms.dom().contains(c_ptr) ==> container_perms[c_ptr].value().children.wf()
     &&& forall|c_ptr: ContainerPtr|
         #![trigger container_perms.dom().contains(c_ptr)]
-    //#![trigger container_perms[c_ptr].value().children.unique()]
+    // #![trigger container_perms[c_ptr].value().children.unique()]
 
         container_perms.dom().contains(c_ptr) ==> container_perms[c_ptr].value().children.unique()
     &&& forall|c_ptr: ContainerPtr|
         #![trigger container_perms.dom().contains(c_ptr)]
-    //#![trigger container_perms[c_ptr].value().uppertree_seq@.no_duplicates()]
+    // #![trigger container_perms[c_ptr].value().uppertree_seq@.no_duplicates()]
 
         container_perms.dom().contains(c_ptr)
             ==> container_perms[c_ptr].value().uppertree_seq@.no_duplicates()
     &&& forall|c_ptr: ContainerPtr|
         #![trigger container_perms.dom().contains(c_ptr)]
-    //#![trigger container_perms[c_ptr].value().children@.contains(c_ptr)]
+    // #![trigger container_perms[c_ptr].value().children@.contains(c_ptr)]
 
         container_perms.dom().contains(c_ptr) ==> container_perms[c_ptr].value().children@.contains(
             c_ptr,
         ) == false
     &&& forall|c_ptr: ContainerPtr|
         #![trigger container_perms.dom().contains(c_ptr)]
-    //#![trigger container_perms[c_ptr].value().subtree_set@.finite()]
+    // #![trigger container_perms[c_ptr].value().subtree_set@.finite()]
 
         container_perms.dom().contains(c_ptr)
             ==> container_perms[c_ptr].value().subtree_set@.finite()
     &&& forall|c_ptr: ContainerPtr|
         #![trigger container_perms.dom().contains(c_ptr)]
-    //#![trigger container_perms[c_ptr].value().uppertree_seq@.len(), container_perms[c_ptr].value().depth]
+    // #![trigger container_perms[c_ptr].value().uppertree_seq@.len(), container_perms[c_ptr].value().depth]
 
         container_perms.dom().contains(c_ptr)
             ==> container_perms[c_ptr].value().uppertree_seq@.len()
@@ -370,6 +370,30 @@ pub proof fn no_child_imply_no_subtree(
         ));
 }
 
+pub proof fn in_child_imply_in_subtree(
+    root_container: ContainerPtr,
+    container_perms: Map<ContainerPtr, PointsTo<Container>>,
+    c_ptr: ContainerPtr,
+    child_ptr: ContainerPtr,
+)
+    requires
+        container_perms_wf(container_perms),
+        container_tree_wf(root_container, container_perms),
+        container_perms.dom().contains(c_ptr),
+        container_perms[c_ptr].value().children@.contains(child_ptr),
+    ensures
+        container_perms[c_ptr].value().subtree_set@.contains(child_ptr),
+{    assert(container_perms[child_ptr].value().parent.unwrap() == c_ptr);
+    assert(container_perms[child_ptr].value().depth == container_perms[c_ptr].value().depth + 1);
+    assert(container_perms[child_ptr].value().uppertree_seq@.len()
+        == container_perms[child_ptr].value().depth);
+    assert(container_perms[c_ptr].value().uppertree_seq@.len()
+        == container_perms[c_ptr].value().depth);
+    assert(container_perms[child_ptr].value().uppertree_seq@[container_perms[child_ptr].value().depth
+        - 1] == c_ptr);
+    assert(container_perms[child_ptr].value().uppertree_seq@.contains(c_ptr));
+    }
+
 pub proof fn in_child_impy_in_subtree(
     root_container: ContainerPtr,
     container_perms: Map<ContainerPtr, PointsTo<Container>>,
@@ -401,6 +425,30 @@ pub proof fn in_child_impy_in_subtree(
     ) == container_perms[child_ptr].value().uppertree_seq@);
     assert(container_perms[s_ptr].value().uppertree_seq@[container_perms[c_ptr].value().depth as int]
         == c_ptr);
+    assert(container_perms[s_ptr].value().uppertree_seq@.contains(c_ptr));
+}
+
+pub proof fn in_subtree_impy_in_subsubtree(
+    root_container: ContainerPtr,
+    container_perms: Map<ContainerPtr, PointsTo<Container>>,
+    c_ptr: ContainerPtr,
+    child_ptr: ContainerPtr,
+    s_ptr: ContainerPtr,
+)
+    requires
+        container_perms_wf(container_perms),
+        container_tree_wf(root_container, container_perms),
+        container_perms.dom().contains(c_ptr),
+        container_perms[c_ptr].value().subtree_set@.contains(child_ptr),
+        container_perms[child_ptr].value().subtree_set@.contains(s_ptr),
+    ensures
+        container_perms[c_ptr].value().subtree_set@.contains(s_ptr),
+{
+    assert(container_perms.dom().contains(s_ptr));
+    assert(container_perms[child_ptr].value().uppertree_seq@.contains(c_ptr));
+    assert(container_perms[s_ptr].value().uppertree_seq@.contains(child_ptr));
+    assert(container_perms[s_ptr].value().uppertree_seq@.subrange(0, container_perms[child_ptr].value().depth as int) 
+        == container_perms[child_ptr].value().uppertree_seq@);
     assert(container_perms[s_ptr].value().uppertree_seq@.contains(c_ptr));
 }
 
