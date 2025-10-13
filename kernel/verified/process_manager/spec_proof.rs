@@ -1115,7 +1115,12 @@ impl ProcessManager {
             forall|e_ptr: EndpointPtr|
                 #![trigger self.endpoint_dom().contains(e_ptr)]
                 #![trigger self.get_endpoint(e_ptr).queue.wf()]
-                self.endpoint_dom().contains(e_ptr) ==> self.get_endpoint(e_ptr).queue.wf(),
+                self.endpoint_dom().contains(e_ptr) 
+                ==> 
+                self.get_endpoint(e_ptr).queue.wf()
+                &&
+                self.container_dom().contains(self.get_endpoint(e_ptr).owning_container)
+                ,
             forall|e_ptr: EndpointPtr, i: int|
                 #![trigger self.get_endpoint(e_ptr).queue@[i]]
                 self.endpoint_dom().contains(e_ptr) && 0 <= i < self.get_endpoint(e_ptr).queue.len()
@@ -1338,6 +1343,23 @@ impl ProcessManager {
             self.process_perms@,
         );
         assert(self.get_container(self.get_proc(proc_ptr).owning_container).owned_procs@.to_set().contains(proc_ptr));
+    }
+    pub proof fn same_or_deeper_depth_imply_none_ancestor(&self, ancestor_ptr: ContainerPtr, child_ptr: ContainerPtr)
+        requires
+            self.wf(),
+            self.container_dom().contains(ancestor_ptr),
+            self.container_dom().contains(child_ptr),
+            self.get_container(ancestor_ptr).depth >= self.get_container(child_ptr).depth,
+        ensures
+            self.get_container(ancestor_ptr).subtree_set@.contains(child_ptr) == false,
+    {
+        broadcast use ProcessManager::reveal_process_manager_wf;
+        crate::process_manager::container_tree::same_or_deeper_depth_imply_none_ancestor(
+            self.root_container,
+            self.container_perms@,
+            ancestor_ptr,
+            child_ptr,
+        )
     }
 }
 

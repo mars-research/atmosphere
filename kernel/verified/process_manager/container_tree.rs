@@ -1566,7 +1566,7 @@ pub proof fn remove_container_preserve_tree_inv(
 }
 
 //exec
-pub fn check_is_ancestor(
+pub fn container_tree_check_is_ancestor(
     root_container: ContainerPtr,
     container_perms: &Tracked<Map<ContainerPtr, PointsTo<Container>>>,
     a_ptr: ContainerPtr,
@@ -1578,9 +1578,9 @@ pub fn check_is_ancestor(
         container_perms@.dom().contains(a_ptr),
         container_perms@.dom().contains(child_ptr),
         container_perms@[a_ptr].value().depth < container_perms@[child_ptr].value().depth,
-        child_ptr != root_container,
     ensures
         ret == container_perms@[child_ptr].value().uppertree_seq@.contains(a_ptr),
+        ret == container_perms@[a_ptr].value().subtree_set@.contains(child_ptr),
 {
     // assert(false);
     proof {

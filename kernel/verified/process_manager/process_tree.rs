@@ -1725,7 +1725,7 @@ pub proof fn remove_proc_preserve_tree_inv(
 }
 
 //exec
-pub fn check_is_ancestor(
+pub fn proc_tree_check_is_ancestor(
     root_proc: ProcPtr,
     proc_tree_dom: Ghost<Set<ProcPtr>>,
     proc_perms: &Tracked<Map<ProcPtr, PointsTo<Process>>>,

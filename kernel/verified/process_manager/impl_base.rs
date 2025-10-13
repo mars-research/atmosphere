@@ -674,70 +674,41 @@ impl ProcessManager {
             self.thread_dom() == old(self).thread_dom(),
             forall|p_ptr: ProcPtr|
                 #![trigger self.get_proc(p_ptr)]
-                old(self).proc_dom().contains(p_ptr) ==> self.get_proc(p_ptr) =~= old(
-                    self,
-                ).get_proc(p_ptr),
+                old(self).proc_dom().contains(p_ptr) ==> self.get_proc(p_ptr) =~= old(self).get_proc(p_ptr),
             forall|container_ptr: ContainerPtr|
                 #![trigger self.get_container(container_ptr)]
-                old(self).container_dom().contains(container_ptr) && container_ptr != old(
-                    self,
-                ).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0]).owning_container
-                    ==> self.get_container(container_ptr) =~= old(self).get_container(
-                    container_ptr,
-                ),
+                old(self).container_dom().contains(container_ptr) && container_ptr != old(self).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0]).owning_container
+                ==> 
+                self.get_container(container_ptr) =~= old(self).get_container(container_ptr),
+            forall|container_ptr: ContainerPtr|
+                #![trigger self.get_container(container_ptr)]
+                old(self).container_dom().contains(container_ptr)
+                ==> 
+                self.get_container(container_ptr).subtree_set =~= old(self).get_container(container_ptr).subtree_set,
             forall|t_ptr: ThreadPtr|
                 #![trigger old(self).get_thread(t_ptr)]
-                old(self).thread_dom().contains(t_ptr) && t_ptr != old(self).get_endpoint(
-                    endpoint_ptr,
-                ).queue@[0] ==> old(self).get_thread(t_ptr) =~= self.get_thread(t_ptr),
+                old(self).thread_dom().contains(t_ptr) && t_ptr != old(self).get_endpoint(endpoint_ptr).queue@[0] ==> old(self).get_thread(t_ptr) =~= self.get_thread(t_ptr),
+            forall|t_ptr: ThreadPtr|
+                #![trigger old(self).get_thread(t_ptr)]
+                old(self).thread_dom().contains(t_ptr) ==> old(self).get_thread(t_ptr).endpoint_descriptors =~= self.get_thread(t_ptr).endpoint_descriptors,
             forall|e_ptr: EndpointPtr|
                 #![trigger self.get_endpoint(e_ptr)]
-                self.endpoint_dom().contains(e_ptr) && e_ptr != endpoint_ptr ==> old(
-                    self,
-                ).get_endpoint(e_ptr) =~= self.get_endpoint(e_ptr),
+                self.endpoint_dom().contains(e_ptr) && e_ptr != endpoint_ptr ==> old(self).get_endpoint(e_ptr) =~= self.get_endpoint(e_ptr),
+            forall|e_ptr: EndpointPtr|
+                #![trigger self.get_endpoint(e_ptr)]
+                self.endpoint_dom().contains(e_ptr) ==> old(self).get_endpoint(e_ptr).owning_container =~= self.get_endpoint(e_ptr).owning_container,
             self.get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0]).endpoint_descriptors
-                =~= old(self).get_thread(
-                old(self).get_endpoint(endpoint_ptr).queue@[0],
-            ).endpoint_descriptors,
-            self.get_container(
-                old(self).get_thread(
-                    old(self).get_endpoint(endpoint_ptr).queue@[0],
-                ).owning_container,
-            ).owned_procs =~= old(self).get_container(
-                old(self).get_thread(
-                    old(self).get_endpoint(endpoint_ptr).queue@[0],
-                ).owning_container,
-            ).owned_procs,
-            self.get_container(
-                old(self).get_thread(
-                    old(self).get_endpoint(endpoint_ptr).queue@[0],
-                ).owning_container,
-            ).owned_threads =~= old(self).get_container(
-                old(self).get_thread(
-                    old(self).get_endpoint(endpoint_ptr).queue@[0],
-                ).owning_container,
-            ).owned_threads,
-            self.get_container(
-                old(self).get_thread(
-                    old(self).get_endpoint(endpoint_ptr).queue@[0],
-                ).owning_container,
-            ).children =~= old(self).get_container(
-                old(self).get_thread(
-                    old(self).get_endpoint(endpoint_ptr).queue@[0],
-                ).owning_container,
-            ).children,
-            self.get_endpoint(endpoint_ptr).queue@ == old(self).get_endpoint(
-                endpoint_ptr,
-            ).queue@.skip(1),
-            self.get_endpoint(endpoint_ptr).owning_threads == old(self).get_endpoint(
-                endpoint_ptr,
-            ).owning_threads,
-            self.get_endpoint(endpoint_ptr).rf_counter == old(self).get_endpoint(
-                endpoint_ptr,
-            ).rf_counter,
-            self.get_endpoint(endpoint_ptr).queue_state == old(self).get_endpoint(
-                endpoint_ptr,
-            ).queue_state,
+                =~= old(self).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0],).endpoint_descriptors,
+            self.get_container(old(self).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0]).owning_container).owned_procs 
+                =~= old(self).get_container(old(self).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0]).owning_container).owned_procs,
+            self.get_container(old(self).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0]).owning_container).owned_threads 
+                =~= old(self).get_container(old(self).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0]).owning_container).owned_threads,
+            self.get_container(old(self).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0],).owning_container).children 
+                =~= old(self).get_container(old(self).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0],).owning_container).children,
+            self.get_endpoint(endpoint_ptr).queue@ == old(self).get_endpoint(endpoint_ptr).queue@.skip(1),
+            self.get_endpoint(endpoint_ptr).owning_threads == old(self).get_endpoint(endpoint_ptr).owning_threads,
+            self.get_endpoint(endpoint_ptr).rf_counter == old(self).get_endpoint(endpoint_ptr).rf_counter,
+            self.get_endpoint(endpoint_ptr).queue_state == old(self).get_endpoint(endpoint_ptr).queue_state,
     {
         broadcast use ProcessManager::reveal_process_manager_wf;
         
@@ -2170,6 +2141,33 @@ impl ProcessManager {
 
         return ret_thread_ptr;
     }
+
+    pub fn container_check_is_ancestor(&self, ancestor_ptr: ContainerPtr, child_ptr: ContainerPtr) -> (ret:bool)
+        requires
+            self.wf(),
+            self.container_dom().contains(ancestor_ptr),
+            self.container_dom().contains(child_ptr),
+            // self.get_container(ancestor_ptr).depth < self.get_container(child_ptr).depth,
+            // child_ptr != ancestor_ptr,
+        ensures
+            // ret == self.get_container(child_ptr).uppertree_seq@.contains(ancestor_ptr),
+            ret == self.get_container(ancestor_ptr).subtree_set@.contains(child_ptr),
+    {
+        broadcast use ProcessManager::reveal_process_manager_wf;
+        if self.get_container(ancestor_ptr).depth >= self.get_container(child_ptr).depth {
+            proof {
+                self.same_or_deeper_depth_imply_none_ancestor(ancestor_ptr, child_ptr);
+            }
+            return false;
+        }
+        container_tree_check_is_ancestor(
+            self.root_container,
+            &self.container_perms,
+            ancestor_ptr,
+            child_ptr,
+        )
+    }
+
 }
 
 } // verus!
