@@ -265,13 +265,12 @@ impl Kernel {
         }
 
         // Check shared endpoint
-        let blocking_endpoint_ptr_op = self.proc_man.get_thread(
-            receiver_thread_ptr,
-        ).endpoint_descriptors.get(blocking_endpoint_index);
+        let blocking_endpoint_ptr_op = self.proc_man.get_thread(receiver_thread_ptr).endpoint_descriptors.get(blocking_endpoint_index);
 
         if blocking_endpoint_ptr_op.is_none() {
             return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
         }
+
         let blocking_endpoint_ptr = blocking_endpoint_ptr_op.unwrap();
         if self.proc_man.get_endpoint(blocking_endpoint_ptr).queue_state.is_receive()
             && self.proc_man.get_endpoint(blocking_endpoint_ptr).queue.len()
@@ -310,9 +309,7 @@ impl Kernel {
         // checking sender thread payload well formed
         let sender_thread_ptr = self.proc_man.get_endpoint(blocking_endpoint_ptr).queue.get_head();
         let sender_container_ptr = self.proc_man.get_thread(sender_thread_ptr).owning_container;
-        let sender_endpoint_payload_op = self.proc_man.get_thread(
-            sender_thread_ptr,
-        ).ipc_payload.get_payload_as_endpoint();
+        let sender_endpoint_payload_op = self.proc_man.get_thread(sender_thread_ptr,).ipc_payload.get_payload_as_endpoint();
         // sender payload ill formed
         if sender_endpoint_payload_op.is_none() {
             return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
@@ -324,26 +321,24 @@ impl Kernel {
             return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
         }  //assert(blocking_endpoint_ptr != sender_endpoint_ptr ==> self.get_endpoint(sender_endpoint_ptr).queue =~= old(self).get_endpoint(sender_endpoint_ptr).queue);
 
-        let sender_endpoint_ptr_op = self.proc_man.get_thread(
-            sender_thread_ptr,
-        ).endpoint_descriptors.get(sender_endpoint_payload);
-        if sender_endpoint_ptr_op.is_none() {
+        let payload_endpoint_ptr_op = self.proc_man.get_thread(sender_thread_ptr).endpoint_descriptors.get(sender_endpoint_payload);
+        if payload_endpoint_ptr_op.is_none() {
             return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
         }
-        let sender_endpoint_ptr = sender_endpoint_ptr_op.unwrap();
+        let payload_endpoint_ptr = payload_endpoint_ptr_op.unwrap();
         // sender payload has max owner
-        if self.proc_man.get_endpoint(sender_endpoint_ptr).rf_counter == usize::MAX {
+        if self.proc_man.get_endpoint(payload_endpoint_ptr).rf_counter == usize::MAX {
             return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
         }
         // Now check receiver payload
 
-        let receiver_endpoint_ptr_op = self.proc_man.get_thread(
+        let receiver_endpoint_dsecriptor_ptr_op = self.proc_man.get_thread(
             receiver_thread_ptr,
         ).endpoint_descriptors.get(receiver_endpoint_payload);
         let receiver_container_ptr = self.proc_man.get_thread(receiver_thread_ptr).owning_container;
 
         // payload idx slot should be empty.
-        if receiver_endpoint_ptr_op.is_some() {
+        if receiver_endpoint_dsecriptor_ptr_op.is_some() {
             return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
         }
         // cannot schedule the sender
@@ -352,6 +347,14 @@ impl Kernel {
             >= MAX_CONTAINER_SCHEDULER_LEN {
             return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
         }
+
+        let payload_endpoint_container_ptr = self.proc_man.get_endpoint(payload_endpoint_ptr).owning_container;
+
+        if self.proc_man.container_check_is_ancestor(payload_endpoint_container_ptr, receiver_container_ptr) == false 
+            && payload_endpoint_container_ptr != receiver_container_ptr {
+            return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
+        }
+
         self.proc_man.schedule_blocked_thread(blocking_endpoint_ptr);
         assert(forall|t_ptr: ThreadPtr|
             #![trigger old(self).get_thread(t_ptr)]
