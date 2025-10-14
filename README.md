@@ -11,6 +11,11 @@ Install Nix with the following command:
 # Using https://github.com/DeterminateSystems/nix-installer
 curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
 ```
+First enter nix
+
+```bash
+nix develop
+```
 
 You can now build and run Atmosphere with `cd kernel && cargo run`.
 
@@ -19,6 +24,11 @@ You can now build and run Atmosphere with `cd kernel && cargo run`.
 Atmosphere builds with `atmo`, a build system that extends Cargo.
 Run `atmo help` for more information.
 
+## Run verification
+
+```bash
+atmo verify
+```
 
 ## Boot on real hardware
 
@@ -50,14 +60,12 @@ sudo update-grub && sudo reboot
 
 ## TODO
 
-Add invariants about endpoints being shared only within the container subtree.
-
 Wire up IPI for killing threads and TLB flush. 
 
 Wire up hugepages. 
 
-Kill container. 
+Kill container (halfway there..). 
 
 Bring back verification for Kernel init(). 
 
-Adjust triggers in ProcessManager
+Adjust triggers in ProcessManager (almost there).
