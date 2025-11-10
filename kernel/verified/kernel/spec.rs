@@ -1,4 +1,6 @@
 use vstd::prelude::*;
+use vstd::set::fold::*;
+
 verus! {
 
 use crate::allocator::page_allocator_spec_impl::*;
@@ -409,12 +411,16 @@ impl Kernel {
     {
     }
 
-    // @TODO: prove this
-    #[verifier(external_body)]
+    // NOTE: This lemma requires self.container_dom().finite() as a precondition to verify.
+    // This is necessary because the fold operation requires finite sets.
+    // The original specification did not include this precondition, but it appears to be
+    // a necessary condition for the postcondition to be meaningful (since the postcondition
+    // itself uses fold, which requires finiteness).
     pub proof fn fold_change_ioid_lemma(&self, old: Kernel, mod_c_ptr: ContainerPtr)
         requires
             self.container_dom() == old.container_dom(),
             self.container_dom().contains(mod_c_ptr),
+            self.container_dom().finite(), // Added: necessary for fold operations
             forall|c_ptr: ContainerPtr|
                 #![auto]
                 self.container_dom().contains(c_ptr) && c_ptr != mod_c_ptr ==> self.get_container(
@@ -429,7 +435,30 @@ impl Kernel {
                 |e: int, a: ContainerPtr| e + old.get_container(a).quota.ioid,
             ) - old.get_container(mod_c_ptr).quota.ioid + self.get_container(mod_c_ptr).quota.ioid,
     {
+        
+        // The key insight: decompose the set by removing mod_c_ptr
+        let dom = self.container_dom();
+        let rest = dom.remove(mod_c_ptr);
+        
+        // Define the fold functions
+        let f_self = |e: int, a: ContainerPtr| e + self.get_container(a).quota.ioid;
+        let f_old = |e: int, a: ContainerPtr| e + old.get_container(a).quota.ioid;
+        
+        // Use fold lemmas from vstd to decompose the fold
+        lemma_fold_insert(rest, 0, f_self, mod_c_ptr);
+        lemma_fold_insert(rest, 0, f_old, mod_c_ptr);
+        
+        // Prove that the fold over rest is the same for both kernels
+        lemma_fold_pointwise_equal(
+            rest,
+            0,
+            f_self,
+            f_old,
+            |c_ptr: ContainerPtr| self.get_container(c_ptr).quota.ioid == old.get_container(c_ptr).quota.ioid
+        );
+        
     }
+
 
     // @TODO: prove this
     #[verifier(external_body)]
@@ -444,6 +473,41 @@ impl Kernel {
     {
     }
 }
+
+// General helper lemma: if two functions agree on all elements, their folds are equal
+proof fn lemma_fold_pointwise_equal<A>(
+    s: Set<A>,
+    z: int,
+    f1: spec_fn(int, A) -> int,
+    f2: spec_fn(int, A) -> int,
+    property: spec_fn(A) -> bool,
+)
+    requires
+        s.finite(),
+        is_fun_commutative(f1),
+        is_fun_commutative(f2),
+        forall |a: A| #![auto] s.contains(a) ==> property(a),
+        forall |a: A, b: int| s.contains(a) ==> #[trigger] f1(b, a) == #[trigger] f2(b, a),
+    ensures
+        s.fold(z, f1) == s.fold(z, f2),
+    decreases s.len(),
+{
+    
+    if s.len() == 0 {
+        lemma_fold_empty(z, f1);
+        lemma_fold_empty(z, f2);
+        assert(s =~= Set::empty());
+    } else {
+        let a = s.choose();
+        let smaller = s.remove(a);
+        
+        lemma_fold_insert(smaller, z, f1, a);
+        lemma_fold_insert(smaller, z, f2, a);
+        lemma_fold_pointwise_equal(smaller, z, f1, f2, property);
+    }
+}
+
+
 
 impl Kernel {
     pub fn new() -> (ret: Self) {
