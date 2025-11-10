@@ -151,7 +151,6 @@ pub fn page_perm_to_page_map(page_ptr: PagePtr, Tracked(page_perm): Tracked<Page
     (page_ptr, Tracked::assume_new())
 }
 
-#[verifier(external_body)]  // TODO: how to prove this .....
 pub fn flush_tlb_4kentry(tlbmap_4k: Ghost<Seq<Map<VAddr, MapEntry>>>, va: Ghost<VAddr>) -> (ret:
     Ghost<Seq<Map<VAddr, MapEntry>>>)
     requires
@@ -191,6 +190,9 @@ pub fn flush_tlb_4kentry(tlbmap_4k: Ghost<Seq<Map<VAddr, MapEntry>>>, va: Ghost<
             forall|cpu_i: CpuId|
                 #![auto]
                 0 <= cpu_i < cpu_id ==> ret_map@[cpu_i as int].submap_of(tlbmap_4k@[cpu_i as int]),
+            forall|cpu_i: CpuId|
+                #![auto]
+                cpu_id <= cpu_i < NUM_CPUS ==> ret_map@[cpu_i as int].submap_of(tlbmap_4k@[cpu_i as int]),
     {
         proof {
             //assert(ret_map@[cpu_id as int].submap_of(tlbmap_4k@[cpu_id as int]));
@@ -211,5 +213,6 @@ pub fn flush_tlb_4kentry(tlbmap_4k: Ghost<Seq<Map<VAddr, MapEntry>>>, va: Ghost<
     }
     ret_map
 }
+
 
 } // verus!
