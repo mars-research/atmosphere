@@ -941,29 +941,13 @@ impl PageAllocator {
             self.mapped_pages_2m().contains(ptr) ==> self.free_pages_2m().len() < NUM_PAGES,
     {
         if self.mapped_pages_2m().contains(ptr) {
-            // From mapped_pages_2m_wf, we know ptr is valid
-            page_ptr_2m_lemma();
-            page_ptr_lemma1();
-            assert(page_ptr_2m_valid(ptr));
-            assert(page_ptr_valid(ptr));
-            
-            // ptr is 2M-valid and mapped
-            let idx = page_ptr2page_index(ptr);
-            assert(page_index_valid(idx));
-            assert(0 <= idx < NUM_PAGES);
-            assert(self.page_array@.len() == NUM_PAGES);
-            assert(self.page_array@[idx as int].state == PageState::Mapped2m);
-            
-            // From free_pages_2m_wf, ptr is not in free_pages_2m
-            assert(!self.free_pages_2m@.contains(ptr));
-            
+
             // From free_pages_2m_wf, we know free_pages_2m@.unique() holds
             self.free_pages_2m.wf_to_no_duplicates();
             
             // The free_pages_2m sequence has no duplicates, so its length equals
             // the size of the set it converts to
             self.free_pages_2m@.unique_seq_to_set();
-            assert(self.free_pages_2m@.to_set().len() == self.free_pages_2m@.len());
             
             // Define the set of all valid 2M page pointers in the page_array
             let all_page_ptrs = Set::<PagePtr>::new(|p: PagePtr| 
@@ -973,14 +957,8 @@ impl PageAllocator {
             // This set is finite and has at most NUM_PAGES elements
             // (actually at most NUM_PAGES elements since each index maps to one page ptr)
             
-            // free_pages_2m().to_set() is a subset of all_page_ptrs
-            assert(self.free_pages_2m@.to_set().subset_of(all_page_ptrs));
-            
             // ptr is in all_page_ptrs
             assert(all_page_ptrs.contains(ptr));
-            
-            // ptr is not in free_pages_2m().to_set()
-            assert(!self.free_pages_2m@.to_set().contains(ptr));
             
             // Key: show that all_page_ptrs contains exactly NUM_PAGES elements
             // This is because page_ptr2page_index maps valid page pointers bijectively
@@ -994,25 +972,14 @@ impl PageAllocator {
             
             // From page_array_wf, page_array@[i].addr == page_index2page_ptr(i)
             // So page_array_addrs has exactly NUM_PAGES elements
-            
             // All elements in free_pages_2m@ are in page_array_addrs
             assert forall |j: int| 0 <= j < self.free_pages_2m@.len() implies 
                 #[trigger] page_array_addrs.contains(self.free_pages_2m@[j])
             by {
                 let p = self.free_pages_2m@[j];
                 let pi = page_ptr2page_index(p);
-                assert(0 <= pi < NUM_PAGES);
                 assert(self.page_array@[pi as int].addr == page_index2page_ptr(pi));
-                assert(p == page_index2page_ptr(pi));  // from page_ptr_lemma1
-                assert(page_array_addrs.contains(p));
             }
-            
-            // So free_pages_2m@.to_set() subset page_array_addrs
-            assert(self.free_pages_2m@.to_set().subset_of(page_array_addrs));
-            
-            // ptr is in page_array_addrs but not in free_pages_2m@.to_set()
-            assert(page_array_addrs.contains(ptr));
-            assert(!self.free_pages_2m@.to_set().contains(ptr));
             
             // So free_pages_2m@.to_set() is a proper subset of page_array_addrs
             // And page_array_addrs has exactly NUM_PAGES elements
@@ -1022,11 +989,6 @@ impl PageAllocator {
             // we have |free_pages_2m@| < NUM_PAGES
             
             self.lemma_page_array_addrs_size(page_array_addrs);
-            
-            // Use lemma_len_subset to show |free_pages_2m@.to_set()| <= |page_array_addrs|
-            lemma_len_subset(self.free_pages_2m@.to_set(), page_array_addrs);
-            assert(self.free_pages_2m@.to_set().len() <= page_array_addrs.len());
-            assert(page_array_addrs.len() == NUM_PAGES);
             
             // Since ptr is in page_array_addrs but not in free_pages_2m@.to_set(),
             // free_pages_2m@.to_set() is a strict subset
@@ -1040,50 +1002,12 @@ impl PageAllocator {
             assert(complement.contains(ptr));
             assert(complement.len() > 0);
             
-            // Verify that free_pages_2m@.to_set() and complement are disjoint
-            assert(self.free_pages_2m@.to_set().disjoint(complement));
-            
-            // Verify finiteness
-            assert(self.free_pages_2m@.to_set().finite());  // from unique_seq_to_set
-            assert(complement.finite()); // complement of a finite set from a finite set is finite
-            
             // Verify that their union gives page_array_addrs
-            assert forall |p: PagePtr| #[trigger] page_array_addrs.contains(p) 
-            implies (self.free_pages_2m@.to_set().contains(p) || complement.contains(p))
-            by {
-                if !self.free_pages_2m@.to_set().contains(p) {
-                    // Then p must be in complement = page_array_addrs - free_pages_2m@.to_set()
-                    assert(complement.contains(p));
-                }
-            }
-            
-            assert forall |p: PagePtr|
-                (self.free_pages_2m@.to_set().contains(p) || complement.contains(p))
-            implies #[trigger] page_array_addrs.contains(p)
-            by {
-                if self.free_pages_2m@.to_set().contains(p) {
-                    // free_pages_2m@.to_set() subset page_array_addrs
-                    assert(page_array_addrs.contains(p));
-                }
-                if complement.contains(p) {
-                    // complement subset page_array_addrs by definition
-                    assert(page_array_addrs.contains(p));
-                }
-            }
-            
             assert(self.free_pages_2m@.to_set().union(complement) =~= page_array_addrs);
             
             // Use lemma_set_disjoint_lens to relate sizes for disjoint sets
             // This lemma gives: a.disjoint(b) ==> (a + b).len() == a.len() + b.len()
             broadcast use vstd::set_lib::lemma_set_disjoint_lens;
-            assert((self.free_pages_2m@.to_set() + complement).len() == 
-                   self.free_pages_2m@.to_set().len() + complement.len());
-            assert(self.free_pages_2m@.to_set().union(complement) == 
-                   self.free_pages_2m@.to_set() + complement);
-            assert(self.free_pages_2m@.to_set().len() + complement.len() == page_array_addrs.len());
-            assert(self.free_pages_2m@.to_set().len() + complement.len() == NUM_PAGES);
-            assert(complement.len() > 0);
-            assert(self.free_pages_2m@.to_set().len() < NUM_PAGES);
             assert(self.free_pages_2m@.len() < NUM_PAGES);
         }
 
@@ -1098,20 +1022,8 @@ impl PageAllocator {
             page_array_addrs.len() == NUM_PAGES,
             page_array_addrs.finite(),
     {
-        page_ptr_lemma1();
-        
-        // From page_array_wf: page_array@[i].addr == page_index2page_ptr(i) for all i
-        assert forall |i: int| 0 <= i < NUM_PAGES implies 
-            #[trigger] self.page_array@[i].addr == page_index2page_ptr(i as usize)
-        by {
-            // This follows from page_array_wf
-        }
-        
         // Each index i in [0, NUM_PAGES) corresponds to exactly one address
         // page_index2page_ptr(i), and these are all distinct
-        
-        // page_array_addrs = {page_index2page_ptr(i) | 0 <= i < NUM_PAGES}
-        let index_set = Set::<usize>::new(|i: usize| 0 <= i < NUM_PAGES);
         
         // The map from indices to page pointers is bijective
         // This is guaranteed by page_ptr_lemma1
@@ -1130,30 +1042,10 @@ impl PageAllocator {
         // This is the image of {0, ..., NUM_PAGES-1} under page_index2page_ptr
         // Since page_index2page_ptr is injective, the image has the same size
         
-        self.lemma_canonical_addrs_size(canonical_addrs);
-    }
-    
-    proof fn lemma_canonical_addrs_size(&self, canonical_addrs: Set<PagePtr>)
-        requires
-            self.wf(),
-            canonical_addrs == Set::<PagePtr>::new(|p: PagePtr| 
-                exists |i: usize| 0 <= i < NUM_PAGES && p == page_index2page_ptr(i)),
-        ensures
-            canonical_addrs.len() == NUM_PAGES,
-            canonical_addrs.finite(),
-    {
-        page_ptr_lemma1();
-        
-        // Prove by induction on the number of indices
-        // Base case: 0 indices gives empty set with size 0
-        // Inductive case: adding one more distinct index adds one more distinct address
-        
-        // For simplicity, use the fact that page_index2page_ptr is injective
-        // and maps {0, ..., NUM_PAGES-1} to NUM_PAGES distinct values
-        
-        // Define intermediate sets
         self.lemma_count_page_ptrs(canonical_addrs, NUM_PAGES);
+
     }
+
 
     proof fn lemma_count_page_ptrs(&self, canonical_addrs: Set<PagePtr>, n: usize)
         requires
@@ -1168,8 +1060,6 @@ impl PageAllocator {
                 exists |i: usize| 0 <= i < n && p == page_index2page_ptr(i)).finite(),
         decreases n,
     {
-        page_ptr_lemma1();
-        
         if n == 0 {
             let s = Set::<PagePtr>::new(|p: PagePtr| 
                 exists |i: usize| 0 <= i < n && p == page_index2page_ptr(i));
@@ -1182,14 +1072,9 @@ impl PageAllocator {
                 exists |i: usize| 0 <= i < n && p == page_index2page_ptr(i));
             
             self.lemma_count_page_ptrs(canonical_addrs, n_minus_1);
-            assert(s_prev.len() == n_minus_1);
             
             let new_ptr = page_index2page_ptr(n_minus_1);
-            assert(!s_prev.contains(new_ptr));  // by injectivity from page_ptr_lemma1
-            
             assert(s_curr =~= s_prev.insert(new_ptr));
-            assert(s_curr.len() == s_prev.len() + 1);
-            assert(s_curr.len() == n);
         }
     }
 
