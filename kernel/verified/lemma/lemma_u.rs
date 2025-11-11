@@ -3,7 +3,6 @@ verus! {
 
 use crate::util::page_ptr_util_u::*;
 
-#[verifier(external_body)]
 pub broadcast proof fn map_equal_implies_submap_each_other<K, V>(a: Map<K, V>, b: Map<K, V>)
     requires
         a =~= b,
@@ -38,7 +37,6 @@ pub proof fn page_ptr_valid_imply_MEM_valid(v: usize)
     ;
 }
 
-#[verifier(external_body)]
 pub proof fn seq_push_lemma<A>()
     ensures
         forall|s: Seq<A>, v: A, x: A|
@@ -46,8 +44,39 @@ pub proof fn seq_push_lemma<A>()
         forall|s: Seq<A>, v: A| #![auto] s.push(v).contains(v),
         forall|s: Seq<A>, v: A, x: A| !s.contains(x) && v != x ==> !s.push(v).contains(x),
 {
+    // Prove the first postcondition: if s contains x, then s.push(v) contains both v and x
+    assert forall|s: Seq<A>, v: A, x: A| s.contains(x) implies s.push(v).contains(v) && s.push(v).contains(x) by {
+        // If s contains x, there exists an index i where s[i] == x
+        if s.contains(x) {
+            let i = choose|i: int| 0 <= i < s.len() && s[i] == x;
+            // After push, s.push(v)[i] == s[i] == x (by axiom_seq_push_index_different)
+            assert(s.push(v)[i] == x);
+            // s.push(v) also contains v at index s.len()
+            assert(s.push(v)[s.len() as int] == v); // by axiom_seq_push_index_same
+        }
+    };
+    
+    // Prove the second postcondition: s.push(v) always contains v
+    assert forall|s: Seq<A>, v: A|  #![auto] s.push(v).contains(v) by {
+        // v is at index s.len() in s.push(v)
+        assert(s.push(v)[s.len() as int] == v); // by axiom_seq_push_index_same
+    };
+    
+    // Prove the third postcondition: if s doesn't contain x and v != x, then s.push(v) doesn't contain x
+    assert forall|s: Seq<A>, v: A, x: A| !s.contains(x) && v != x implies !s.push(v).contains(x) by {
+        if !s.contains(x) && v != x {
+            // Proof by contradiction: assume s.push(v) contains x
+            if s.push(v).contains(x) {
+                // Then there exists an index j where s.push(v)[j] == x
+                let j = choose|j: int| 0 <= j < s.push(v).len() && s.push(v)[j] == x;
+                
+                assert(false);
+            }
+        }
+    };
+
 }
-#[verifier(external_body)]
+
 pub proof fn seq_push_index_of_lemma<A>()
     ensures
         forall|s: Seq<A>, v: A, x: A|
@@ -55,9 +84,11 @@ pub proof fn seq_push_index_of_lemma<A>()
             ==> 
             s.push(x).index_of(v) == s.index_of(v),
 {
+    assert forall|s: Seq<A>, v: A, x: A| s.no_duplicates() && s.contains(v) && v != x implies s.push(x).index_of(v) == s.index_of(v) by {
+        assert(s.push(x)[s.index_of(v)] == s[s.index_of(v)]);
+    }
 }
 
-#[verifier(external_body)]
 pub proof fn seq_skip_index_of_lemma<A>()
     ensures
         forall|s: Seq<A>, v: A,|
@@ -66,8 +97,21 @@ pub proof fn seq_skip_index_of_lemma<A>()
             ==> 
             s.skip(1).index_of(v) == s.index_of(v) - 1,
 {
+    assert forall|s: Seq<A>, v: A| 
+        #![auto] s.len() != 0 && s.no_duplicates() && s.contains(v) && s[0] != v
+    implies
+        s.skip(1).index_of(v) == s.index_of(v) - 1
+    by {
+        // Get the index where v appears in s
+        let i = s.index_of(v);
+        
+        // Now we need to show that s.skip(1).index_of(v) == i - 1
+        // We know s[i] == v and i > 0, so i-1 is a valid index in s.skip(1)
+        assert(s.skip(1)[i - 1] == s[i]);
+    }
+
 }
-#[verifier(external_body)]
+
 pub proof fn seq_to_set_lemma<A>()
     ensures
         forall|s: Seq<A>, a: A|
@@ -92,7 +136,6 @@ pub proof fn seq_pop_unique_lemma<A>()
 {
 }
 
-#[verifier(external_body)]
 pub proof fn seq_update_lemma<A>()
     ensures
         forall|s: Seq<A>, i: int, j: int, v: A|
@@ -104,7 +147,6 @@ pub proof fn seq_update_lemma<A>()
 {
 }
 
-#[verifier(external_body)]
 pub proof fn map_insert_lemma<A, B>()
     ensures
         forall|m: Map<A, B>, x: A, y: A, v: B| x != y ==> m.insert(x, v)[y] == m[y],
@@ -176,7 +218,6 @@ pub proof fn seq_remove_index_of_lemma<A>()
             ).index_of(v) == s.index_of(v) - 1,
 {}
 
-#[verifier(external_body)]
 pub proof fn seq_push_unique_lemma<A>()
     ensures
         forall|s: Seq<A>, v: A|
@@ -189,9 +230,39 @@ pub proof fn seq_push_unique_lemma<A>()
             s.no_duplicates() && s.contains(v) && s.contains(y) == false ==> s.push(y).index_of(v)
                 == s.index_of(v),
 {
+    // Prove the first postcondition
+    assert forall|s: Seq<A>, v: A| #![auto]
+        s.no_duplicates() && s.contains(v) == false
+    implies
+        s.push(v).no_duplicates() && s.push(v).index_of(v) == s.push(v).len() - 1
+    by {
+        
+        // Now prove that index_of(v) == s.push(v).len() - 1
+        assert(s.push(v)[s.len() as int] == v);
+        
+    }
+
+    // Prove the second postcondition
+    assert forall|s: Seq<A>, v: A, y: A|
+        s.no_duplicates() && s.contains(v) && s.contains(y) == false
+    implies
+        s.push(y).index_of(v) == s.index_of(v)
+    by {
+        // s.index_of(v) is some index i_v such that 0 <= i_v < s.len() && s[i_v] == v
+        let i_v = s.index_of(v);
+        
+        // In s.push(y), the element at i_v is still s[i_v] because i_v < s.len()
+        assert(s.push(y)[i_v] == v);
+        
+        // Since s has no duplicates and y is not in s, we know v != y
+        assert(v != y);
+        
+        // Therefore, s.push(y).index_of(v) == i_v == s.index_of(v)
+        assert(s.push(y).index_of(v) == i_v);
+    }
+
 }
 
-#[verifier(external_body)]
 pub proof fn seq_remove_lemma_2<A>()
     ensures
         forall|s: Seq<A>, v: A, x: A|
@@ -200,6 +271,70 @@ pub proof fn seq_remove_lemma_2<A>()
             #![auto]
             s.no_duplicates() ==> s.remove_value(v).contains(v) == false,
 {
+    // Prove first postcondition
+    assert forall|s: Seq<A>, v: A, x: A|
+        x != v && s.no_duplicates() implies s.remove_value(x).contains(v) == s.contains(v)
+    by {
+        s.index_of_first_ensures(x);
+        if s.contains(x) {
+            let idx = s.index_of_first(x).unwrap();
+            s.remove_ensures(idx);
+            
+            // Prove the forward direction: if s.remove_value(x).contains(v) then s.contains(v)
+            if s.remove_value(x).contains(v) {
+                let removed = s.remove_value(x);
+                let i = removed.index_of(v);
+                assert(removed[i] == v);
+            }
+            
+            // Prove the backward direction: if s.contains(v) then s.remove_value(x).contains(v)
+            if s.contains(v) {
+                let j = s.index_of(v);
+                let removed = s.remove_value(x);
+                assert(removed.len() == s.len() - 1);
+                
+                if j < idx {
+                    assert(removed[j] == v);
+                    assert(removed.contains(v));
+                } else {
+                    // j > idx since j != idx
+                    assert(removed[j - 1] == v);
+                    assert(removed.contains(v));
+                }
+            }
+        } else {
+            // If s doesn't contain x, then remove_value(x) returns s unchanged
+            assert(s.remove_value(x) == s);
+        }
+    };
+    
+    // Prove second postcondition
+    assert forall|s: Seq<A>, v: A|
+        #![auto]
+        s.no_duplicates() implies s.remove_value(v).contains(v) == false
+    by {
+        s.index_of_first_ensures(v);
+        if s.contains(v) {
+            let idx = s.index_of_first(v).unwrap();
+            s.remove_ensures(idx);
+            
+            let removed = s.remove_value(v);
+            assert(removed.len() == s.len() - 1);
+            
+            // Prove by contradiction: assume removed contains v
+            if removed.contains(v) {
+                let i = removed.index_of(v);
+                assert(0 <= i < removed.len());
+                assert(removed[i] == v);
+                assert(false);
+            }
+        } else {
+            // If s doesn't contain v, then remove_value(v) returns s unchanged
+            assert(s.remove_value(v) == s);
+            assert(!s.contains(v));
+        }
+    };
+
 }
 
 #[verifier(external_body)]
