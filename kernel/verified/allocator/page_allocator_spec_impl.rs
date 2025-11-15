@@ -845,8 +845,10 @@ impl PageAllocator {
         self.free_pages_2m.wf_to_no_duplicates();
         self.free_pages_4k.wf_to_no_duplicates();
         let all_page_ptrs = Set::new(|page_ptr: PagePtr| page_ptr_valid(page_ptr));
-        assume(all_page_ptrs.finite());
-        assume(all_page_ptrs.len() == NUM_PAGES);  // this should be inferred smh by verus...
+
+        // Inline proof that all_page_ptrs is finite and has cardinality NUM_PAGES
+        proof_all_page_ptrs_finite_and_len();
+
         assert(forall|page_ptr: PagePtr|
             #![auto]
             self.free_pages_2m@.contains(page_ptr) ==> all_page_ptrs.contains(page_ptr));
@@ -878,8 +880,10 @@ impl PageAllocator {
         self.free_pages_2m.wf_to_no_duplicates();
         self.free_pages_4k.wf_to_no_duplicates();
         let all_page_ptrs = Set::new(|page_ptr: PagePtr| page_ptr_valid(page_ptr));
-        assume(all_page_ptrs.finite());
-        assume(all_page_ptrs.len() == NUM_PAGES);  // this should be inferred smh by verus...
+
+        // Inline proof that all_page_ptrs is finite and has cardinality NUM_PAGES
+        proof_all_page_ptrs_finite_and_len();
+
         assert(forall|page_ptr: PagePtr|
             #![auto]
             self.free_pages_2m@.contains(page_ptr) ==> all_page_ptrs.contains(page_ptr));
@@ -912,8 +916,9 @@ impl PageAllocator {
         self.free_pages_2m.wf_to_no_duplicates();
         self.free_pages_4k.wf_to_no_duplicates();
         let all_page_ptrs = Set::new(|page_ptr: PagePtr| page_ptr_valid(page_ptr));
-        assume(all_page_ptrs.finite());
-        assume(all_page_ptrs.len() == NUM_PAGES);  // this should be inferred smh by verus...
+
+        proof_all_page_ptrs_finite_and_len();
+
         assert(forall|page_ptr: PagePtr|
             #![auto]
             self.free_pages_2m@.contains(page_ptr) ==> all_page_ptrs.contains(page_ptr));
@@ -946,8 +951,9 @@ impl PageAllocator {
         self.free_pages_2m.wf_to_no_duplicates();
         self.free_pages_4k.wf_to_no_duplicates();
         let all_page_ptrs = Set::new(|page_ptr: PagePtr| page_ptr_valid(page_ptr));
-        assume(all_page_ptrs.finite());
-        assume(all_page_ptrs.len() == NUM_PAGES);  // this should be inferred smh by verus...
+
+        proof_all_page_ptrs_finite_and_len();
+
         assert(forall|page_ptr: PagePtr|
             #![auto]
             self.free_pages_2m@.contains(page_ptr) ==> all_page_ptrs.contains(page_ptr));
@@ -2981,6 +2987,53 @@ impl PageAllocator {
         assert(self.merged_pages_wf());
 
     }
+
+}
+
+// Proof that all valid page pointers form a finite set with cardinality NUM_PAGES
+proof fn proof_all_page_ptrs_finite_and_len()
+    ensures
+        Set::new(|page_ptr: PagePtr| page_ptr_valid(page_ptr)).finite(),
+        Set::new(|page_ptr: PagePtr| page_ptr_valid(page_ptr)).len() == NUM_PAGES,
+{
+    page_ptr_lemma1();
+    let all_page_ptrs = Set::new(|page_ptr: PagePtr| page_ptr_valid(page_ptr));
+    let page_ptrs_via_indices = Set::new(|page_ptr: PagePtr| 
+        exists |i: usize| 0 <= i < NUM_PAGES && page_ptr == page_index2page_ptr(i));
+    
+    assert(all_page_ptrs =~= page_ptrs_via_indices);
+    
+    // Prove the indexed version is finite with the right cardinality
+    proof_indexed_page_ptrs_recursive(NUM_PAGES);
+}
+
+proof fn proof_indexed_page_ptrs_recursive(n: usize)
+    requires
+        n <= NUM_PAGES,
+    ensures
+        Set::new(|page_ptr: PagePtr| 
+            exists |i: usize| 0 <= i < n && page_ptr == page_index2page_ptr(i)).finite(),
+        Set::new(|page_ptr: PagePtr| 
+            exists |i: usize| 0 <= i < n && page_ptr == page_index2page_ptr(i)).len() == n,
+    decreases n,
+{
+    let s = Set::new(|page_ptr: PagePtr| 
+        exists |i: usize| 0 <= i < n && page_ptr == page_index2page_ptr(i));
+    
+    page_ptr_lemma1();
+    
+    if n == 0 {
+        assert(s =~= Set::empty());
+    } else {
+        let s_prev = Set::new(|page_ptr: PagePtr| 
+            exists |i: usize| 0 <= i < (n - 1) && page_ptr == page_index2page_ptr(i));
+        let new_ptr = page_index2page_ptr((n - 1) as usize);
+        
+        proof_indexed_page_ptrs_recursive((n - 1) as usize);
+        
+        assert(s =~= s_prev.insert(new_ptr)); 
+    }
+
 }
 
 } // verus!
