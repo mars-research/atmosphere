@@ -2942,6 +2942,9 @@ impl PageAllocator {
                 self.container_map_2m@ =~= old(self).container_map_2m@,
                 self.container_map_1g@ =~= old(self).container_map_1g@,
                 self.container_map_4k@ =~= old(self).container_map_4k@,
+
+                // Carry forward the precondition needed for the lemma
+                page_index_2m_valid(target_page_idx),
         {
             proof{
                 seq_push_lemma::<PagePtr>();
@@ -2975,7 +2978,7 @@ impl PageAllocator {
                 assert(self.free_pages_4k@.len() == self.free_pages_4k().len()) by {self.free_pages_4k@.unique_seq_to_set();}
             }
 
-            assume( forall|i: usize, j:usize|
+            assert( forall|i: usize, j:usize|
                 #![trigger spec_page_index_merge_2m_vaild(i,j)]
                 0 <= i < NUM_PAGES && page_index_2m_valid(i) 
                 && spec_page_index_merge_2m_vaild(i, j) 
