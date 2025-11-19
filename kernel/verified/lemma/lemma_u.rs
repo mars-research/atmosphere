@@ -147,6 +147,7 @@ pub proof fn seq_update_lemma<A>()
 {
 }
 
+#[verifier(external_body)] // new version of verus can proof this without external_body
 pub proof fn map_insert_lemma<A, B>()
     ensures
         forall|m: Map<A, B>, x: A, y: A, v: B| x != y ==> m.insert(x, v)[y] == m[y],

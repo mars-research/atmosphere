@@ -1170,7 +1170,24 @@ impl ProcessManager {
         assert(self.schedulers_wf());
         assert(self.pcid_ioid_wf());
         assert(self.threads_cpu_wf());
-        assert(self.threads_container_wf());
+        assert(self.threads_container_wf()) by {
+            assert(forall|c_ptr: ContainerPtr|
+            #![trigger self.get_container(c_ptr).owned_threads]
+            self.container_dom().contains(c_ptr) 
+            ==> 
+            self.get_container(c_ptr).owned_threads@.subset_of(self.thread_perms@.dom()));
+        assert(forall|c_ptr: ContainerPtr, t_ptr: ThreadPtr|
+            #![trigger  self.get_container(c_ptr).owned_threads, self.get_thread(t_ptr)]
+            self.container_dom().contains(c_ptr) && self.get_container(c_ptr).owned_threads@.contains(t_ptr) 
+            ==> 
+            self.get_thread(t_ptr).owning_container == c_ptr);
+        assert(forall|t_ptr: ThreadPtr|
+            #![trigger self.container_dom().contains(self.thread_perms@[t_ptr].value().owning_container)]
+            self.thread_perms@.dom().contains(t_ptr) 
+            ==> 
+            self.container_dom().contains(self.thread_perms@[t_ptr].value().owning_container) 
+            && self.get_container(self.thread_perms@[t_ptr].value().owning_container).owned_threads@.contains(t_ptr));
+        };
     }
 
     pub fn block_running_thread_and_change_queue_state(
