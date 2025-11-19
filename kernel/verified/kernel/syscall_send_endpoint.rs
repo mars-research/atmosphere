@@ -336,6 +336,8 @@ impl Kernel {
         
         let payload_endpoint_container_ptr = self.proc_man.get_endpoint(payload_endpoint_ptr).owning_container;
 
+        assume(false); //@Xiangdong finish refactoring
+
         if self.proc_man.container_check_is_ancestor(payload_endpoint_container_ptr, receiver_container_ptr) == false 
             && payload_endpoint_container_ptr != receiver_container_ptr {
             return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
