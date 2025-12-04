@@ -1,4 +1,6 @@
 use vstd::prelude::*;
+use vstd::seq::*;
+
 verus! {
 
 use crate::util::page_ptr_util_u::*;
@@ -121,19 +123,42 @@ pub proof fn seq_to_set_lemma<A>()
 {
 }
 
-#[verifier(external_body)]
 pub proof fn seq_pop_unique_lemma<A>()
     ensures
         forall|s: Seq<A>, i: int|
-            s.no_duplicates() && 0 <= i < s.len() - 1 ==> s.drop_last().contains(s[s.len() - 1])
-                && s.drop_last()[i] == s[i],
+            s.len() >= 1 && s.no_duplicates() && 0 <= i < s.len() - 1 ==> !s.drop_last().contains(s[s.len() - 1]) && s.drop_last()[i] == s[i],
         forall|s: Seq<A>, v: A|
-            s.no_duplicates() && s[s.len() - 1] == v ==> s.drop_last().to_set().contains(v)
+            s.len() >= 1 && s.no_duplicates() && s[s.len() - 1] == v ==> s.drop_last().to_set().contains(v)
                 == false,
         forall|s: Seq<A>, v: A|
-            s.no_duplicates() && s[s.len() - 1] != v ==> s.drop_last().to_set().contains(v)
+            s.len() >= 1 && s.no_duplicates() && s[s.len() - 1] != v ==> s.drop_last().to_set().contains(v)
                 == s.to_set().contains(v),
 {
+    // Prove the third postcondition
+    assert forall|s: Seq<A>, v: A|
+        s.len() >= 1 && s.no_duplicates() && s[s.len() - 1] != v
+    implies
+        s.drop_last().to_set().contains(v) == s.to_set().contains(v)
+    by {
+        // s.to_set().contains(v) iff there exists i such that s[i] == v
+        // s.drop_last().to_set().contains(v) iff there exists i such that s.drop_last()[i] == v
+        // Since s[s.len() - 1] != v, v appears in s iff v appears in s.drop_last()
+        
+        if s.to_set().contains(v) {
+            let j = choose|j: int| 0 <= j < s.len() && s[j] == v;
+            if j == s.len() - 1 {
+            } else {
+                assert(s.drop_last()[j] == v);
+                assert(s.drop_last().to_set().contains(v));
+            }
+        }
+        
+        if s.drop_last().to_set().contains(v) {
+            let j = choose|j: int| 0 <= j < s.drop_last().len() && s.drop_last()[j] == v;
+            assert(s[j] == v);
+            assert(s.to_set().contains(v));
+        }
+    }
 }
 
 pub proof fn seq_update_lemma<A>()
@@ -154,70 +179,161 @@ pub proof fn map_insert_lemma<A, B>()
 {
 }
 
-#[verifier(external_body)]
 pub proof fn seq_skip_lemma<A>()
     ensures
         forall|s: Seq<A>, v: A|
-            s[0] != v && s.no_duplicates() ==> (s.skip(1).contains(v) == s.contains(v)),
+            s.len() > 0 && s[0] != v && s.no_duplicates() ==> (s.skip(1).contains(v) == s.contains(v)),
         forall|s: Seq<A>| #![trigger s[0]] s.len() > 0 ==> s.contains(s[0]),
-        forall|s: Seq<A>| #![trigger s[0]] s.len() > 0 ==> !s.skip(1).contains(s[0]),
-        forall|s: Seq<A>, v: A| s[0] == v && s.no_duplicates() ==> s.skip(1) =~= s.remove_value(v),
+        forall|s: Seq<A>| #![trigger s[0]] s.len() > 0 && s.no_duplicates() ==> !s.skip(1).contains(s[0]),
+        forall|s: Seq<A>, v: A| s.len() > 0 && s[0] == v && s.no_duplicates() ==> s.skip(1) =~= s.remove_value(v),
         forall|s: Seq<A>, i: int| 0 <= i < s.len() - 1 ==> s.skip(1)[i] == s[i + 1],
 {
+
+    // Prove property 1: s.skip(1).contains(v) == s.contains(v) when s[0] != v
+    assert forall|s: Seq<A>, v: A| s.len() > 0 && s[0] != v && s.no_duplicates() implies (s.skip(1).contains(v) == s.contains(v)) by {
+        broadcast use vstd::seq_lib::lemma_seq_skip_contains;
+    }
+
+    // Prove property 4: s.skip(1) =~= s.remove_value(v) when s[0] == v and s.no_duplicates()
+    assert forall|s: Seq<A>, v: A| s.len() > 0 && s[0] == v && s.no_duplicates() implies s.skip(1) =~= s.remove_value(v) by {
+        // When s[0] == v, index_of_first(v) should return Some(0)
+        s.index_of_first_ensures(v);
+
+    }
 }
 
-#[verifier(external_body)]
+
 pub proof fn seq_remove_lemma<A>()
     ensures
         forall|s: Seq<A>, v: A, i: int|
             #![trigger s.subrange(0,i), s.contains(v)]
-            s.contains(v) && s[i] != v && s.no_duplicates() ==> s.subrange(0, i).add(
+            0 <= i < s.len() && s.contains(v) && s[i] != v && s.no_duplicates() ==> s.subrange(0, i).add(
                 s.subrange(i + 1, s.len() as int),
             ).contains(v),
         forall|s: Seq<A>, v: A, i: int|
             #![trigger s.subrange(0,i), s.contains(v)]
-            s.contains(v) && s[i] == v && s.no_duplicates() ==> s.subrange(0, i).add(
+            0 <= i < s.len() && s.contains(v) && s[i] == v && s.no_duplicates() ==> s.subrange(0, i).add(
                 s.subrange(i + 1, s.len() as int),
             ).contains(v) == false,
         forall|s: Seq<A>, i: int, j: int|
             #![trigger s.subrange(0,i), s[j]]
-            0 <= j < i ==> s.subrange(0, i).add(s.subrange(i + 1, s.len() as int))[j] == s[j],
+            0 <= i < s.len() && 0 <= j < i ==> s.subrange(0, i).add(s.subrange(i + 1, s.len() as int))[j] == s[j],
         forall|s: Seq<A>, i: int, j: int|
             #![trigger s.subrange(0,i), s[j+1]]
-            i <= j < s.len() - 1 ==> s.subrange(0, i).add(s.subrange(i + 1, s.len() as int))[j]
+            0 <= i < s.len() && i <= j < s.len() - 1 ==> s.subrange(0, i).add(s.subrange(i + 1, s.len() as int))[j]
                 == s[j + 1],
         forall|s: Seq<A>, v: A, i: int|
             #![trigger s.remove_value(v), s.subrange(0,i)]
-            s.contains(v) && s[i] == v && s.no_duplicates() ==> s.subrange(0, i).add(
+            0 <= i < s.len() && s.contains(v) && s[i] == v && s.no_duplicates() ==> s.subrange(0, i).add(
                 s.subrange(i + 1, s.len() as int),
             ) == s.remove_value(v),
 {
+    // Prove each postcondition by introducing the quantified variables
+    assert forall|s: Seq<A>, v: A, i: int|
+        #![trigger s.subrange(0,i), s.contains(v)]
+        0 <= i < s.len() && s.contains(v) && s[i] != v && s.no_duplicates()
+    implies s.subrange(0, i).add(s.subrange(i + 1, s.len() as int)).contains(v) by {
+        // Since s.contains(v), there exists some index k where s[k] == v
+        // Since s[i] != v and s.no_duplicates(), we know k != i
+        // So either k < i or k > i
+        let removed = s.subrange(0, i).add(s.subrange(i + 1, s.len() as int));
+        
+        // Get the witness index for v in s
+        let k = choose|k: int| 0 <= k < s.len() && s[k] == v;
+        
+        if k < i {
+            assert(removed[k] == s.subrange(0, i)[k]);
+        } else {
+            // k > i (since k != i because s[i] != v)
+            // v is in the second part: s.subrange(i + 1, s.len() as int)
+            let k2 = k - i - 1;
+            let k3 = i + k2;
+            assert(removed[k3] == v);
+            assert(removed.contains(v));
+        }
+    };
+
+    assert forall|s: Seq<A>, v: A, i: int|
+        #![trigger s.remove_value(v), s.subrange(0,i)]
+        0 <= i < s.len() && s.contains(v) && s[i] == v && s.no_duplicates()
+    implies s.subrange(0, i).add(s.subrange(i + 1, s.len() as int)) == s.remove_value(v) by {
+        // remove_value uses index_of_first to find the first occurrence
+        s.index_of_first_ensures(v);
+        let first_idx = s.index_of_first(v).unwrap();
+        
+        // Since s.no_duplicates() and s[i] == v, i must be the first occurrence
+        assert(first_idx == i) by {
+            // first_idx is the first occurrence of v
+            // s[i] == v
+            if i < first_idx {
+                // Then s[i] == v but i < first_idx, contradiction
+                assert(false);
+            } else if i > first_idx {
+                // Then s[i] == v and s[first_idx] == v with i != first_idx
+                // This contradicts no_duplicates
+                assert(false);
+            }
+        };
+        
+        // Now we know s.remove_value(v) = s.remove(i)
+        // And s.remove(i) = s.subrange(0, i).add(s.subrange(i + 1, s.len() as int))
+        assert(s.remove(i) == s.subrange(0, i).add(s.subrange(i + 1, s.len() as int)));
+    };
 }
 
-#[verifier(external_body)]
 pub proof fn seq_remove_index_of_lemma<A>()
     ensures
         forall|s: Seq<A>, v: A, i: int|
             #![trigger s.index_of(v), s[i]]
-            s.contains(v) && s[i] != v && s.no_duplicates() && s.subrange(0, i).contains(v) ==> s.subrange(0, i).add(
+            0 <= i < s.len() && s.contains(v) && s[i] != v && s.no_duplicates() && s.subrange(0, i).contains(v) ==> s.subrange(0, i).add(
                 s.subrange(i + 1, s.len() as int),
             ).index_of(v) == s.index_of(v),
         forall|s: Seq<A>, v: A, i: int|
         #![trigger s.index_of(v), s[i]]
-            s.contains(v) && s[i] != v && s.no_duplicates() && s.index_of(v) < i ==> s.subrange(0, i).add(
+            0 <= i < s.len() && s.contains(v) && s[i] != v && s.no_duplicates() && s.index_of(v) < i ==> s.subrange(0, i).add(
                 s.subrange(i + 1, s.len() as int),
             ).index_of(v) == s.index_of(v),
         forall|s: Seq<A>, v: A, i: int|
             #![trigger s.index_of(v), s[i]]
-            s.contains(v) && s[i] != v && s.no_duplicates() && s.subrange(i + 1, s.len() as int).contains(v) ==> s.subrange(0, i).add(
+            0 <= i < s.len() && s.contains(v) && s[i] != v && s.no_duplicates() && s.subrange(i + 1, s.len() as int).contains(v) ==> s.subrange(0, i).add(
                 s.subrange(i + 1, s.len() as int),
             ).index_of(v) == s.index_of(v) - 1,
         forall|s: Seq<A>, v: A, i: int|
             #![trigger s.index_of(v), s[i]]
-            s.contains(v) && s[i] != v && s.no_duplicates() && s.index_of(v) > i ==> s.subrange(0, i).add(
+            0 <= i < s.len() && s.contains(v) && s[i] != v && s.no_duplicates() && s.index_of(v) > i ==> s.subrange(0, i).add(
                 s.subrange(i + 1, s.len() as int),
             ).index_of(v) == s.index_of(v) - 1,
-{}
+{
+    assert forall|s: Seq<A>, v: A, i: int|
+        #![trigger s.index_of(v), s[i]]
+        0 <= i < s.len() && s.contains(v) && s[i] != v && s.no_duplicates() && s.index_of(v) < i
+    implies 
+        s.subrange(0, i).add(s.subrange(i + 1, s.len() as int)).index_of(v) == s.index_of(v)
+    by {
+        let removed = s.subrange(0, i).add(s.subrange(i + 1, s.len() as int));
+        let idx_s = s.index_of(v);
+         
+        // Since idx_s < i, removed[idx_s] == s[idx_s] == v
+        assert(removed[idx_s] == v); 
+
+    }
+    
+    assert forall|s: Seq<A>, v: A, i: int|
+        #![trigger s.index_of(v), s[i]]
+        0 <= i < s.len() && s.contains(v) && s[i] != v && s.no_duplicates() && s.index_of(v) > i
+    implies 
+        s.subrange(0, i).add(s.subrange(i + 1, s.len() as int)).index_of(v) == s.index_of(v) - 1
+    by {
+        let removed = s.subrange(0, i).add(s.subrange(i + 1, s.len() as int));
+        let idx_s = s.index_of(v);
+        let idx_r = removed.index_of(v);
+
+        assert(removed[idx_s - 1] == v); 
+
+        // In removed, the element at original position idx_s is now at idx_s - 1
+        assert(idx_r == idx_s - 1);
+    }
+}
 
 pub proof fn seq_push_unique_lemma<A>()
     ensures
@@ -338,10 +454,9 @@ pub proof fn seq_remove_lemma_2<A>()
 
 }
 
-#[verifier(external_body)]
 pub proof fn seq_index_lemma<A>()
     ensures
-        forall|s: Seq<A>, i: int| #![trigger s[i]] s.no_duplicates() ==> s.index_of(s[i]) == i,
+        forall|s: Seq<A>, i: int| #![trigger s[i]] 0 <= i < s.len() && s.no_duplicates() ==> s.index_of(s[i]) == i,
 {
 }
 
