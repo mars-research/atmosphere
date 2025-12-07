@@ -8,7 +8,8 @@ extern crate nvme_driver;
 extern crate pcid;
 extern crate ring_buffer;
 
-// mod ixgbe_client;
+mod e810_client;
+mod ixgbe_client;
 mod nvme_client;
 mod pci;
 mod slab_alloc;
@@ -21,12 +22,13 @@ use core::panic::PanicInfo;
 // mod benchmark_null_driver;
 mod syscall_benchmark;
 use alloc::vec::Vec;
-// use ixgbe_client::*;
+use constants::*;
+use e810_client::test_e810_driver;
+use ixgbe_client::*;
 use libtime::sys_ns_loopsleep;
 pub use log::info as println;
 use nvme_client::test_nvme_driver;
 use pci::scan_pci_devs;
-use constants::*;
 
 fn test_sleep() {
     log::trace!("Sleeping for 100 ns");
@@ -103,8 +105,9 @@ extern "C" fn main(payload_base: *mut u8, payload_size: usize) -> isize {
 
     // // test_ixgbe_with_ring_buffer_tx();
 
-    // // test_ixgbe_driver();
-    test_nvme_driver();
+    // test_ixgbe_driver(); // Commenting out ixgbe driver for now.
+    test_e810_driver();
+    // test_nvme_driver();
 
     loop {}
 }

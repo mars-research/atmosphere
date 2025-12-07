@@ -1,12 +1,7 @@
 //! The Atmosphere early loader.
 
 #![cfg_attr(not(test), no_std, no_main, feature(start))]
-#![feature(
-    alloc_error_handler,
-    strict_provenance,
-    abi_x86_interrupt,
-    asm_const,
-)]
+#![feature(alloc_error_handler, strict_provenance, abi_x86_interrupt, asm_const)]
 #![deny(
     asm_sub_register,
     deprecated,
@@ -17,10 +12,7 @@
 )]
 #![deny(clippy::from_over_into, clippy::needless_question_mark)]
 #![deny(rustdoc::bare_urls, rustdoc::broken_intra_doc_links)]
-#![cfg_attr(
-    not(debug_assertions),
-    deny(dead_code)
-)]
+#![cfg_attr(not(debug_assertions), deny(dead_code))]
 
 pub mod acpi;
 pub mod boot;
@@ -38,7 +30,7 @@ use core::panic::PanicInfo;
 use x86::cpuid::cpuid;
 
 use aelf::ElfHandle;
-use astd::boot::{BootInfo, DomainMapping, PhysicalMemoryType, Payload};
+use astd::boot::{BootInfo, DomainMapping, Payload, PhysicalMemoryType};
 use astd::io::{Cursor, Read, Seek, SeekFrom};
 use astd::memory::{USERSPACE_BASE, USERSPACE_PAYLOAD_BASE};
 use constants::*;
@@ -75,14 +67,7 @@ fn main(_argc: isize, _argv: *const *const u8) -> ! {
     let virt_base = USERSPACE_BASE;
     while cur < 0xFEBD4000 + 0x4000 {
         unsafe {
-            address_space_iommu.map(
-                bootstrap_allocator,
-                cur + virt_base,
-                cur,
-                true,
-                false,
-                true,
-            );
+            address_space_iommu.map(bootstrap_allocator, cur + virt_base, cur, true, false, true);
             cur = cur + PAGE_SIZE as u64;
         }
     }
@@ -166,7 +151,8 @@ fn main(_argc: isize, _argv: *const *const u8) -> ! {
                     size: payload_size as usize,
                 });
 
-                let phys_base = unsafe { domain.allocator.allocate_physical(payload_size as usize).0 };
+                let phys_base =
+                    unsafe { domain.allocator.allocate_physical(payload_size as usize).0 };
                 let virt_base = USERSPACE_PAYLOAD_BASE;
                 let mut cur = virt_base;
                 while cur < virt_base + payload_size {
@@ -174,16 +160,11 @@ fn main(_argc: isize, _argv: *const *const u8) -> ! {
                         let paddr = cur - virt_base + phys_base;
                         let page = slice::from_raw_parts_mut(paddr as *mut u8, PAGE_SIZE);
 
-                        address_space.map(
-                            bootstrap_allocator,
-                            cur,
-                            paddr,
-                            true,
-                            false,
-                            false,
-                        );
+                        address_space.map(bootstrap_allocator, cur, paddr, true, false, false);
 
-                        domain.remaining_file.read(page)
+                        domain
+                            .remaining_file
+                            .read(page)
                             .expect("Failed to copy payload page");
                     }
                     cur = cur + PAGE_SIZE as u64;
@@ -199,8 +180,7 @@ fn main(_argc: isize, _argv: *const *const u8) -> ! {
     let mut cur = 0;
     log::info!("Populating physical page list");
     for (region, label) in memory::get_physical_memory_map().regions.iter() {
-
-        if boot_info.pages.is_full(){
+        if boot_info.pages.is_full() {
             break;
         }
 
@@ -213,8 +193,7 @@ fn main(_argc: isize, _argv: *const *const u8) -> ! {
             *label
         );
         while cur < region.base() {
-
-            if boot_info.pages.is_full(){
+            if boot_info.pages.is_full() {
                 break;
             }
 
@@ -225,8 +204,7 @@ fn main(_argc: isize, _argv: *const *const u8) -> ! {
             cur += PAGE_SIZE as u64;
         }
         while cur < region.end_inclusive() {
-
-            if boot_info.pages.is_full(){
+            if boot_info.pages.is_full() {
                 break;
             }
 
@@ -241,8 +219,7 @@ fn main(_argc: isize, _argv: *const *const u8) -> ! {
         }
     }
     while cur < 4 * 1024 * 1024 * 4096 {
-
-        if boot_info.pages.is_full(){
+        if boot_info.pages.is_full() {
             break;
         }
 
@@ -254,7 +231,6 @@ fn main(_argc: isize, _argv: *const *const u8) -> ! {
     }
 
     log::info!("ALoader: Num of free pages --> {:?}", free_page_count);
-
 
     debugger::on_ready();
 
@@ -374,7 +350,7 @@ where
     let mut cur = 0xFE000000;
     let virt_base = USERSPACE_BASE;
     while cur < 0xFE000000 + 0x100000 {
-    // while cur < 0xfebf_0000 + 0x1000 {
+        // while cur < 0xfebf_0000 + 0x1000 {
         unsafe {
             address_space.map(
                 page_table_allocator,
@@ -388,8 +364,25 @@ where
         }
     }
 
-    elf
-        .seek(SeekFrom::Start(dom_end as u64))
+    // E810 bar region
+    let mut cur = 0xFA000000;
+    let virt_base = USERSPACE_BASE;
+    while cur < 0xFA000000 + 0x2000000 {
+        // while cur < 0xfebf_0000 + 0x1000 {
+        unsafe {
+            address_space.map(
+                page_table_allocator,
+                cur + virt_base,
+                cur,
+                true,
+                false,
+                true,
+            );
+            cur = cur + PAGE_SIZE as u64;
+        }
+    }
+
+    elf.seek(SeekFrom::Start(dom_end as u64))
         .expect("dom0 incomplete");
 
     log::debug!("Dom0 end: {}", dom_end);

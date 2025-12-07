@@ -1,0 +1,11 @@
+[package]
+name = "e810_driver"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# If your pcid crate is no_std, keep this. Otherwise remove and adapt.
+pcid = { path = "../pcid" }
+log = { version = "0.4", default-features = false }
+asys = { path = "../asys" }
+libdma = { path = "../user/libdma" }

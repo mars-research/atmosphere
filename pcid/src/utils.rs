@@ -75,6 +75,12 @@ impl PartialEq for PciBarAddr {
 }
 
 impl PciBarAddr {
+    pub fn base(&self) -> u64 {
+        self.base
+    }
+    pub fn size(&self) -> usize {
+        self.size
+    }
     pub unsafe fn new(base: u64, size: usize) -> PciBarAddr {
         PciBarAddr { base, size }
     }

@@ -52,7 +52,10 @@ impl Emulator for Qemu {
         let suppress_initial_outputs = config.suppress_initial_outputs; // FIXME
 
         let mut command = Command::new("sudo");
-        command.arg(self.qemu_binary.as_os_str());
+        command
+            .arg("-E")                         // keep env (incl. PATH)
+            .arg("--preserve-env=PATH")        // explicitly preserve PATH
+            .arg(self.qemu_binary.as_os_str());
 
         let mut initrd = JumboBinary::new()?;
         initrd.push(&config.kernel)?;

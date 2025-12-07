@@ -17,6 +17,7 @@ members = [
   "user/hello",
   "user/maglev",
   "user/kv",
+  "e810_driver",
 
   #"test-cargo-driver",
   #"atcp",

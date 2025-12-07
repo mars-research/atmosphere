@@ -9,11 +9,11 @@ edition = "2021"
 astd = { path = "../astd" }
 aelf = { path = "../aelf" }
 asys = { path = "../asys" }
-
 pcid = { path = "../pcid" }
 nvme_driver = { path = "../nvme_driver" }
 ring_buffer = { path = "../ring_buffer" }
-# ixgbe_driver = { path = "../ixgbe_driver" }
+ixgbe_driver = { path = "../ixgbe_driver" }
+e810_driver = { path = "../e810_driver" }
 # redhttpd = { path = "../redhttpd" }
 
 libtime = { path = "../user/libtime" }

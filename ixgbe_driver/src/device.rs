@@ -177,6 +177,7 @@ impl IxgbeDevice {
 
         println!("Writing regs");
         self.write_reg(IxgbeRegs::CTRL, IXGBE_CTRL_PCIE_MASTER_DISABLE);
+        println!("CTRL <- {:#010x}", IXGBE_CTRL_PCIE_MASTER_DISABLE);
 
         self.wait_clear_reg(IxgbeRegs::STATUS, IXGBE_STATUS_PCIE_MASTER_STATUS);
 
@@ -553,6 +554,7 @@ impl IxgbeDevice {
 
     fn wait_clear_reg(&self, register: IxgbeRegs, value: u64) {
         loop {
+            println!("Waiting for {:?} bit {:x} to clear/set", register, value);
             let current = self.read_reg(register);
             if (current & value) == 0 {
                 break;
@@ -2739,8 +2741,7 @@ impl IxgbeDevice {
                 &mut *(self.transmit_ring.as_ptr().add(tx_index) as *mut ixgbe_adv_tx_desc)
             };
 
-            let status =
-                unsafe { core::ptr::read_volatile(&mut (*desc).wb.status as *mut u32) };
+            let status = unsafe { core::ptr::read_volatile(&mut (*desc).wb.status as *mut u32) };
 
             //unsafe {
             //println!("pkt_addr {:08X} tx_Buffer {:08X}",
@@ -2790,7 +2791,6 @@ impl IxgbeDevice {
                 self.transmit_addrs[tx_index] = Some(packet);
                 self.tx_slot[tx_index] = true;
 
-                
                 // println!("driver sending tx_index {}", tx_index);
 
                 // println!("driver sending packet@ {:x} self.transmit_index {} self.tx_clean_index {} tx_clean_index {}
@@ -2841,14 +2841,13 @@ impl IxgbeDevice {
             self.write_qreg_idx(IxgbeDmaArrayRegs::Tdt, 0, tx_index as u64);
             self.transmit_index = tx_index;
         }
-        
+
         let mut reaped = 0;
         let mut count = 0;
         let batch = BATCH_SIZE;
 
         loop {
-
-            if reap_queue.is_full(){
+            if reap_queue.is_full() {
                 break;
             }
 
@@ -2858,13 +2857,11 @@ impl IxgbeDevice {
 
             let status = unsafe {
                 core::ptr::read_volatile(
-                    &(*self.transmit_ring.as_ptr().add(tx_clean_index)).wb.status
-                        as *const u32,
+                    &(*self.transmit_ring.as_ptr().add(tx_clean_index)).wb.status as *const u32,
                 )
             };
 
             if (status & IXGBE_ADVTXD_STAT_DD) != 0 {
-
                 // log::info!("tx_clean_index {}
                 // self.transmit_index {}
                 // self.tx_clean_index {}
@@ -2872,12 +2869,8 @@ impl IxgbeDevice {
                 // self.tx_slot {:?}", tx_clean_index,  self.transmit_index,self.tx_clean_index,self.transmit_ring.len(), self.tx_slot);
 
                 if self.tx_slot[tx_clean_index] {
-                    if let Some(pkt) =
-                        self.transmit_addrs[tx_clean_index].take()
-                    {
-                        while reap_queue.try_push(&pkt) == false {
-
-                        }
+                    if let Some(pkt) = self.transmit_addrs[tx_clean_index].take() {
+                        while reap_queue.try_push(&pkt) == false {}
                         // println!("driver sent tx_clean_index {}", tx_clean_index);
                         // println!("driver sent packet@ {:x} self.transmit_index {} self.tx_clean_index {} tx_clean_index {}
                         // self.tx_slot {:?}
@@ -2887,12 +2880,11 @@ impl IxgbeDevice {
                     self.transmit_addrs[tx_clean_index] = None;
                 }
                 tx_clean_index = wrap_ring(tx_clean_index, self.transmit_ring.len());
-            }else{
+            } else {
                 break;
             }
 
             count += 1;
-
         }
         self.tx_clean_index = tx_clean_index;
     }
@@ -2947,7 +2939,7 @@ impl IxgbeDevice {
                 //             while reap_queue.try_push(&pkt) == false{
 
                 //             }
-                            
+
                 //             // log::info!("driver received @ {:x}", pkt.addr);
                 //             //received_packets += 1;
                 //         } else {
@@ -2991,92 +2983,83 @@ impl IxgbeDevice {
         }
 
         if rx_index != self.receive_index {
-                // println!(
-                //     "Update rdt from {} to {}",
-                //     self.read_qreg_idx(IxgbeDmaArrayRegs::Rdt, 0),
-                //     rx_index
-                // );
-                // println!("rx_index {} clean_index {}", rx_index, self.rx_clean_index);
+            // println!(
+            //     "Update rdt from {} to {}",
+            //     self.read_qreg_idx(IxgbeDmaArrayRegs::Rdt, 0),
+            //     rx_index
+            // );
+            // println!("rx_index {} clean_index {}", rx_index, self.rx_clean_index);
             self.write_qreg_idx(IxgbeDmaArrayRegs::Rdt, 0, rx_index as u64);
             self.receive_index = rx_index;
         }
 
-            let mut reaped = 0;
-            let batch = BATCH_SIZE;
-            let mut count = 0;
-            //println!("reap_queue {} ", reap_queue.len());
+        let mut reaped = 0;
+        let batch = BATCH_SIZE;
+        let mut count = 0;
+        //println!("reap_queue {} ", reap_queue.len());
 
-            loop {
-
-                // println!("rx_clean_index: {} 
-                // rx_index: {}
-                // self.rx_slot: {:#?}", rx_clean_index, rx_index,self.rx_slot);
-                if reap_queue.is_full(){
-                    break;
-                }
-
-                if rx_clean_index == rx_index || count == batch {
-                    // println!("break; rx_clean_index{} rx_index {}",rx_clean_index, rx_index );
-                    break;
-                }
-
-                let mut desc = unsafe {
-                    &mut *(self.receive_ring.as_ptr().add(rx_clean_index) as *mut ixgbe_adv_rx_desc)
-                };
-
-                let status = unsafe {
-                    core::ptr::read_volatile(&mut (*desc).wb.upper.status_error as *mut u32)
-                };
-
-                if debug {
-                    println!("checking status[{}] {:x}", rx_clean_index, status);
-                }
-
-                if (status & IXGBE_RXDADV_STAT_DD) == 0 {
-                    break;
-                }
-                // log::info!("driver sent rx_clean_index {}", rx_clean_index);
-                if ((status & IXGBE_RXDADV_STAT_DD) != 0) && ((status & IXGBE_RXDADV_STAT_EOP) == 0)
-                {
-                    panic!("increase buffer size or decrease MTU")
-                }
-
-                if self.rx_slot[rx_clean_index] {
-                    if let Some(mut pkt) =
-                        self.receive_addrs[rx_clean_index].take()
-                    {
-                        let length = unsafe {
-                            core::ptr::read_volatile(&(*desc).wb.upper.length as *const u16)
-                                as usize
-                        };
-                        //log::info!("length {}", length);
-
-                        //let mut buf = pkt.as_mut_ptr();
-                        //let vec = unsafe { Vec::from_raw_parts(buf, length, pkt.capacity()) };
-                        //if length <= pkt.len {
-                        pkt.len = length;
-                        while reap_queue.try_push(&pkt) == false{
-
-                        }
-                    }
-                    self.rx_slot[rx_clean_index] = false;
-                    self.receive_addrs[rx_clean_index] = None;
-                    reaped += 1;
-                }else{
-                    // log::info!("driver received rx_clean_index @ {:?} on empty slot", rx_clean_index);
-                }
-                rx_clean_index = wrap_ring(rx_clean_index, self.receive_ring.len());
-
-                count += 1;
+        loop {
+            // println!("rx_clean_index: {}
+            // rx_index: {}
+            // self.rx_slot: {:#?}", rx_clean_index, rx_index,self.rx_slot);
+            if reap_queue.is_full() {
+                break;
             }
+
+            if rx_clean_index == rx_index || count == batch {
+                // println!("break; rx_clean_index{} rx_index {}",rx_clean_index, rx_index );
+                break;
+            }
+
+            let mut desc = unsafe {
+                &mut *(self.receive_ring.as_ptr().add(rx_clean_index) as *mut ixgbe_adv_rx_desc)
+            };
+
+            let status =
+                unsafe { core::ptr::read_volatile(&mut (*desc).wb.upper.status_error as *mut u32) };
 
             if debug {
-                println!("clean_index {}", rx_clean_index);
+                println!("checking status[{}] {:x}", rx_clean_index, status);
             }
 
-            //println!("reap_queue_after {}\n", reap_queue.len());
-        
-            self.rx_clean_index = rx_clean_index;
+            if (status & IXGBE_RXDADV_STAT_DD) == 0 {
+                break;
+            }
+            // log::info!("driver sent rx_clean_index {}", rx_clean_index);
+            if ((status & IXGBE_RXDADV_STAT_DD) != 0) && ((status & IXGBE_RXDADV_STAT_EOP) == 0) {
+                panic!("increase buffer size or decrease MTU")
+            }
 
+            if self.rx_slot[rx_clean_index] {
+                if let Some(mut pkt) = self.receive_addrs[rx_clean_index].take() {
+                    let length = unsafe {
+                        core::ptr::read_volatile(&(*desc).wb.upper.length as *const u16) as usize
+                    };
+                    //log::info!("length {}", length);
+
+                    //let mut buf = pkt.as_mut_ptr();
+                    //let vec = unsafe { Vec::from_raw_parts(buf, length, pkt.capacity()) };
+                    //if length <= pkt.len {
+                    pkt.len = length;
+                    while reap_queue.try_push(&pkt) == false {}
+                }
+                self.rx_slot[rx_clean_index] = false;
+                self.receive_addrs[rx_clean_index] = None;
+                reaped += 1;
+            } else {
+                // log::info!("driver received rx_clean_index @ {:?} on empty slot", rx_clean_index);
+            }
+            rx_clean_index = wrap_ring(rx_clean_index, self.receive_ring.len());
+
+            count += 1;
+        }
+
+        if debug {
+            println!("clean_index {}", rx_clean_index);
+        }
+
+        //println!("reap_queue_after {}\n", reap_queue.len());
+
+        self.rx_clean_index = rx_clean_index;
     }
 }

@@ -16,7 +16,7 @@ use constants::*;
 
 pub fn test_nvme_driver() {
     unsafe {
-        let pml4 = asys::sys_rd_io_cr3() as u64;
+        let pml4: u64 = asys::sys_rd_io_cr3() as u64;
         log::info!("IOMMUTable Root @ {:x?}", pml4);
         asys::sys_set_device_iommu(NVME_PCI_DEV.0, NVME_PCI_DEV.1, NVME_PCI_DEV.2, pml4);
     }
