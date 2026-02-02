@@ -4212,22 +4212,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
-name = "vfio-bindings"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4bc5b4aade27640cea4ee1ce50ef3614598050dc97e44714b9daea779d1b59a"
-
-[[package]]
-name = "vfio_tool"
-version = "0.1.0"
-dependencies = [
- "env_logger",
- "libc",
- "log",
- "vfio-bindings",
-]
-
-[[package]]
 name = "vstd"
 version = "0.1.0"
 source = "git+https://github.com/mars-research/verus?branch=mars#68dbc921b2b69ca7612ff02f2c1f62cc397e6610"

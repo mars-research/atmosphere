@@ -382,6 +382,24 @@ where
         }
     }
 
+    // E810 bar region 2
+    let mut cur = 0xFD000000;
+    let virt_base = USERSPACE_BASE;
+    while cur < 0xFD000000 + 0x10000 {
+        // while cur < 0xfebf_0000 + 0x1000 {
+        unsafe {
+            address_space.map(
+                page_table_allocator,
+                cur + virt_base,
+                cur,
+                true,
+                false,
+                true,
+            );
+            cur = cur + PAGE_SIZE as u64;
+        }
+    }
+
     elf.seek(SeekFrom::Start(dom_end as u64))
         .expect("dom0 incomplete");
 

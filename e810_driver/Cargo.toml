@@ -3,6 +3,10 @@ name = "e810_driver"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = []
+std = []
+
 [dependencies]
 # If your pcid crate is no_std, keep this. Otherwise remove and adapt.
 pcid = { path = "../pcid" }

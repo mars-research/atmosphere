@@ -634,6 +634,8 @@ pub extern "C" fn sys_iommu_mmap(va:usize, perm_bits:usize, range:usize, regs: &
     let mut kernel = KERNEL.lock();
     let thread_info = kernel.as_mut().unwrap().get_current_cpu_info(cpu_id);
 
+    log::trace!{"iommaping from {:x?} with {:#?} pages", va, range};
+
     let address_shareable = kernel.as_ref().unwrap().check_address_space_va_range_shareable(        thread_info.1.unwrap(),
         &vVaRange4K::new(va, range));
      log::trace!{"address_shareable {:#?}", address_shareable};
