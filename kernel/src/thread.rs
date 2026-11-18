@@ -38,25 +38,20 @@ pub unsafe fn start_thread(code: u64, stack: u64, ring: Ring) {
     interrupt::set_timer(TIME_SLICE);
 }
 
-/// Schedules the next thread, returning its time slice.
-pub fn schedule(regs: &mut Registers) -> Option<Cycles> {
-    // crate::debugger::breakpoint(1);
-    // let cpu = cpu::get_current();
-    // mem::swap(&mut cpu.parked, regs);
-    // Some(TIME_SLICE)
+/// Arms the timer for the first time slice of this CPU.
+pub fn start_time_slices() {
+    interrupt::set_timer(TIME_SLICE);
+}
 
-    log::debug!("hello from cpu {:?} scheduler",cpu::get_cpu_id());
-    loop{
-        // unsafe{
-        //     let has_next_thread = kernel::sched_get_next_thread(regs);
-        //     if has_next_thread == false{
-        //         for i in 0..1000{
-        //             asm!("nop");
-        //         }
-        //     }else{
-        //         break;
-        //     }
-        // }
+/// Handles the end of a time slice, returning the next one.
+///
+/// `regs` is the interrupted context. If the kernel switches threads, it replaces `regs` with the
+/// context of the next thread, and the interrupt return resumes that thread.
+pub fn schedule(regs: &mut Registers) -> Option<Cycles> {
+    // Only a thread in user mode is preempted. The kernel runs syscalls with interrupts off, so an
+    // interrupted kernel context is boot code or an idle loop, and it has no thread to save.
+    if regs.cs & 3 == Ring::Ring3 as u64 {
+        kernel::timer_preempt(regs);
     }
-    None
+    Some(TIME_SLICE)
 }

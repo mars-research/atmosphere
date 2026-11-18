@@ -150,6 +150,11 @@ extern "C" fn main(boot_info: *const BootInfo) -> isize {
             (0, 0)
         };
 
+        // Start time slices. Interrupts stay off until the sysret, so the first timer interrupt
+        // is taken in user mode.
+        asm!("cli");
+        thread::start_time_slices();
+
         enter_userspace(dom0.entry_point, initial_sp as *mut _, rdi, rsi);
     }
 
@@ -246,6 +251,8 @@ unsafe fn enter_userspace(pc: *const c_void, sp: *mut c_void, rdi: u64, rsi: u64
         "mov rsp, {sp}",
         // HACK: Set IOPL to 3 unconditionally for accessing io ports from dom0
         "or r11, (3 << 12)",
+        // The caller turned interrupts off; user mode runs with them on.
+        "or r11, (1 << 9)",
         "sysretq",
 
         in("rcx") pc,

@@ -192,6 +192,30 @@ pub fn kernel_init(
     log::trace!("Kernel init success!! XD");
 }
 
+/// Ends the time slice of the thread that the timer interrupted in user mode.
+///
+/// `regs` is the interrupted context. The verified kernel picks the next thread and puts its
+/// context in `regs`; the interrupt return restores all of it, whatever way the next thread
+/// left the CPU.
+pub fn timer_preempt(regs: &mut vRegisters) {
+    let cpu_id = cpu::get_cpu_id();
+    // Syscalls run with interrupts off, so the lock is free. Skip the slice otherwise.
+    let Some(mut guard) = KERNEL.try_lock() else {
+        return;
+    };
+    let Some(kernel) = guard.as_mut() else {
+        return;
+    };
+
+    let prev_pcid = kernel.get_current_cpu_info(cpu_id).4;
+    let ret = kernel.timer_interrupt(cpu_id, regs);
+    if let (Some(cr3), Some(pcid)) = (ret.cr3, ret.pcid) {
+        if Some(pcid) != prev_pcid {
+            Bridge::set_cr3((cr3 | pcid | vdefine::PCID_ENABLE_MASK) as u64);
+        }
+    }
+}
+
 pub extern "C" fn sys_mmap(va:usize, perm_bits:usize, range:usize, regs: &mut vRegisters) {
     let cpu_id = cpu::get_cpu_id();
     let mut kernel = KERNEL.lock();
@@ -439,6 +463,12 @@ pub extern "C" fn sys_receive_empty(endpoint_index:usize, _:usize, _:usize, regs
     // switchdecision: {:x?}", sche_ret.is_error(), sche_ret.pcid, sche_ret.cr3, sche_ret.switch_decision};
         if pcid != sche_ret.pcid.unwrap(){
             Bridge::set_cr3((sche_ret.cr3.unwrap() | sche_ret.pcid.unwrap() | vdefine::PCID_ENABLE_MASK) as u64);
+        }
+        // The next thread may have lost the CPU to the timer instead of entering a syscall.
+        // `regs` then holds its whole context, and the exit path must restore every register.
+        if matches!(sche_ret.switch_decision, verified::define::SwitchDecision::SwitchPreempted) {
+            Bridge::set_switch_decision(SwitchDecision::SwitchToPreempted);
+            return;
         }
     }
     
