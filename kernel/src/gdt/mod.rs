@@ -10,11 +10,16 @@
 //! ## GDT Entries
 //!
 //! * 0 - Null
-//! * 1 - Kernel Data
-//! * 2 - Kernel Code
+//! * 1 - Kernel Code
+//! * 2 - Kernel Data
 //! * 3 - User Data
 //! * 4 - User Code
 //! * 5,6 - TSS
+//!
+//! The order is fixed by `syscall` and `sysret`, which derive the selectors from the two bases in
+//! the STAR register without reading the table: `syscall` loads CS = base and SS = base + 8, and
+//! the 64-bit `sysret` loads SS = base + 8 and CS = base + 16. An `iret` does read the table, so
+//! the selectors that those instructions load must name the matching descriptors.
 
 mod types;
 
@@ -125,11 +130,11 @@ pub struct GlobalDescriptorTable {
     /// Null entry.
     _null: GdtEntry,
 
-    /// Kernel data.
-    pub kernel_data: GdtEntry,
-
     /// Kernel code.
     pub kernel_code: GdtEntry,
+
+    /// Kernel data.
+    pub kernel_data: GdtEntry,
 
     /// User data.
     pub user_data: GdtEntry,
@@ -144,8 +149,8 @@ pub struct GlobalDescriptorTable {
 }
 
 impl GlobalDescriptorTable {
-    pub const KERNEL_DATA_INDEX: u16 = 1;
-    pub const KERNEL_CODE_INDEX: u16 = 2;
+    pub const KERNEL_CODE_INDEX: u16 = 1;
+    pub const KERNEL_DATA_INDEX: u16 = 2;
     pub const USER_DATA_INDEX: u16 = 3;
     pub const USER_CODE_INDEX: u16 = 4;
     pub const TSS_INDEX: u16 = 5;

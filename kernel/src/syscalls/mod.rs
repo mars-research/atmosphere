@@ -16,6 +16,9 @@ use verified::trap::Registers;
 const SYSCALL32_ENTRY: u64 = 0; // nein
 const SYSCALL32_ENTRY_EIP: u32 = 0; // nein
 
+/// Flags cleared on syscall entry: TF (8), IF (9), DF (10), AC (18).
+const SYSCALL_FLAG_MASK: u64 = (1 << 8) | (1 << 9) | (1 << 10) | (1 << 18);
+
 static mut SYSCALLS: [u64; MAX_SYSCALLS] = [0; MAX_SYSCALLS];
 
 static mut CPU0_SYSCALL_STACK: [u8; 4 * 1024 * 1024] = [0; 4 * 1024 * 1024];
@@ -27,13 +30,14 @@ static mut CPU0_SYSCALL_SP: u64 = 0;
 pub unsafe fn init_cpu() {
     use GlobalDescriptorTable as GDT;
 
-    // index - 1 because syscall and sysret will add 8 (cs) or 16 (ss) to those values
-    let kernel_seg = SegmentSelector::new(GDT::KERNEL_CODE_INDEX - 1, Ring::Ring0);
-    let user_seg = SegmentSelector::new(GDT::USER_CODE_INDEX - 1, Ring::Ring3);
+    // syscall loads CS = STAR[47:32] and SS = STAR[47:32] + 8.
+    let kernel_seg = SegmentSelector::new(GDT::KERNEL_CODE_INDEX, Ring::Ring0);
+    // The 64-bit sysret loads SS = STAR[63:48] + 8 and CS = STAR[63:48] + 16.
+    let user_seg = SegmentSelector::new(GDT::USER_DATA_INDEX - 1, Ring::Ring3);
 
     // Set STAR
-    let star = ((kernel_seg.bits() as u64) << 48)
-        | ((user_seg.bits() as u64) << 32)
+    let star = ((user_seg.bits() as u64) << 48)
+        | ((kernel_seg.bits() as u64) << 32)
         | (SYSCALL32_ENTRY_EIP as u64);
     msr::wrmsr(msr::IA32_STAR, star);
 
@@ -42,6 +46,10 @@ pub unsafe fn init_cpu() {
 
     // Set LSTAR - 32-bit syscall entry
     msr::wrmsr(msr::IA32_CSTAR, SYSCALL32_ENTRY);
+
+    // Set FMASK - the flags that the syscall instruction clears. Syscall handlers hold the kernel
+    // lock and run on the syscall stack, so the timer interrupt must not arrive inside one.
+    msr::wrmsr(msr::IA32_FMASK, SYSCALL_FLAG_MASK);
 
     // Enable EFER Bit 0 - System Call Extensions
     let mut efer = msr::rdmsr(msr::IA32_EFER);
