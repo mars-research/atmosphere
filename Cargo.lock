@@ -179,6 +179,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "atmo-rt"
+version = "0.1.0"
+dependencies = [
+ "asys",
+ "log",
+]
+
+[[package]]
 name = "atomic-polyfill"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

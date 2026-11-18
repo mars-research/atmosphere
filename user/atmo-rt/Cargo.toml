@@ -1,0 +1,13 @@
+[package]
+name = "atmo-rt"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "C runtime for Atmosphere: tasks, synchronization, time, console"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+asys = { path = "../../asys" }
+log = "0.4.19"

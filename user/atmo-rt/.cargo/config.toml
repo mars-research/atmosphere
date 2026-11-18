@@ -1,0 +1,12 @@
+[build]
+target = "../../dom0/src/x86_64-unknown-aloader.json"
+
+[unstable]
+build-std = [ "core" ]
+build-std-features = [ "compiler-builtins-mem" ]
+unstable-options = true
+json-target-spec = true
+
+# Rust 1.99.1 is a stable compiler: unlock -Z flags and build-std.
+[env]
+RUSTC_BOOTSTRAP = "1"
