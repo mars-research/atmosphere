@@ -5,6 +5,13 @@ verus! {
 pub struct TrapFrameOption {
     pub reg: Registers,
     pub exists: bool,
+    /// Whether `reg` is the whole context of a thread that an interrupt took off the CPU.
+    ///
+    /// A thread that entered the kernel through a syscall expects back only the registers that a
+    /// syscall preserves, and the fast copies below save and restore just those. A preempted
+    /// thread needs every register back. Each function that saves a context sets this flag, and
+    /// whoever resumes the thread reads it to choose how much to restore.
+    pub preempted: bool,
 }
 
 impl TrapFrameOption {
@@ -57,8 +64,10 @@ impl TrapFrameOption {
         ensures
             self.is_Some(),
             self.get_Some_0() =~= src,
+            !self.preempted,
     {
         self.exists = true;
+        self.preempted = false;
         self.reg.rbx = src.rbx;
         self.reg.rbp = src.rbp;
         self.reg.r12 = src.r12;
@@ -74,9 +83,33 @@ impl TrapFrameOption {
         ensures
             self.is_Some(),
             self.get_Some_0() =~= src,
+            !self.preempted,
     {
         self.exists = true;
+        self.preempted = false;
         self.reg = *src;
+    }
+
+    /// Saves the whole context of a thread that an interrupt took off the CPU.
+    pub fn set_self_preempted(&mut self, src: &Registers)
+        ensures
+            self.is_Some(),
+            self.get_Some_0() =~= src,
+            self.preempted,
+    {
+        self.exists = true;
+        self.preempted = true;
+        self.reg = *src;
+    }
+
+    /// Marks the saved context as consumed. The registers stay.
+    pub fn clear_preempted(&mut self)
+        ensures
+            !self.preempted,
+            self.exists == old(self).exists,
+            self.reg == old(self).reg,
+    {
+        self.preempted = false;
     }
 
     #[verifier(external_body)]
@@ -117,7 +150,7 @@ impl TrapFrameOption {
         ensures
             ret.is_None(),
     {
-        Self { reg: Registers::zeroed(), exists: false }
+        Self { reg: Registers::zeroed(), exists: false, preempted: false }
     }
 }
 
@@ -217,6 +250,46 @@ impl Registers {
             ss: input.ss,
         };
         ret
+    }
+
+    /// Clears the registers that a syscall does not preserve.
+    ///
+    /// When an interrupt hands the CPU to a thread that waits inside a syscall, the fast restore
+    /// fills in the registers the thread expects back. The others still hold the values of the
+    /// interrupted thread and must not reach the next one.
+    pub fn clear_caller_saved(&mut self)
+        ensures
+            self.rax == 0,
+            self.rdi == 0,
+            self.rsi == 0,
+            self.rdx == 0,
+            self.rcx == 0,
+            self.r8 == 0,
+            self.r9 == 0,
+            self.r10 == 0,
+            self.r11 == 0,
+            self.rbx == old(self).rbx,
+            self.rbp == old(self).rbp,
+            self.r12 == old(self).r12,
+            self.r13 == old(self).r13,
+            self.r14 == old(self).r14,
+            self.r15 == old(self).r15,
+            self.error_code == old(self).error_code,
+            self.rip == old(self).rip,
+            self.cs == old(self).cs,
+            self.flags == old(self).flags,
+            self.rsp == old(self).rsp,
+            self.ss == old(self).ss,
+    {
+        self.rax = 0;
+        self.rdi = 0;
+        self.rsi = 0;
+        self.rdx = 0;
+        self.rcx = 0;
+        self.r8 = 0;
+        self.r9 = 0;
+        self.r10 = 0;
+        self.r11 = 0;
     }
 
     #[verifier(external_body)]

@@ -19,6 +19,7 @@ pub mod impl_kill_container;
 pub mod proc_util_t;
 pub mod spec_proof;
 pub mod impl_base;
+pub mod impl_preempt;
 pub mod spec_util;
 pub mod thread;
 pub mod thread_util_t;

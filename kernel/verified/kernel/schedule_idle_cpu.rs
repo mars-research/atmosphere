@@ -37,9 +37,15 @@ impl Kernel {
             return SyscallReturnStruct::NoNextThreadNew(RetValueType::Error);
         }
         let ret_thread_ptr = self.proc_man.pop_scheduler_for_idle_cpu(cpu_id, pt_regs);
+        // The fast restore above is enough for a thread that entered the kernel through a
+        // syscall. A thread that an interrupt took off the CPU gets every register back.
+        let preempted = self.proc_man.take_preempted_trap_frame(ret_thread_ptr, pt_regs);
         let proc_ptr = self.proc_man.get_thread(ret_thread_ptr).owning_proc;
         let pcid = self.proc_man.get_proc(proc_ptr).pcid;
         let cr3 = self.mem_man.get_cr3_by_pcid(pcid);
+        if preempted {
+            return SyscallReturnStruct::SwitchPreemptedNew(RetValueType::Else, cr3, pcid);
+        }
         return SyscallReturnStruct::SwitchNew(RetValueType::Else, cr3, pcid);
     }
 }

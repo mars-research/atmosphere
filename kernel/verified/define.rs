@@ -281,6 +281,9 @@ pub enum SwitchDecision {
     NoSwitch,
     NoThread,
     Switch,
+    /// A switch to a thread that an interrupt took off the CPU. The trap frame holds the whole
+    /// context of the thread, and the kernel must restore every register on the way out.
+    SwitchPreempted,
 }
 
 #[derive(Clone, Copy)]
@@ -398,6 +401,21 @@ impl SyscallReturnStruct {
             pcid: Some(pcid),
             cr3: Some(cr3),
             switch_decision: SwitchDecision::Switch,
+        };
+    }
+
+    pub fn SwitchPreemptedNew(error_code: RetValueType, cr3: usize, pcid: Pcid) -> (ret: Self)
+        ensures
+            ret.error_code == error_code,
+            ret.pcid =~= Some(pcid),
+            ret.cr3 =~= Some(cr3),
+            ret.switch_decision == SwitchDecision::SwitchPreempted,
+    {
+        return Self {
+            error_code: error_code,
+            pcid: Some(pcid),
+            cr3: Some(cr3),
+            switch_decision: SwitchDecision::SwitchPreempted,
         };
     }
 }

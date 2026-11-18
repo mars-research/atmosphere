@@ -2,6 +2,7 @@ pub mod create_and_map_pages;
 pub mod create_and_share_pages;
 pub mod mem_util;
 pub mod schedule_idle_cpu;
+pub mod kernel_timer_interrupt;
 pub mod send_receive_pre_spec;
 pub mod spec;
 pub mod spec_util;

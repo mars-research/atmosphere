@@ -116,6 +116,10 @@ impl ProcessManager {
         }
     }
 
+    // This proof is sensitive to the size of the Thread type: one more field in the trap frame
+    // takes it past the default limit. The solver spends the time on the pairwise quantifiers of
+    // pcid_ioid_wf, which this function does not affect.
+    #[verifier::rlimit(20)]
     pub fn set_container_mem_quota_mem_4k(&mut self, container_ptr: ContainerPtr, new_quota: usize)
         requires
             old(self).wf(),
@@ -2045,6 +2049,18 @@ impl ProcessManager {
             old(self).get_thread(ret).endpoint_descriptors =~= self.get_thread(
                 ret,
             ).endpoint_descriptors,
+            ret == old(self).get_container(
+                old(self).cpu_list@[cpu_id as int].owning_container,
+            ).scheduler@[0],
+            self.cpu_list@[cpu_id as int].current_thread == Some(ret),
+            self.cpu_list@[cpu_id as int].owning_container
+                == old(self).cpu_list@[cpu_id as int].owning_container,
+            self.cpu_list@[cpu_id as int].active,
+            forall|cpu_i: CpuId|
+                #![trigger self.cpu_list@[cpu_i as int]]
+                0 <= cpu_i < NUM_CPUS && cpu_i != cpu_id ==> self.cpu_list@[cpu_i as int] == old(
+                    self,
+                ).cpu_list@[cpu_i as int],
     {
         broadcast use ProcessManager::reveal_process_manager_wf;
         
